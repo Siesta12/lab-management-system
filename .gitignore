@@ -1,0 +1,47 @@
+﻿# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Maven / Java / Spring Boot
+.m2/
+backend/target/
+backend/.mvn-local-settings.xml
+backend/.idea/
+backend/*.log
+backend/hs_err_pid*
+backend/replay_pid*
+
+# Frontend / Node / Vue
+frontend/node_modules/
+frontend/dist/
+frontend/.idea/
+frontend/.vite/
+frontend/*.log
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~

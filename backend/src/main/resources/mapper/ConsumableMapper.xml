@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nlt.mapper.ConsumableMapper">
+    <select id="selectPage" resultType="com.nlt.domain.entity.ConsumableEntity">
+        select *
+        from lab_consumable
+        where deleted = 0
+        <if test="labId != null">
+            and lab_id = #{labId}
+        </if>
+        <if test="consumableName != null and consumableName != ''">
+            and consumable_name like concat('%', #{consumableName}, '%')
+        </if>
+        <if test="consumableCode != null and consumableCode != ''">
+            and consumable_code like concat('%', #{consumableCode}, '%')
+        </if>
+        order by id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(*)
+        from lab_consumable
+        where deleted = 0
+        <if test="labId != null">
+            and lab_id = #{labId}
+        </if>
+        <if test="consumableName != null and consumableName != ''">
+            and consumable_name like concat('%', #{consumableName}, '%')
+        </if>
+        <if test="consumableCode != null and consumableCode != ''">
+            and consumable_code like concat('%', #{consumableCode}, '%')
+        </if>
+    </select>
+
+    <select id="selectById" resultType="com.nlt.domain.entity.ConsumableEntity">
+        select *
+        from lab_consumable
+        where id = #{id}
+            and deleted = 0
+    </select>
+
+    <select id="selectWarningList" resultType="com.nlt.domain.entity.ConsumableEntity">
+        select *
+        from lab_consumable
+        where deleted = 0
+            and stock_quantity &lt;= warning_threshold
+        order by id desc
+    </select>
+
+    <insert id="insert"
+                    parameterType="com.nlt.domain.entity.ConsumableEntity"
+                    useGeneratedKeys="true"
+                    keyProperty="id">
+        insert into lab_consumable(
+            lab_id,
+            consumable_name,
+            consumable_code,
+            unit,
+            stock_quantity,
+            warning_threshold,
+            remark,
+            deleted
+        )
+        values(
+            #{labId},
+            #{consumableName},
+            #{consumableCode},
+            #{unit},
+            #{stockQuantity},
+            #{warningThreshold},
+            #{remark},
+            0
+        )
+    </insert>
+
+    <update id="update" parameterType="com.nlt.domain.entity.ConsumableEntity">
+        update lab_consumable
+        set lab_id = #{labId},
+                consumable_name = #{consumableName},
+                consumable_code = #{consumableCode},
+                unit = #{unit},
+                stock_quantity = #{stockQuantity},
+                warning_threshold = #{warningThreshold},
+                remark = #{remark}
+        where id = #{id}
+            and deleted = 0
+    </update>
+
+    <update id="updateStock">
+        update lab_consumable
+        set stock_quantity = #{stockQuantity}
+        where id = #{id}
+            and deleted = 0
+    </update>
+
+    <update id="softDelete">
+        update lab_consumable
+        set deleted = 1
+        where id = #{id}
+            and deleted = 0
+    </update>
+</mapper>

@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nlt.mapper.ReservationMapper">
+    <select id="selectPage" resultType="com.nlt.domain.entity.ReservationEntity">
+        select *
+        from lab_reservation
+        where 1 = 1
+        <if test="reservationNo != null and reservationNo != ''">
+            and reservation_no like concat('%', #{reservationNo}, '%')
+        </if>
+        <if test="labId != null">
+            and lab_id = #{labId}
+        </if>
+        <if test="applicantUserId != null">
+            and applicant_user_id = #{applicantUserId}
+        </if>
+        <if test="approverUserId != null">
+            and approver_user_id = #{approverUserId}
+        </if>
+        <if test="status != null">
+            and status = #{status}
+        </if>
+        <if test="reservationDate != null">
+            and reservation_date = #{reservationDate}
+        </if>
+        order by id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(*)
+        from lab_reservation
+        where 1 = 1
+        <if test="reservationNo != null and reservationNo != ''">
+            and reservation_no like concat('%', #{reservationNo}, '%')
+        </if>
+        <if test="labId != null">
+            and lab_id = #{labId}
+        </if>
+        <if test="applicantUserId != null">
+            and applicant_user_id = #{applicantUserId}
+        </if>
+        <if test="approverUserId != null">
+            and approver_user_id = #{approverUserId}
+        </if>
+        <if test="status != null">
+            and status = #{status}
+        </if>
+        <if test="reservationDate != null">
+            and reservation_date = #{reservationDate}
+        </if>
+    </select>
+
+    <select id="selectById" resultType="com.nlt.domain.entity.ReservationEntity">
+        select *
+        from lab_reservation
+        where id = #{id}
+    </select>
+
+    <select id="selectMine" resultType="com.nlt.domain.entity.ReservationEntity">
+        select *
+        from lab_reservation
+        where applicant_user_id = #{userId}
+        order by id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="countMine" resultType="long">
+        select count(*)
+        from lab_reservation
+        where applicant_user_id = #{userId}
+    </select>
+
+    <select id="selectPendingAudit" resultType="com.nlt.domain.entity.ReservationEntity">
+        select *
+        from lab_reservation
+        where status = 1
+        order by id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="countPendingAudit" resultType="long">
+        select count(*)
+        from lab_reservation
+        where status = 1
+    </select>
+
+    <insert id="insert"
+                    parameterType="com.nlt.domain.entity.ReservationEntity"
+                    useGeneratedKeys="true"
+                    keyProperty="id">
+        insert into lab_reservation(
+            reservation_no,
+            lab_id,
+            applicant_user_id,
+            approver_user_id,
+            reservation_type,
+            priority_level,
+            reservation_date,
+            start_time,
+            end_time,
+            usage_purpose,
+            course_or_project_name,
+            participant_count,
+            contact_phone,
+            status,
+            reject_reason,
+            check_in_time,
+            check_out_time
+        )
+        values(
+            #{reservationNo},
+            #{labId},
+            #{applicantUserId},
+            #{approverUserId},
+            #{reservationType},
+            #{priorityLevel},
+            #{reservationDate},
+            #{startTime},
+            #{endTime},
+            #{usagePurpose},
+            #{courseOrProjectName},
+            #{participantCount},
+            #{contactPhone},
+            #{status},
+            #{rejectReason},
+            #{checkInTime},
+            #{checkOutTime}
+        )
+    </insert>
+
+    <update id="updateAuditResult" parameterType="com.nlt.domain.entity.ReservationEntity">
+        update lab_reservation
+        set approver_user_id = #{approverUserId},
+                status = #{status},
+                reject_reason = #{rejectReason}
+        where id = #{id}
+    </update>
+
+    <update id="cancel">
+        update lab_reservation
+        set status = 4
+        where id = #{id}
+    </update>
+
+    <update id="checkIn">
+        update lab_reservation
+        set check_in_time = now()
+        where id = #{id}
+    </update>
+
+    <update id="checkOut">
+        update lab_reservation
+        set check_out_time = now(),
+                status = 5
+        where id = #{id}
+    </update>
+
+    <select id="countConflict" resultType="int">
+        select count(*)
+        from lab_reservation
+        where lab_id = #{labId}
+            and status in (1, 2, 5)
+            and start_time &lt; #{endTime}
+            and end_time &gt; #{startTime}
+    </select>
+
+    <select id="selectByLabAndDate" resultType="com.nlt.domain.entity.ReservationEntity">
+        select *
+        from lab_reservation
+        where lab_id = #{labId}
+            and status in (1, 2, 5)
+            and reservation_date = #{reservationDate}
+        order by start_time asc
+    </select>
+
+    <select id="countByReservationType" resultType="map">
+        select reservation_type as name, count(*) as count
+        from lab_reservation
+        where 1 = 1
+        <if test="startDate != null">
+            and reservation_date <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null">
+            and reservation_date <![CDATA[ <= ]]> #{endDate}
+        </if>
+        <if test="labId != null">
+            and lab_id = #{labId}
+        </if>
+        group by reservation_type
+    </select>
+
+    <select id="countByStatus" resultType="map">
+        select status as name, count(*) as count
+        from lab_reservation
+        where 1 = 1
+        <if test="startDate != null">
+            and reservation_date <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null">
+            and reservation_date <![CDATA[ <= ]]> #{endDate}
+        </if>
+        <if test="labId != null">
+            and lab_id = #{labId}
+        </if>
+        group by status
+    </select>
+
+    <select id="countByLabUsage" resultType="map">
+        select l.lab_name as name, count(r.id) as count
+        from lab l
+        left join lab_reservation r on l.id = r.lab_id
+        where l.deleted = 0
+        <if test="departmentId != null">
+            and l.department_id = #{departmentId}
+        </if>
+        <if test="labId != null">
+            and l.id = #{labId}
+        </if>
+        <if test="startDate != null">
+            and (r.id is null or r.reservation_date <![CDATA[ >= ]]> #{startDate})
+        </if>
+        <if test="endDate != null">
+            and (r.id is null or r.reservation_date <![CDATA[ <= ]]> #{endDate})
+        </if>
+        group by l.id, l.lab_name
+        order by count desc, l.id asc
+    </select>
+
+    <select id="countByTimeDistribution" resultType="map">
+        select date_format(start_time, '%H:00') as name, count(*) as count
+        from lab_reservation
+        where 1 = 1
+        <if test="startDate != null">
+            and reservation_date <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null">
+            and reservation_date <![CDATA[ <= ]]> #{endDate}
+        </if>
+        <if test="labId != null">
+            and lab_id = #{labId}
+        </if>
+        group by date_format(start_time, '%H:00')
+        order by name asc
+    </select>
+
+    <select id="reservationTrend" resultType="map">
+        select date_format(reservation_date, '%Y-%m-%d') as name, count(*) as count
+        from lab_reservation
+        where 1 = 1
+        <if test="startDate != null">
+            and reservation_date <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null">
+            and reservation_date <![CDATA[ <= ]]> #{endDate}
+        </if>
+        group by reservation_date
+        order by reservation_date asc
+    </select>
+</mapper>

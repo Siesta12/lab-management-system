@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nlt.mapper.LabMapper">
+    <select id="selectPage" resultType="com.nlt.domain.entity.LabEntity">
+        select *
+        from lab
+        where deleted = 0
+        <if test="labName != null and labName != ''">
+            and lab_name like concat('%', #{labName}, '%')
+        </if>
+        <if test="labCode != null and labCode != ''">
+            and lab_code like concat('%', #{labCode}, '%')
+        </if>
+        <if test="labType != null and labType != ''">
+            and lab_type = #{labType}
+        </if>
+        <if test="departmentId != null">
+            and department_id = #{departmentId}
+        </if>
+        <if test="openStatus != null">
+            and open_status = #{openStatus}
+        </if>
+        <if test="labStatus != null">
+            and lab_status = #{labStatus}
+        </if>
+        order by id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(*)
+        from lab
+        where deleted = 0
+        <if test="labName != null and labName != ''">
+            and lab_name like concat('%', #{labName}, '%')
+        </if>
+        <if test="labCode != null and labCode != ''">
+            and lab_code like concat('%', #{labCode}, '%')
+        </if>
+        <if test="labType != null and labType != ''">
+            and lab_type = #{labType}
+        </if>
+        <if test="departmentId != null">
+            and department_id = #{departmentId}
+        </if>
+        <if test="openStatus != null">
+            and open_status = #{openStatus}
+        </if>
+        <if test="labStatus != null">
+            and lab_status = #{labStatus}
+        </if>
+    </select>
+
+    <select id="selectById" resultType="com.nlt.domain.entity.LabEntity">
+        select *
+        from lab
+        where id = #{id}
+            and deleted = 0
+    </select>
+
+    <select id="selectOptions" resultType="com.nlt.domain.entity.LabEntity">
+        select *
+        from lab
+        where deleted = 0
+        <if test="openStatus != null">
+            and open_status = #{openStatus}
+        </if>
+        order by id asc
+    </select>
+
+    <insert id="insert"
+                    parameterType="com.nlt.domain.entity.LabEntity"
+                    useGeneratedKeys="true"
+                    keyProperty="id">
+        insert into lab(
+            department_id,
+            lab_code,
+            lab_name,
+            lab_type,
+            building_name,
+            room_no,
+            capacity,
+            manager_user_id,
+            open_status,
+            lab_status,
+            description,
+            usage_rule,
+            deleted
+        )
+        values(
+            #{departmentId},
+            #{labCode},
+            #{labName},
+            #{labType},
+            #{buildingName},
+            #{roomNo},
+            #{capacity},
+            #{managerUserId},
+            #{openStatus},
+            #{labStatus},
+            #{description},
+            #{usageRule},
+            0
+        )
+    </insert>
+
+    <update id="update" parameterType="com.nlt.domain.entity.LabEntity">
+        update lab
+        set department_id = #{departmentId},
+                lab_code = #{labCode},
+                lab_name = #{labName},
+                lab_type = #{labType},
+                building_name = #{buildingName},
+                room_no = #{roomNo},
+                capacity = #{capacity},
+                manager_user_id = #{managerUserId},
+                open_status = #{openStatus},
+                lab_status = #{labStatus},
+                description = #{description},
+                usage_rule = #{usageRule}
+        where id = #{id}
+            and deleted = 0
+    </update>
+
+    <update id="updateOpenStatus">
+        update lab
+        set open_status = #{status}
+        where id = #{id}
+            and deleted = 0
+    </update>
+
+    <update id="updateLabStatus">
+        update lab
+        set lab_status = #{status}
+        where id = #{id}
+            and deleted = 0
+    </update>
+
+    <update id="softDelete">
+        update lab
+        set deleted = 1
+        where id = #{id}
+            and deleted = 0
+    </update>
+
+    <select id="selectRecommendationCandidates" resultType="com.nlt.domain.entity.LabEntity">
+        select *
+        from lab
+        where deleted = 0
+            and open_status = 1
+            and lab_status = 1
+            and id != #{excludeLabId}
+        <if test="participantCount != null">
+            and capacity <![CDATA[ >= ]]> #{participantCount}
+        </if>
+        order by id asc
+    </select>
+</mapper>

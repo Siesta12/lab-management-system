@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nlt.mapper.RoleMapper">
+    <select id="selectPage" resultType="com.nlt.domain.entity.RoleEntity">
+        select *
+        from sys_role
+        where deleted = 0
+        <if test="roleName != null and roleName != ''">
+            and role_name like concat('%', #{roleName}, '%')
+        </if>
+        <if test="roleCode != null and roleCode != ''">
+            and role_code like concat('%', #{roleCode}, '%')
+        </if>
+        <if test="status != null">
+            and status = #{status}
+        </if>
+        order by id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(*)
+        from sys_role
+        where deleted = 0
+        <if test="roleName != null and roleName != ''">
+            and role_name like concat('%', #{roleName}, '%')
+        </if>
+        <if test="roleCode != null and roleCode != ''">
+            and role_code like concat('%', #{roleCode}, '%')
+        </if>
+        <if test="status != null">
+            and status = #{status}
+        </if>
+    </select>
+
+    <select id="selectById" resultType="com.nlt.domain.entity.RoleEntity">
+        select *
+        from sys_role
+        where id = #{id}
+            and deleted = 0
+    </select>
+
+    <select id="selectOptions" resultType="com.nlt.domain.entity.RoleEntity">
+        select *
+        from sys_role
+        where deleted = 0
+            and status = 1
+        order by id asc
+    </select>
+
+    <select id="selectByIds" resultType="com.nlt.domain.entity.RoleEntity">
+        select *
+        from sys_role
+        where deleted = 0
+            and status = 1
+        <if test="ids != null and ids.size() > 0">
+            and id in
+            <foreach collection="ids" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        </if>
+    </select>
+
+    <insert id="insert"
+                    parameterType="com.nlt.domain.entity.RoleEntity"
+                    useGeneratedKeys="true"
+                    keyProperty="id">
+        insert into sys_role(
+            role_name,
+            role_code,
+            description,
+            status,
+            deleted
+        )
+        values(
+            #{roleName},
+            #{roleCode},
+            #{description},
+            #{status},
+            0
+        )
+    </insert>
+
+    <update id="update" parameterType="com.nlt.domain.entity.RoleEntity">
+        update sys_role
+        set role_name = #{roleName},
+                role_code = #{roleCode},
+                description = #{description},
+                status = #{status}
+        where id = #{id}
+            and deleted = 0
+    </update>
+
+    <update id="softDelete">
+        update sys_role
+        set deleted = 1
+        where id = #{id}
+            and deleted = 0
+    </update>
+</mapper>

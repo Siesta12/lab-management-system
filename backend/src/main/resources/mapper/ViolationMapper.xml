@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nlt.mapper.ViolationMapper">
+    <select id="selectPage" resultType="com.nlt.domain.entity.ViolationRecordEntity">
+        select *
+        from user_violation_record
+        where 1 = 1
+        <if test="userId != null">
+            and user_id = #{userId}
+        </if>
+        <if test="reservationId != null">
+            and reservation_id = #{reservationId}
+        </if>
+        <if test="violationType != null">
+            and violation_type = #{violationType}
+        </if>
+        order by id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(*)
+        from user_violation_record
+        where 1 = 1
+        <if test="userId != null">
+            and user_id = #{userId}
+        </if>
+        <if test="reservationId != null">
+            and reservation_id = #{reservationId}
+        </if>
+        <if test="violationType != null">
+            and violation_type = #{violationType}
+        </if>
+    </select>
+
+    <select id="selectById" resultType="com.nlt.domain.entity.ViolationRecordEntity">
+        select *
+        from user_violation_record
+        where id = #{id}
+    </select>
+
+    <select id="selectMine" resultType="com.nlt.domain.entity.ViolationRecordEntity">
+        select *
+        from user_violation_record
+        where user_id = #{userId}
+        order by id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="countMine" resultType="long">
+        select count(*)
+        from user_violation_record
+        where user_id = #{userId}
+    </select>
+
+    <insert id="insert"
+                    parameterType="com.nlt.domain.entity.ViolationRecordEntity"
+                    useGeneratedKeys="true"
+                    keyProperty="id">
+        insert into user_violation_record(
+            user_id,
+            reservation_id,
+            violation_type,
+            score_change,
+            remark
+        )
+        values(
+            #{userId},
+            #{reservationId},
+            #{violationType},
+            #{scoreChange},
+            #{remark}
+        )
+    </insert>
+
+    <delete id="deleteById">
+        delete from user_violation_record
+        where id = #{id}
+    </delete>
+
+    <select id="countByType" resultType="map">
+        select violation_type as name, count(*) as count
+        from user_violation_record v
+        left join sys_user u on v.user_id = u.id
+        where 1 = 1
+        <if test="startDate != null">
+            and date(v.created_at) <![CDATA[ >= ]]> #{startDate}
+        </if>
+        <if test="endDate != null">
+            and date(v.created_at) <![CDATA[ <= ]]> #{endDate}
+        </if>
+        <if test="departmentId != null">
+            and u.department_id = #{departmentId}
+        </if>
+        <if test="violationType != null">
+            and violation_type = #{violationType}
+        </if>
+        group by violation_type
+    </select>
+</mapper>

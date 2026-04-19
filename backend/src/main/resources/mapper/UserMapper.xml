@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nlt.mapper.UserMapper">
+    <select id="selectPage" resultType="com.nlt.domain.entity.UserEntity">
+        select *
+        from sys_user
+        where deleted = 0
+        <if test="username != null and username != ''">
+            and username like concat('%', #{username}, '%')
+        </if>
+        <if test="realName != null and realName != ''">
+            and real_name like concat('%', #{realName}, '%')
+        </if>
+        <if test="departmentId != null">
+            and department_id = #{departmentId}
+        </if>
+        <if test="status != null">
+            and status = #{status}
+        </if>
+        order by id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(*)
+        from sys_user
+        where deleted = 0
+        <if test="username != null and username != ''">
+            and username like concat('%', #{username}, '%')
+        </if>
+        <if test="realName != null and realName != ''">
+            and real_name like concat('%', #{realName}, '%')
+        </if>
+        <if test="departmentId != null">
+            and department_id = #{departmentId}
+        </if>
+        <if test="status != null">
+            and status = #{status}
+        </if>
+    </select>
+
+    <select id="selectById" resultType="com.nlt.domain.entity.UserEntity">
+        select *
+        from sys_user
+        where id = #{id}
+            and deleted = 0
+    </select>
+
+    <select id="selectByUsername" resultType="com.nlt.domain.entity.UserEntity">
+        select *
+        from sys_user
+        where username = #{username}
+            and deleted = 0
+    </select>
+
+    <select id="selectOptions" resultType="com.nlt.domain.entity.UserEntity">
+        select *
+        from sys_user
+        where deleted = 0
+        <if test="status != null">
+            and status = #{status}
+        </if>
+        order by id asc
+    </select>
+
+    <insert id="insert"
+                    parameterType="com.nlt.domain.entity.UserEntity"
+                    useGeneratedKeys="true"
+                    keyProperty="id">
+        insert into sys_user(
+            department_id,
+            username,
+            password,
+            real_name,
+            user_no,
+            gender,
+            phone,
+            email,
+            credit_score,
+            violation_count,
+            status,
+            deleted
+        )
+        values(
+            #{departmentId},
+            #{username},
+            #{password},
+            #{realName},
+            #{userNo},
+            #{gender},
+            #{phone},
+            #{email},
+            #{creditScore},
+            #{violationCount},
+            #{status},
+            0
+        )
+    </insert>
+
+    <update id="update" parameterType="com.nlt.domain.entity.UserEntity">
+        update sys_user
+        set department_id = #{departmentId},
+                real_name = #{realName},
+                user_no = #{userNo},
+                gender = #{gender},
+                phone = #{phone},
+                email = #{email},
+                status = #{status}
+        where id = #{id}
+            and deleted = 0
+    </update>
+
+    <update id="updateProfile" parameterType="com.nlt.domain.entity.UserEntity">
+        update sys_user
+        set real_name = #{realName},
+                gender = #{gender},
+                phone = #{phone},
+                email = #{email}
+        where id = #{id}
+            and deleted = 0
+    </update>
+
+    <update id="updatePassword">
+        update sys_user
+        set password = #{password}
+        where id = #{id}
+            and deleted = 0
+    </update>
+
+    <update id="updateStatus">
+        update sys_user
+        set status = #{status}
+        where id = #{id}
+            and deleted = 0
+    </update>
+
+    <update id="updateLastLoginAt">
+        update sys_user
+        set last_login_at = now()
+        where id = #{id}
+    </update>
+
+    <update id="softDelete">
+        update sys_user
+        set deleted = 1
+        where id = #{id}
+            and deleted = 0
+    </update>
+</mapper>

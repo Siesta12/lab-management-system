@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nlt.mapper.ConsumableStockLogMapper">
+    <insert id="insert"
+                    parameterType="com.nlt.domain.entity.ConsumableStockLogEntity"
+                    useGeneratedKeys="true"
+                    keyProperty="id">
+        insert into consumable_stock_log(
+            consumable_id,
+            change_type,
+            change_amount,
+            before_stock,
+            after_stock,
+            operator_user_id,
+            remark
+        )
+        values(
+            #{consumableId},
+            #{changeType},
+            #{changeAmount},
+            #{beforeStock},
+            #{afterStock},
+            #{operatorUserId},
+            #{remark}
+        )
+    </insert>
+</mapper>

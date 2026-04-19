@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nlt.mapper.DepartmentMapper">
+    <select id="selectPage" resultType="com.nlt.domain.entity.DepartmentEntity">
+        select *
+        from department
+        where deleted = 0
+        <if test="departmentName != null and departmentName != ''">
+            and department_name like concat('%', #{departmentName}, '%')
+        </if>
+        <if test="departmentCode != null and departmentCode != ''">
+            and department_code like concat('%', #{departmentCode}, '%')
+        </if>
+        <if test="status != null">
+            and status = #{status}
+        </if>
+        order by id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(*)
+        from department
+        where deleted = 0
+        <if test="departmentName != null and departmentName != ''">
+            and department_name like concat('%', #{departmentName}, '%')
+        </if>
+        <if test="departmentCode != null and departmentCode != ''">
+            and department_code like concat('%', #{departmentCode}, '%')
+        </if>
+        <if test="status != null">
+            and status = #{status}
+        </if>
+    </select>
+
+    <select id="selectById" resultType="com.nlt.domain.entity.DepartmentEntity">
+        select *
+        from department
+        where id = #{id}
+            and deleted = 0
+    </select>
+
+    <select id="selectOptions" resultType="com.nlt.domain.entity.DepartmentEntity">
+        select *
+        from department
+        where deleted = 0
+            and status = 1
+        order by id asc
+    </select>
+
+    <insert id="insert"
+                    parameterType="com.nlt.domain.entity.DepartmentEntity"
+                    useGeneratedKeys="true"
+                    keyProperty="id">
+        insert into department(
+            department_name,
+            department_code,
+            leader_name,
+            phone,
+            status,
+            deleted
+        )
+        values(
+            #{departmentName},
+            #{departmentCode},
+            #{leaderName},
+            #{phone},
+            #{status},
+            0
+        )
+    </insert>
+
+    <update id="update" parameterType="com.nlt.domain.entity.DepartmentEntity">
+        update department
+        set department_name = #{departmentName},
+                department_code = #{departmentCode},
+                leader_name = #{leaderName},
+                phone = #{phone},
+                status = #{status}
+        where id = #{id}
+            and deleted = 0
+    </update>
+
+    <update id="softDelete">
+        update department
+        set deleted = 1
+        where id = #{id}
+            and deleted = 0
+    </update>
+</mapper>

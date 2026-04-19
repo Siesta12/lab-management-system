@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nlt.mapper.DeviceMapper">
+    <select id="selectPage" resultType="com.nlt.domain.entity.DeviceEntity">
+        select *
+        from lab_device
+        where deleted = 0
+        <if test="labId != null">
+            and lab_id = #{labId}
+        </if>
+        <if test="deviceName != null and deviceName != ''">
+            and device_name like concat('%', #{deviceName}, '%')
+        </if>
+        <if test="deviceCode != null and deviceCode != ''">
+            and device_code like concat('%', #{deviceCode}, '%')
+        </if>
+        <if test="status != null">
+            and status = #{status}
+        </if>
+        order by id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(*)
+        from lab_device
+        where deleted = 0
+        <if test="labId != null">
+            and lab_id = #{labId}
+        </if>
+        <if test="deviceName != null and deviceName != ''">
+            and device_name like concat('%', #{deviceName}, '%')
+        </if>
+        <if test="deviceCode != null and deviceCode != ''">
+            and device_code like concat('%', #{deviceCode}, '%')
+        </if>
+        <if test="status != null">
+            and status = #{status}
+        </if>
+    </select>
+
+    <select id="selectById" resultType="com.nlt.domain.entity.DeviceEntity">
+        select *
+        from lab_device
+        where id = #{id}
+            and deleted = 0
+    </select>
+
+    <select id="selectOptions" resultType="com.nlt.domain.entity.DeviceEntity">
+        select *
+        from lab_device
+        where deleted = 0
+        <if test="labId != null">
+            and lab_id = #{labId}
+        </if>
+        order by id asc
+    </select>
+
+    <insert id="insert"
+                    parameterType="com.nlt.domain.entity.DeviceEntity"
+                    useGeneratedKeys="true"
+                    keyProperty="id">
+        insert into lab_device(
+            lab_id,
+            device_name,
+            device_code,
+            brand,
+            model_no,
+            quantity,
+            available_quantity,
+            status,
+            purchase_date,
+            remark,
+            deleted
+        )
+        values(
+            #{labId},
+            #{deviceName},
+            #{deviceCode},
+            #{brand},
+            #{modelNo},
+            #{quantity},
+            #{availableQuantity},
+            #{status},
+            #{purchaseDate},
+            #{remark},
+            0
+        )
+    </insert>
+
+    <update id="update" parameterType="com.nlt.domain.entity.DeviceEntity">
+        update lab_device
+        set lab_id = #{labId},
+                device_name = #{deviceName},
+                device_code = #{deviceCode},
+                brand = #{brand},
+                model_no = #{modelNo},
+                quantity = #{quantity},
+                available_quantity = #{availableQuantity},
+                status = #{status},
+                purchase_date = #{purchaseDate},
+                remark = #{remark}
+        where id = #{id}
+            and deleted = 0
+    </update>
+
+    <update id="updateStatus">
+        update lab_device
+        set status = #{status}
+        where id = #{id}
+            and deleted = 0
+    </update>
+
+    <update id="softDelete">
+        update lab_device
+        set deleted = 1
+        where id = #{id}
+            and deleted = 0
+    </update>
+</mapper>
