@@ -33,3 +33,4 @@ public class LabSaveRequest {
     private String usageRule;
 
 }
+

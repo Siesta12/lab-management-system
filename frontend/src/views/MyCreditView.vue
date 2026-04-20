@@ -1,38 +1,38 @@
-<template>
+﻿<template>
   <section class="card-grid metrics-grid">
     <article class="metric-card brand">
       <span>当前信用分</span>
       <strong>{{ profile?.creditScore ?? '--' }}</strong>
-      <small>基于预约履约情况动态变化</small>
+      <small>基于预约表现情况自动变更</small>
     </article>
     <article class="metric-card warning">
-      <span>违规次数</span>
+      <span>违纪次数</span>
       <strong>{{ profile?.violationCount ?? '--' }}</strong>
-      <small>多次违规会影响预约优先级</small>
+      <small>多次违纪将会降低预约优先级</small>
     </article>
     <article class="metric-card success">
-      <span>最近扣分</span>
+      <span>最新得分</span>
       <strong>{{ latestScoreChange }}</strong>
-      <small>查看违规记录了解扣分原因</small>
+      <small>鏌ョ湅杩濊璁板綍浜嗚В鎵ｅ垎鍘熷洜</small>
     </article>
     <article class="metric-card accent">
-      <span>记录总数</span>
+      <span>璁板綍鎬绘暟</span>
       <strong>{{ violations.length }}</strong>
-      <small>当前账号可查看自己的违规明细</small>
+      <small>当前用户可查看自己的违纪详情</small>
     </article>
   </section>
 
   <section class="content-grid two-columns">
-    <BasePanel tag="信用说明" title="预约与信用关系">
+    <BasePanel tag="信用说明" title="预约及使用相关说明">
       <ul class="bullet-list">
-        <li>按时签到、按时结束使用，有助于维持良好的信用记录。</li>
-        <li>爽约、迟到或违规使用实验室，会被记录到违规列表并扣减信用分。</li>
-        <li>信用分较低时，预约审核优先级可能下降。</li>
+        <li>按时到达、按时结束使用，有助于保持良好的信用记录。</li>
+        <li>迟到、早退或违纪使用实验室，将被记录到黑名单并扣量信用分。</li>
+        <li>信用分较低时，预约审核优先级可能会降低。</li>
       </ul>
     </BasePanel>
 
-    <BasePanel tag="违规记录" title="我的违规记录列表">
-      <BaseTable :headers="['时间', '违规类型', '扣分', '备注']">
+    <BasePanel tag="违纪记录" title="我的违纪记录列表">
+      <BaseTable :headers="['时间', '违纪类型', '扣分', '说明']">
         <tr v-for="item in violations" :key="item.id">
           <td>{{ item.createdAt }}</td>
           <td>{{ violationTypeText(item.violationType) }}</td>
@@ -66,7 +66,7 @@ const latestScoreChange = computed(() => {
 });
 
 function violationTypeText(type: number): string {
-  if (type === 1) return '爽约';
+  if (type === 1) return '损坏';
   if (type === 2) return '迟到';
   if (type === 3) return '违规使用';
   return '其他';
@@ -81,3 +81,4 @@ onMounted(async () => {
   violations.value = violationData.list;
 });
 </script>
+

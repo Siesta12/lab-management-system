@@ -99,3 +99,4 @@ public class ReservationController {
         return ApiResponse.success(reservationService.checkOut(id, tokenService.getCurrentUserId(servletRequest)));
     }
 }
+

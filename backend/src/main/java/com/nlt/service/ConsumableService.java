@@ -64,3 +64,4 @@ public interface ConsumableService {
     ConsumableEntity updateStock(Long id, ConsumableStockUpdateRequest request, Long operatorUserId);
 
 }
+

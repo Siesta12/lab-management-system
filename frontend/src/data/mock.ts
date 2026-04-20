@@ -152,3 +152,4 @@ export const labRecommendations: LabRecommendation[] = [
   { name: '嵌入式实验室', location: '实验楼 B / 305', reason: '同时间段可用，容量满足 32 人' },
   { name: '网络工程实验室', location: '实验楼 C / 201', reason: '设备配置接近当前需求，冲突率低' },
 ];
+

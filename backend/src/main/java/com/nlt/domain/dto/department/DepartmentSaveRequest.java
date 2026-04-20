@@ -19,3 +19,4 @@ public class DepartmentSaveRequest {
     private Integer status;
 
 }
+

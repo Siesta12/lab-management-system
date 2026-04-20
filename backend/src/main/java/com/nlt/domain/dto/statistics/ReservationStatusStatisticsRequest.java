@@ -12,3 +12,4 @@ public class ReservationStatusStatisticsRequest {
     private Long labId;
 
 }
+

@@ -39,3 +39,4 @@ import BaseTable from '../components/BaseTable.vue';
 import { users } from '../data/mock';
 import { getBadgeClass } from '../utils/format';
 </script>
+

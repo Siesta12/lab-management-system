@@ -13,3 +13,4 @@ export function login(payload: LoginPayload): Promise<LoginResponseData> {
 export function fetchCurrentUser(token: string): Promise<AuthUser> {
   return get<AuthUser>('/auth/me', token);
 }
+

@@ -29,16 +29,16 @@ public class LabController {
     private final LabScheduleService labScheduleService;
 
     /**
-     * 鏌ヨ瀹為獙瀹や俊鎭垪琛?
-     * @param pageNum 椤电爜
-     * @param pageSize 姣忛〉鏉℃暟
-     * @param labName 鍙傛暟
-     * @param labCode 鍙傛暟
-     * @param labType 鍙傛暟
-     * @param departmentId 閮ㄩ棬ID
-     * @param openStatus 鍙傛暟
-     * @param labStatus 鍙傛暟
-     * @return 鍝嶅簲缁撴灉
+     * 分页查询实验室列表
+     * @param pageNum 页码
+     * @param pageSize 每页大小
+     * @param labName 实验室名称
+     * @param labCode 实验室编号
+     * @param labType 实验室类型
+     * @param departmentId 部门ID
+     * @param openStatus 开放状态
+     * @param labStatus 实验室状态
+     * @return 分页数据
      */
     @GetMapping
     public ApiResponse<PageData<LabEntity>> page(@RequestParam(defaultValue = "1") int pageNum,
@@ -57,9 +57,9 @@ public class LabController {
     }
 
     /**
-     * 鏂板瀹為獙瀹や俊鎭?
-     * @param request 璇锋眰鍙傛暟
-     * @return 鍝嶅簲缁撴灉
+     * 创建实验室
+     * @param request 创建请求
+     * @return 创建的实验室实体
      */
     @PostMapping
     public ApiResponse<LabEntity> create(@Valid @RequestBody LabSaveRequest request) {
@@ -67,9 +67,9 @@ public class LabController {
     }
 
     /**
-     * 澶勭悊瀹為獙瀹や俊鎭?
-     * @param openStatus 鍙傛暟
-     * @return 鍝嶅簲缁撴灉
+     * 获取实验室选项列表
+     * @param openStatus 开放状态
+     * @return 选项列表
      */
     @GetMapping("/options")
     public ApiResponse<List<OptionItem>> options(@RequestParam(required = false) Integer openStatus,
@@ -80,9 +80,9 @@ public class LabController {
     }
 
     /**
-     * 鏌ヨ瀹為獙瀹や俊鎭?
-     * @param id 涓婚敭ID
-     * @return 鍝嶅簲缁撴灉
+     * 根据ID查询实验室详情
+     * @param id 实验室ID
+     * @return 实验室实体
      */
     @GetMapping("/{id}")
     public ApiResponse<LabEntity> getById(@PathVariable Long id, HttpServletRequest request) {
@@ -92,10 +92,10 @@ public class LabController {
     }
 
     /**
-     * 鏇存柊瀹為獙瀹や俊鎭?
-     * @param id 涓婚敭ID
-     * @param request 璇锋眰鍙傛暟
-     * @return 鍝嶅簲缁撴灉
+     * 更新实验室信息
+     * @param id 实验室ID
+     * @param request 更新请求
+     * @return 更新后的实验室实体
      */
     @PutMapping("/{id}")
     public ApiResponse<LabEntity> update(@PathVariable Long id,
@@ -104,9 +104,9 @@ public class LabController {
     }
 
     /**
-     * 鍒犻櫎瀹為獙瀹や俊鎭?
-     * @param id 涓婚敭ID
-     * @return 鍝嶅簲缁撴灉
+     * 删除实验室
+     * @param id 实验室ID
+     * @return 操作结果
      */
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
@@ -115,10 +115,10 @@ public class LabController {
     }
 
     /**
-     * 鏇存柊瀹為獙瀹や俊鎭?
-     * @param id 涓婚敭ID
-     * @param request 璇锋眰鍙傛暟
-     * @return 鍝嶅簲缁撴灉
+     * 更新实验室开放状态
+     * @param id 实验室ID
+     * @param request 状态更新请求
+     * @return 操作结果
      */
     @PatchMapping("/{id}/open-status")
     public ApiResponse<Void> updateOpenStatus(@PathVariable Long id,
@@ -128,10 +128,10 @@ public class LabController {
     }
 
     /**
-     * 鏇存柊瀹為獙瀹や俊鎭?
-     * @param id 涓婚敭ID
-     * @param request 璇锋眰鍙傛暟
-     * @return 鍝嶅簲缁撴灉
+     * 更新实验室状态
+     * @param id 实验室ID
+     * @param request 状态更新请求
+     * @return 操作结果
      */
     @PatchMapping("/{id}/lab-status")
     public ApiResponse<Void> updateLabStatus(@PathVariable Long id,
@@ -180,3 +180,4 @@ public class LabController {
     }
 
 }
+

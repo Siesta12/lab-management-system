@@ -19,3 +19,4 @@ public class ReservationRecommendationRequest {
     private List<ReservationCreateRequest.ReservationSlotItem> slots;
 }
 
+

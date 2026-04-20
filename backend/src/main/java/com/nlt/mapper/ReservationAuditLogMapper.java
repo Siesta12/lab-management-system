@@ -10,10 +10,10 @@ public interface ReservationAuditLogMapper {
 
     /**
      * 查询预约审核日志
-     * @param offset 参数
+     * @param offset 偏移量
      * @param pageSize 每页条数
      * @param reservationId 预约ID
-     * @param auditUserId auditUserID
+     * @param auditUserId 审核人ID
      * @return 数据列表
      */
     List<ReservationAuditLogEntity> selectPage(@Param("offset") int offset, @Param("pageSize") int pageSize,
@@ -23,7 +23,7 @@ public interface ReservationAuditLogMapper {
     /**
      * 统计预约审核日志数量
      * @param reservationId 预约ID
-     * @param auditUserId auditUserID
+     * @param auditUserId 审核人ID
      * @return 处理结果
      */
     long countPage(@Param("reservationId") Long reservationId, @Param("auditUserId") Long auditUserId);
@@ -50,3 +50,4 @@ public interface ReservationAuditLogMapper {
     int insert(ReservationAuditLogEntity entity);
 
 }
+

@@ -14,3 +14,4 @@ public class UserProfileUpdateRequest {
     private String email;
 
 }
+

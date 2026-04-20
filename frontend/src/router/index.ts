@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router';
+﻿import { createRouter, createWebHistory } from 'vue-router';
 import { getFirstAccessiblePath, hasRouteAccess, type AppRole } from '../access';
 import AdminLayout from '../layouts/AdminLayout.vue';
 import ConsumablesView from '../views/ConsumablesView.vue';
@@ -27,7 +27,6 @@ const router = createRouter({
       meta: {
         public: true,
         title: '登录',
-        description: '请输入账号密码进入实验室管理系统。',
       },
     },
     {
@@ -43,7 +42,6 @@ const router = createRouter({
           component: OverviewView,
           meta: {
             title: '系统总览',
-            description: '管理员概览页：运行状态、提醒、趋势与统计。',
             roles: ['ADMIN'] satisfies AppRole[],
           },
         },
@@ -53,7 +51,6 @@ const router = createRouter({
           component: DailyScheduleView,
           meta: {
             title: '每日课表总览',
-            description: '按日期查看所有实验室的节次占用/维护/开放情况。',
             roles: ['ADMIN'] satisfies AppRole[],
           },
         },
@@ -63,7 +60,6 @@ const router = createRouter({
           component: TeacherHomeView,
           meta: {
             title: '教师首页',
-            description: '面向教师展示教学/科研预约概览。',
             roles: ['TEACHER'] satisfies AppRole[],
           },
         },
@@ -73,7 +69,6 @@ const router = createRouter({
           component: StudentHomeView,
           meta: {
             title: '学生首页',
-            description: '面向学生展示预约提醒与快捷入口。',
             roles: ['STUDENT'] satisfies AppRole[],
           },
         },
@@ -83,7 +78,6 @@ const router = createRouter({
           component: UsersView,
           meta: {
             title: '用户管理',
-            description: '管理员维护账号、角色与状态。',
             roles: ['ADMIN'] satisfies AppRole[],
           },
         },
@@ -93,7 +87,6 @@ const router = createRouter({
           component: LabsView,
           meta: {
             title: '实验室查询',
-            description: '查看实验室详情，并在未来三周课表中按节次预约或维护。',
             roles: ['ADMIN', 'TEACHER', 'STUDENT'] satisfies AppRole[],
           },
         },
@@ -103,7 +96,6 @@ const router = createRouter({
           component: MyReservationsView,
           meta: {
             title: '我的预约',
-            description: '查看自己的预约单与节次明细，并可取消可取消的预约。',
             roles: ['TEACHER', 'STUDENT'] satisfies AppRole[],
           },
         },
@@ -113,7 +105,6 @@ const router = createRouter({
           component: ReservationsView,
           meta: {
             title: '预约管理',
-            description: '管理员分页查看预约单并进行审批。',
             roles: ['ADMIN'] satisfies AppRole[],
           },
         },
@@ -123,7 +114,6 @@ const router = createRouter({
           component: DevicesView,
           meta: {
             title: '设备管理',
-            description: '查看设备台账与状态。',
             roles: ['ADMIN', 'TEACHER'] satisfies AppRole[],
           },
         },
@@ -133,7 +123,6 @@ const router = createRouter({
           component: ConsumablesView,
           meta: {
             title: '耗材管理',
-            description: '查看耗材库存与预警。',
             roles: ['ADMIN', 'TEACHER'] satisfies AppRole[],
           },
         },
@@ -143,7 +132,6 @@ const router = createRouter({
           component: StatisticsView,
           meta: {
             title: '统计分析',
-            description: '查看实验室使用统计与趋势。',
             roles: ['ADMIN', 'TEACHER'] satisfies AppRole[],
           },
         },
@@ -153,7 +141,6 @@ const router = createRouter({
           component: MyCreditView,
           meta: {
             title: '我的信用',
-            description: '查看信用分与违规记录。',
             roles: ['STUDENT'] satisfies AppRole[],
           },
         },
@@ -163,7 +150,6 @@ const router = createRouter({
           component: ProfileView,
           meta: {
             title: '个人中心',
-            description: '维护个人资料与密码。',
             roles: ['ADMIN', 'TEACHER', 'STUDENT'] satisfies AppRole[],
           },
         },

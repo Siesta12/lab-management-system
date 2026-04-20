@@ -18,35 +18,35 @@ public interface StatisticsService {
     Map<String, Long> overview();
 
     /**
-     * 处理统计信息
+     * 实验室使用情况统计
      * @param request 请求参数
      * @return 数据列表
      */
     List<StatisticsItem> labUsage(LabUsageStatisticsRequest request);
 
     /**
-     * 处理统计信息
+     * 预约状态统计
      * @param request 请求参数
      * @return 数据列表
      */
     List<StatisticsItem> reservationStatus(ReservationStatusStatisticsRequest request);
 
     /**
-     * 处理统计信息
+     * 预约类型统计
      * @param request 请求参数
      * @return 数据列表
      */
     List<StatisticsItem> reservationType(ReservationTypeStatisticsRequest request);
 
     /**
-     * 处理统计信息
+     * 时间分布统计
      * @param request 请求参数
      * @return 数据列表
      */
     List<StatisticsItem> timeDistribution(TimeDistributionStatisticsRequest request);
 
     /**
-     * 处理统计信息
+     * 违规统计
      * @param request 请求参数
      * @return 数据列表
      */
@@ -54,10 +54,11 @@ public interface StatisticsService {
 
     /**
      * 获取预约趋势统计数据
-     * @param startDate 日期参数
-     * @param endDate 日期参数
+     * @param startDate 开始日期
+     * @param endDate 结束日期
      * @return 处理结果
      */
     List<Map<String, Object>> reservationTrend(String startDate, String endDate);
 
 }
+

@@ -17,3 +17,4 @@ public class LoginResponseData {
     private List<String> roleCodes;
 
 }
+

@@ -15,3 +15,4 @@ public class DailyScheduleLabItem {
     private List<ScheduleCellItem> cells;
 }
 
+

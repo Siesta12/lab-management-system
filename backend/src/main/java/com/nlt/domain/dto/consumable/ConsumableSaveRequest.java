@@ -26,3 +26,4 @@ public class ConsumableSaveRequest {
     private String remark;
 
 }
+

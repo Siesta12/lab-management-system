@@ -1,15 +1,15 @@
-<template>
+﻿<template>
   <section class="content-grid two-columns">
     <BasePanel tag="个人信息" title="查看个人资料">
       <div v-if="profile" class="detail-list">
         <div><strong>姓名</strong><span>{{ profile.realName }}</span></div>
-        <div><strong>学号 / 账号</strong><span>{{ profile.userNo }} / {{ profile.username }}</span></div>
+        <div><strong>学号 / 工号</strong><span>{{ profile.userNo }} / {{ profile.username }}</span></div>
         <div><strong>性别</strong><span>{{ genderText(profile.gender) }}</span></div>
         <div><strong>手机号</strong><span>{{ profile.phone || '未填写' }}</span></div>
         <div><strong>邮箱</strong><span>{{ profile.email || '未填写' }}</span></div>
         <div><strong>所属学院 / 部门</strong><span>{{ departmentName }}</span></div>
         <div><strong>信用分</strong><span>{{ profile.creditScore }}</span></div>
-        <div><strong>违规次数</strong><span>{{ profile.violationCount }}</span></div>
+        <div><strong>违纪次数</strong><span>{{ profile.violationCount }}</span></div>
       </div>
     </BasePanel>
 
@@ -27,7 +27,7 @@
   <section class="content-grid two-columns">
     <BasePanel tag="密码修改" title="修改登录密码" panel-class="form-panel">
       <form class="stack-form" @submit.prevent="handlePasswordUpdate">
-        <label><span>原密码</span><input v-model="passwordForm.oldPassword" type="password" /></label>
+        <label><span>旧密码</span><input v-model="passwordForm.oldPassword" type="password" /></label>
         <label><span>新密码</span><input v-model="passwordForm.newPassword" type="password" /></label>
         <label><span>确认新密码</span><input v-model="passwordForm.confirmPassword" type="password" /></label>
         <button type="submit" class="primary-btn wide">修改密码</button>
@@ -36,11 +36,11 @@
       <p v-if="passwordMessage" class="info-text">{{ passwordMessage }}</p>
     </BasePanel>
 
-    <BasePanel tag="说明" title="个人中心可修改范围">
+    <BasePanel tag="说明" title="个人资料修改范围">
       <ul class="bullet-list">
         <li>当前支持修改手机号、邮箱和登录密码。</li>
-        <li>姓名、学号、角色和信用分属于系统基础信息，不在学生端开放修改。</li>
-        <li>修改密码时请确保新旧密码不同，且两次输入保持一致。</li>
+        <li>姓名、学号、角色和信用分等基本信息，不在客户端开放修改。</li>
+        <li>修改密码时请确保新密码不同，且两次输入保持一致。</li>
       </ul>
     </BasePanel>
   </section>
@@ -136,3 +136,4 @@ onMounted(() => {
   void loadProfile();
 });
 </script>
+

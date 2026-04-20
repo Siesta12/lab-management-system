@@ -1,6 +1,6 @@
-<template>
+﻿<template>
   <section class="content-grid">
-    <BasePanel tag="每日总览" title="某天所有实验室节次状态" :note="schedule ? schedule.date : ''">
+    <BasePanel tag="每日概览" title="查看今天所有实验室预约状态" :note="schedule ? schedule.date : ''">
       <div class="toolbar">
         <label>
           <span>日期</span>
@@ -15,8 +15,8 @@
         <div class="legend">
           <span class="legend-item free">空闲</span>
           <span class="legend-item reserved">已预约</span>
-          <span class="legend-item pending">待审批</span>
-          <span class="legend-item maintenance">维护中</span>
+          <span class="legend-item pending">待审核</span>
+          <span class="legend-item maintenance">维修中</span>
           <span class="legend-item closed">不开放</span>
         </div>
 
@@ -73,7 +73,7 @@ function cellText(cells: ScheduleCellDto[], periodId: number): string {
   if (!c) return '--';
   if (c.status === 'FREE') return '空闲';
   if (c.status === 'RESERVED') return '已预约';
-  if (c.status === 'PENDING') return '待审批';
+  if (c.status === 'PENDING') return '待审核';
   if (c.status === 'MAINTENANCE') return '维护';
   return '不开放';
 }
@@ -95,7 +95,7 @@ async function loadDaily(): Promise<void> {
   message.value = '';
   try {
     schedule.value = await fetchDailySchedule(date.value, auth.token.value);
-    message.value = '已加载每日总览。';
+    message.value = '已加载每日概览。';
   } catch (error) {
     message.value = error instanceof Error ? error.message : '查询失败。';
   }
@@ -224,4 +224,5 @@ onMounted(() => {
   background: rgba(148, 163, 184, 0.16);
 }
 </style>
+
 

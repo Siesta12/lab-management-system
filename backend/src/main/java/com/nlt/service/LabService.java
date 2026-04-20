@@ -73,3 +73,4 @@ public interface LabService {
     List<OptionItem> options(Integer openStatus, Long currentUserId, List<String> currentRoleCodes);
 
 }
+

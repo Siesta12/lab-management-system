@@ -19,13 +19,13 @@ public class RoleController {
     private final RoleService roleService;
 
     /**
-     * 鏌ヨ瑙掕壊淇℃伅鍒楄〃
-     * @param pageNum 椤电爜
-     * @param pageSize 姣忛〉鏉℃暟
-     * @param roleName 鍙傛暟
-     * @param roleCode 鍙傛暟
-     * @param status 鐘舵€佸€?
-     * @return 鍝嶅簲缁撴灉
+     * 分页查询角色列表
+     * @param pageNum 页码
+     * @param pageSize 每页大小
+     * @param roleName 角色名称
+     * @param roleCode 角色编码
+     * @param status 状态
+     * @return 分页数据
      */
     @GetMapping
     public ApiResponse<PageData<RoleEntity>> page(@RequestParam(defaultValue = "1") int pageNum,
@@ -37,9 +37,9 @@ public class RoleController {
     }
 
     /**
-     * 鏂板瑙掕壊淇℃伅
-     * @param request 璇锋眰鍙傛暟
-     * @return 鍝嶅簲缁撴灉
+     * 创建角色
+     * @param request 请求参数
+     * @return 创建后的角色信息
      */
     @PostMapping
     public ApiResponse<RoleEntity> create(@Valid @RequestBody RoleSaveRequest request) {
@@ -47,8 +47,8 @@ public class RoleController {
     }
 
     /**
-     * 澶勭悊瑙掕壊淇℃伅
-     * @return 鍝嶅簲缁撴灉
+     * 获取角色选项列表
+     * @return 角色选项列表
      */
     @GetMapping("/options")
     public ApiResponse<List<OptionItem>> options() {
@@ -56,9 +56,9 @@ public class RoleController {
     }
 
     /**
-     * 鏌ヨ瑙掕壊淇℃伅
-     * @param id 涓婚敭ID
-     * @return 鍝嶅簲缁撴灉
+     * 根据ID查询角色详情
+     * @param id 角色ID
+     * @return 角色详情
      */
     @GetMapping("/{id}")
     public ApiResponse<RoleEntity> getById(@PathVariable Long id) {
@@ -66,10 +66,10 @@ public class RoleController {
     }
 
     /**
-     * 鏇存柊瑙掕壊淇℃伅
-     * @param id 涓婚敭ID
-     * @param request 璇锋眰鍙傛暟
-     * @return 鍝嶅簲缁撴灉
+     * 更新角色信息
+     * @param id 角色ID
+     * @param request 请求参数
+     * @return 更新后的角色信息
      */
     @PutMapping("/{id}")
     public ApiResponse<RoleEntity> update(@PathVariable Long id,
@@ -78,9 +78,9 @@ public class RoleController {
     }
 
     /**
-     * 鍒犻櫎瑙掕壊淇℃伅
-     * @param id 涓婚敭ID
-     * @return 鍝嶅簲缁撴灉
+     * 删除角色
+     * @param id 角色ID
+     * @return 操作结果
      */
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
@@ -89,3 +89,4 @@ public class RoleController {
     }
 
 }
+

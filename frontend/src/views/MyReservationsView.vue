@@ -1,10 +1,10 @@
-<template>
+﻿<template>
   <section class="content-grid split-grid">
-    <BasePanel tag="我的预约" title="预约记录列表" :note="`共 ${reservationState.total} 条`">
+    <BasePanel tag="我的预订" title="预订记录列表" :note="`共${reservationState.total} 项`">
       <div class="toolbar">
         <select v-model="statusFilter">
           <option value="">全部状态</option>
-          <option value="1">待审批</option>
+          <option value="1">待审核</option>
           <option value="2">已通过</option>
           <option value="3">已驳回</option>
           <option value="4">已取消</option>
@@ -15,7 +15,7 @@
 
       <p v-if="message" class="info-text">{{ message }}</p>
 
-      <BaseTable :headers="['预约编号', '实验室', '节次明细', '状态', '操作']">
+      <BaseTable :headers="['预订编号', '实验室', '时段详情', '状态', '操作']">
         <tr v-for="item in filteredReservations" :key="item.id" class="clickable-row" @click="selectReservation(item.id)">
           <td>{{ item.reservationNo }}</td>
           <td>{{ labName(item.labId) }}</td>
@@ -23,7 +23,7 @@
           <td><span :class="getBadgeClass(statusText(item.status))">{{ statusText(item.status) }}</span></td>
           <td>
             <button v-if="canCancel(item)" type="button" class="ghost-btn small-btn" @click.stop="handleCancel(item.id)">
-              取消预约
+              鍙栨秷棰勭害
             </button>
           </td>
         </tr>
@@ -98,35 +98,35 @@ const filteredReservations = computed(() => {
 });
 
 function labName(id: number): string {
-  return labs.value.find((item) => item.id === id)?.labName ?? `实验室#${id}`;
+  return labs.value.find((item) => item.id === id)?.labName ?? `实验室${id}`;
 }
 
 function slotSummary(item: ReservationDto): string {
   const parts = item.slots?.map((s) => `${s.reservationDate} ${s.periodName}`) ?? [];
-  if (parts.length <= 2) return parts.join('；') || '--';
-  return `${parts.slice(0, 2).join('；')}…（共${parts.length}条）`;
+  if (parts.length <= 2) return parts.join('，') || '--';
+  return `${parts.slice(0, 2).join('，')}等（共${parts.length}项）`;
 }
 
-function statusText(status: number): '待审批' | '已通过' | '已驳回' | '已取消' | '已完成' {
+function statusText(status: number): '待审核' | '已通过' | '已驳回' | '已取消' | '已完成' {
   if (status === 2) return '已通过';
   if (status === 3) return '已驳回';
   if (status === 4) return '已取消';
   if (status === 5) return '已完成';
-  return '待审批';
+  return '待审核';
 }
 
 function reservationTypeText(type: number): string {
-  if (type === 1) return '课程预约';
-  if (type === 2) return '科研预约';
+  if (type === 1) return '教学预约';
+  if (type === 2) return '管理员预约';
   return '个人预约';
 }
 
 function auditActionText(action: number): string {
   if (action === 1) return '提交申请';
-  if (action === 2) return '审批通过';
-  if (action === 3) return '审批驳回';
-  if (action === 4) return '取消预约';
-  if (action === 5) return '完成/签退';
+  if (action === 2) return '审核通过';
+  if (action === 3) return '审核驳回';
+  if (action === 4) return '取消预订';
+  if (action === 5) return '完成/结束';
   return '状态变更';
 }
 
@@ -142,13 +142,13 @@ async function loadReservations(): Promise<void> {
     ]);
     reservationState.value = reservationData;
     labs.value = labData.list;
-    message.value = '已加载当前用户的预约记录。';
+    message.value = '已加载当前用户的预订记录。';
 
     if (reservationData.list.length && !selectedReservation.value) {
       await selectReservation(reservationData.list[0].id);
     }
   } catch (error) {
-    message.value = error instanceof Error ? error.message : '预约记录加载失败。';
+    message.value = error instanceof Error ? error.message : '预订记录加载失败。';
   }
 }
 
@@ -161,18 +161,18 @@ async function selectReservation(id: number): Promise<void> {
     selectedReservation.value = reservation;
     auditLogs.value = logs;
   } catch (error) {
-    message.value = error instanceof Error ? error.message : '预约详情加载失败。';
+    message.value = error instanceof Error ? error.message : '预订详情加载失败。';
   }
 }
 
 async function handleCancel(id: number): Promise<void> {
   try {
     await cancelReservation(id, auth.token.value);
-    message.value = '预约已取消。';
+    message.value = '预订已取消。';
     selectedReservation.value = null;
     await loadReservations();
   } catch (error) {
-    message.value = error instanceof Error ? error.message : '取消预约失败。';
+    message.value = error instanceof Error ? error.message : '取消预订失败。';
   }
 }
 
@@ -180,4 +180,5 @@ onMounted(() => {
   void loadReservations();
 });
 </script>
+
 

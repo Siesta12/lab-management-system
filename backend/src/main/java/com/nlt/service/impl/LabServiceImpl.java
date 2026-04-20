@@ -154,7 +154,7 @@ public class LabServiceImpl implements LabService {
 
         UserEntity currentUser = loadCurrentUser(currentUserId);
         if (currentUser.getDepartmentId() == null) {
-            throw new BusinessException(403, "当前用户未关联学院，无法查看实验室");
+            throw new BusinessException(403, "当前用户没有关联院系，无法查看实验室");
         }
 
         return currentUser.getDepartmentId();
@@ -167,11 +167,11 @@ public class LabServiceImpl implements LabService {
 
         UserEntity currentUser = loadCurrentUser(currentUserId);
         if (currentUser.getDepartmentId() == null) {
-            throw new BusinessException(403, "当前用户未关联学院，无法查看实验室");
+            throw new BusinessException(403, "当前用户没有关联院系，无法查看实验室");
         }
 
         if (!currentUser.getDepartmentId().equals(entity.getDepartmentId())) {
-            throw new BusinessException(403, "只能查看所属学院的实验室");
+            throw new BusinessException(403, "只能查看所属院系的实验室");
         }
     }
 
@@ -200,3 +200,4 @@ public class LabServiceImpl implements LabService {
                 || "ROLE_TEACHER".equalsIgnoreCase(roleCode));
     }
 }
+

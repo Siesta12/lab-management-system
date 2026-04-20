@@ -1,10 +1,10 @@
-<template>
+﻿<template>
   <div class="shell">
     <aside class="sidebar">
       <div v-if="showBrandBlock" class="brand-block">
-        <span class="brand-pill">毕业设计</span>
+        <span class="brand-pill">精品设计</span>
         <h1>高校实验室管理系统</h1>
-        <p>根据不同角色展示不同菜单，让学生端、教师端、管理员端都回到各自真正常用的场景里。</p>
+        <p>根据不同角色显示不同菜单，让学生端、管理员端功能回到各自正使用的环境里。</p>
       </div>
 
       <div class="sidebar-card user-card">
@@ -80,11 +80,11 @@ const showRoleHint = computed(() => primaryRole.value !== 'STUDENT');
 
 const roleHint = computed(() => {
   if (primaryRole.value === 'ADMIN') {
-    return '当前是管理员视角，可维护用户、实验室、设备、耗材和统计信息。';
+    return '当前是管理员视角，可管理用户、实验室、设备和统计信息';
   }
 
   if (primaryRole.value === 'TEACHER') {
-    return '当前是教师视角，重点支持教学与科研预约、实验室查询和统计查看。';
+    return '当前是教师视角，支持预约审核、设备查询和统计查询';
   }
 
   return '';
@@ -95,3 +95,4 @@ function handleLogout(): void {
   router.push('/login');
 }
 </script>
+

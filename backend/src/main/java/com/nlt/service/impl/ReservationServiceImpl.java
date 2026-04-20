@@ -91,7 +91,7 @@ public class ReservationServiceImpl implements ReservationService {
     public ReservationDetailVo getById(Long id) {
         ReservationEntity entity = reservationMapper.selectById(id);
         if (entity == null) {
-            throw new BusinessException(404, "Reservation not found");
+            throw new BusinessException(404, "预订不存在");
         }
         List<ReservationSlotVo> slots = labReservationSlotMapper.selectDetailByReservationId(id);
         return toDetail(entity, slots);
@@ -101,7 +101,7 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     public ReservationDetailVo create(ReservationCreateRequest request, Long currentUserId) {
         if (currentUserId == null) {
-            throw new BusinessException(401, "User not logged in");
+            throw new BusinessException(401, "用户未登录");
         }
         LabEntity lab = loadAndValidateLab(request.getLabId());
 
@@ -142,12 +142,13 @@ public class ReservationServiceImpl implements ReservationService {
         }).toList();
 
         try {
+            labReservationSlotMapper.deleteCanceledSlots(slotEntities);
             labReservationSlotMapper.insertBatch(slotEntities);
         } catch (DuplicateKeyException ex) {
-            throw new BusinessException(400, "Slot conflict: the lab is already reserved for one of the selected periods");
+            throw new BusinessException(400, "所选节次存在冲突：该实验室在所选日期/节次已被占用");
         }
 
-        insertAuditLog(entity.getId(), currentUserId, 1, "Submit reservation request");
+        insertAuditLog(entity.getId(), currentUserId, 1, "提交预约申请");
         return getById(entity.getId());
     }
 
@@ -157,7 +158,7 @@ public class ReservationServiceImpl implements ReservationService {
         requireAdmin(currentUserId);
         ReservationEntity entity = requireReservation(id);
         if (!Objects.equals(entity.getStatus(), 1)) {
-            throw new BusinessException(400, "Only pending reservations can be approved");
+            throw new BusinessException(400, "仅待审批的预约可审核通过");
         }
         entity.setApproverUserId(currentUserId);
         entity.setStatus(2);
@@ -173,7 +174,7 @@ public class ReservationServiceImpl implements ReservationService {
         requireAdmin(currentUserId);
         ReservationEntity entity = requireReservation(id);
         if (!Objects.equals(entity.getStatus(), 1)) {
-            throw new BusinessException(400, "Only pending reservations can be rejected");
+            throw new BusinessException(400, "仅待审批的预约可审核拒绝");
         }
         entity.setApproverUserId(currentUserId);
         entity.setStatus(3);
@@ -188,19 +189,19 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     public ReservationDetailVo cancel(Long id, Long currentUserId) {
         if (currentUserId == null) {
-            throw new BusinessException(401, "User not logged in");
+            throw new BusinessException(401, "用户未登录");
         }
         ReservationEntity entity = requireReservation(id);
         boolean isAdmin = isAdmin(currentUserId);
         if (!isAdmin && !Objects.equals(entity.getApplicantUserId(), currentUserId)) {
-            throw new BusinessException(403, "Only the applicant or admin can cancel this reservation");
+            throw new BusinessException(403, "仅申请人或管理员可取消该预约");
         }
         if (entity.getStatus() == null || (entity.getStatus() != 1 && entity.getStatus() != 2)) {
-            throw new BusinessException(400, "Only pending or approved reservations can be canceled");
+            throw new BusinessException(400, "仅待审批或已通过的预约可取消");
         }
         reservationMapper.cancel(id);
         labReservationSlotMapper.cancelByReservationId(id);
-        insertAuditLog(id, currentUserId, 4, "Cancel reservation");
+        insertAuditLog(id, currentUserId, 4, "取消预约");
         return getById(id);
     }
 
@@ -209,7 +210,7 @@ public class ReservationServiceImpl implements ReservationService {
     public ReservationDetailVo checkIn(Long id, Long currentUserId) {
         requireReservation(id);
         reservationMapper.checkIn(id);
-        insertAuditLog(id, currentUserId, 5, "Check in");
+        insertAuditLog(id, currentUserId, 5, "签到");
         return getById(id);
     }
 
@@ -218,17 +219,17 @@ public class ReservationServiceImpl implements ReservationService {
     public ReservationDetailVo checkOut(Long id, Long currentUserId) {
         requireReservation(id);
         reservationMapper.checkOut(id);
-        insertAuditLog(id, currentUserId, 5, "Check out / complete");
+        insertAuditLog(id, currentUserId, 6, "签退/完成");
         return getById(id);
     }
 
     @Override
     public List<SlotRecommendationItem> recommend(ReservationRecommendationRequest request, Long currentUserId) {
         if (request == null || request.getLabId() == null) {
-            throw new BusinessException(400, "labId is required");
+            throw new BusinessException(400, "labId 不能为空");
         }
         if (currentUserId == null) {
-            throw new BusinessException(401, "User not logged in");
+            throw new BusinessException(401, "用户未登录");
         }
 
         LabEntity baseLab = loadAndValidateLab(request.getLabId());
@@ -241,7 +242,7 @@ public class ReservationServiceImpl implements ReservationService {
 
         List<ClassPeriodEntity> periods = classPeriodMapper.selectActiveList();
         if (periods.isEmpty()) {
-            throw new BusinessException(400, "No class periods configured");
+            throw new BusinessException(400, "未配置课程节次");
         }
         List<Long> allPeriodIds = periods.stream().map(ClassPeriodEntity::getId).toList();
         Map<Long, ClassPeriodEntity> periodMap = periods.stream()
@@ -265,7 +266,7 @@ public class ReservationServiceImpl implements ReservationService {
                         blocked.reservationDate().format(DATE_FORMATTER),
                         candidatePeriodId,
                         periodName(periodMap, candidatePeriodId),
-                        "Same lab adjacent free period"));
+                        "同实验室相邻空闲节次"));
                 }
             }
             if (!slotRecs.isEmpty()) {
@@ -284,7 +285,7 @@ public class ReservationServiceImpl implements ReservationService {
                         blocked.reservationDate().format(DATE_FORMATTER),
                         blocked.periodId(),
                         periodName(periodMap, blocked.periodId()),
-                        "Same department & type lab, same period"));
+                        "同院系同类型实验室，相同节次"));
                 }
                 if (slotRecs.size() >= 5) {
                     break;
@@ -303,7 +304,7 @@ public class ReservationServiceImpl implements ReservationService {
                         blocked.reservationDate().format(DATE_FORMATTER),
                         blocked.periodId(),
                         periodName(periodMap, blocked.periodId()),
-                        "Other available lab, same period"));
+                        "其他可用实验室，相同节次"));
                 } else {
                     for (Long candidatePeriodId : adjacentPeriodIds(periods, blocked.periodId())) {
                         SlotKey candidate = new SlotKey(blocked.reservationDate(), blocked.weekday(), candidatePeriodId);
@@ -312,7 +313,7 @@ public class ReservationServiceImpl implements ReservationService {
                                 blocked.reservationDate().format(DATE_FORMATTER),
                                 candidatePeriodId,
                                 periodName(periodMap, candidatePeriodId),
-                                "Other available lab, nearby period"));
+                                "其他可用实验室，相邻节次"));
                         }
                         if (slotRecs.size() >= 5) {
                             break;
@@ -472,34 +473,34 @@ public class ReservationServiceImpl implements ReservationService {
     private ReservationEntity requireReservation(Long id) {
         ReservationEntity entity = reservationMapper.selectById(id);
         if (entity == null) {
-            throw new BusinessException(404, "Reservation not found");
+            throw new BusinessException(404, "预订不存在");
         }
         return entity;
     }
 
     private LabEntity loadAndValidateLab(Long labId) {
         if (labId == null) {
-            throw new BusinessException(400, "labId is required");
+            throw new BusinessException(400, "实验室ID不能为空");
         }
         LabEntity lab = labMapper.selectById(labId);
         if (lab == null) {
-            throw new BusinessException(404, "Lab not found");
+            throw new BusinessException(404, "实验室不存在");
         }
         if (lab.getDeleted() != null && lab.getDeleted() == 1) {
-            throw new BusinessException(400, "Lab is deleted");
+            throw new BusinessException(400, "实验室已删除");
         }
         if (lab.getOpenStatus() == null || lab.getOpenStatus() != 1) {
-            throw new BusinessException(400, "Lab is closed");
+            throw new BusinessException(400, "实验室未开放");
         }
         if (lab.getLabStatus() == null || lab.getLabStatus() != 1) {
-            throw new BusinessException(400, "Lab is under maintenance");
+            throw new BusinessException(400, "实验室维护中");
         }
         return lab;
     }
 
     private List<SlotKey> normalizeRequestedSlots(ReservationCreateRequest request) {
         if (request.getSlots() == null || request.getSlots().isEmpty()) {
-            throw new BusinessException(400, "slots is required");
+            throw new BusinessException(400, "预约时段不能为空");
         }
         return request.getSlots().stream().map(item -> {
             LocalDate date = LocalDate.parse(item.getReservationDate(), DATE_FORMATTER);
@@ -514,7 +515,7 @@ public class ReservationServiceImpl implements ReservationService {
         for (SlotKey key : slots) {
             if (key.reservationDate().isBefore(today) || key.reservationDate().isAfter(last)) {
                 throw new BusinessException(400,
-                    "Date out of allowed range (today to next 21 days): " + key.reservationDate().format(DATE_FORMATTER));
+                    "预约日期超出允许范围（仅限今天起21天内）: " + key.reservationDate().format(DATE_FORMATTER));
             }
         }
     }
@@ -531,7 +532,7 @@ public class ReservationServiceImpl implements ReservationService {
         for (SlotKey key : requestedSlots) {
             LabOpenSlotEntity matched = map.get(new SlotKey(null, key.weekday(), key.periodId()));
             if (matched == null) {
-                throw new BusinessException(400, "Slot not open: weekday=" + key.weekday() + ", periodId=" + key.periodId());
+                throw new BusinessException(400, "该时段未开放：星期" + key.weekday() + "，节次ID=" + key.periodId());
             }
         }
         return map;
@@ -553,12 +554,12 @@ public class ReservationServiceImpl implements ReservationService {
             boolean allowTeacher = slot.getAllowTeacher() != null && slot.getAllowTeacher() == 1;
             if (isStudent && isTeacher) {
                 if (!allowStudent && !allowTeacher) {
-                    throw new BusinessException(400, "Slot not allowed for current user roles");
+                    throw new BusinessException(400, "当前用户角色不允许预约该时段");
                 }
             } else if (isStudent && !allowStudent) {
-                throw new BusinessException(400, "Slot not allowed for students");
+                throw new BusinessException(400, "学生不允许预约该时段");
             } else if (isTeacher && !allowTeacher) {
-                throw new BusinessException(400, "Slot not allowed for teachers");
+                throw new BusinessException(400, "教师不允许预约该时段");
             }
         }
     }
@@ -576,8 +577,8 @@ public class ReservationServiceImpl implements ReservationService {
             .collect(Collectors.toMap(m -> key(m.getMaintenanceDate(), m.getPeriodId()), m -> m, (a, b) -> a));
         for (SlotKey key : requestedSlots) {
             if (map.containsKey(key(key.reservationDate(), key.periodId()))) {
-                throw new BusinessException(400, "Slot under maintenance: " + key.reservationDate().format(DATE_FORMATTER)
-                    + ", periodId=" + key.periodId());
+                throw new BusinessException(400, "该时段实验室维护中：" + key.reservationDate().format(DATE_FORMATTER)
+                    + "，节次ID=" + key.periodId());
             }
         }
     }
@@ -589,8 +590,8 @@ public class ReservationServiceImpl implements ReservationService {
             .collect(Collectors.toMap(r -> key(r.getReservationDate(), r.getPeriodId()), r -> true, (a, b) -> a));
         for (SlotKey key : requestedSlots) {
             if (reservedMap.containsKey(key(key.reservationDate(), key.periodId()))) {
-                throw new BusinessException(400, "Slot conflict: already reserved (" + key.reservationDate().format(DATE_FORMATTER)
-                    + ", periodId=" + key.periodId() + ")");
+                throw new BusinessException(400, "该节次已被预约：" + key.reservationDate().format(DATE_FORMATTER)
+                    + "，节次ID=" + key.periodId());
             }
         }
     }
@@ -609,10 +610,10 @@ public class ReservationServiceImpl implements ReservationService {
 
     private void requireAdmin(Long currentUserId) {
         if (currentUserId == null) {
-            throw new BusinessException(401, "User not logged in");
+            throw new BusinessException(401, "用户未登录");
         }
         if (!isAdmin(currentUserId)) {
-            throw new BusinessException(403, "Admin role required");
+            throw new BusinessException(403, "需要管理员权限");
         }
     }
 

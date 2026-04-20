@@ -25,3 +25,4 @@ public class LabOpenSlotEntity {
     private LocalDateTime updatedAt;
 }
 
+

@@ -14,3 +14,4 @@ public class ConsumableStockUpdateRequest {
     private String remark;
 
 }
+

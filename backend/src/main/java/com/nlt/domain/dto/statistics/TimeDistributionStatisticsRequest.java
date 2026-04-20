@@ -12,3 +12,4 @@ public class TimeDistributionStatisticsRequest {
     private Long labId;
 
 }
+

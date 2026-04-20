@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <section class="card-grid metrics-grid">
     <article class="metric-card brand">
       <span>本周预约</span>
@@ -75,4 +75,5 @@ onMounted(async () => {
   labCount.value = labData.total;
 });
 </script>
+
 

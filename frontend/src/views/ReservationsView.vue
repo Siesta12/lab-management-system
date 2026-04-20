@@ -1,10 +1,10 @@
-<template>
+﻿<template>
   <section class="content-grid split-grid">
-    <BasePanel tag="预约管理" title="预约单列表" :note="`共 ${state.total} 条`">
+    <BasePanel tag="预约管理" title="预约列表" :note="`共${state.total} 条`">
       <div class="toolbar">
         <select v-model="statusFilter">
           <option value="">全部状态</option>
-          <option value="1">待审批</option>
+          <option value="1">待审核</option>
           <option value="2">已通过</option>
           <option value="3">已驳回</option>
           <option value="4">已取消</option>
@@ -15,7 +15,7 @@
 
       <p v-if="message" class="info-text">{{ message }}</p>
 
-      <BaseTable :headers="['预约编号', '实验室', '申请人', '节次明细', '状态']">
+      <BaseTable :headers="['预订编号', '实验室', '申请人', '时段详情', '状态']">
         <tr v-for="item in filteredList" :key="item.id" class="clickable-row" @click="select(item.id)">
           <td>{{ item.reservationNo }}</td>
           <td>{{ labName(item.labId) }}</td>
@@ -113,21 +113,21 @@ const filteredList = computed(() => {
 });
 
 function labName(id: number): string {
-  return labs.value.find((l) => l.id === id)?.labName ?? `实验室#${id}`;
+  return labs.value.find((l) => l.id === id)?.labName ?? `实验室${id}`;
 }
 
 function slotSummary(item: ReservationDto): string {
   const parts = item.slots?.map((s) => `${s.reservationDate} ${s.periodName}`) ?? [];
-  if (parts.length <= 2) return parts.join('；') || '--';
-  return `${parts.slice(0, 2).join('；')}…（共${parts.length}条）`;
+  if (parts.length <= 2) return parts.join('，') || '--';
+  return `${parts.slice(0, 2).join('，')}等（共${parts.length}项）`;
 }
 
-function statusText(status: number): '待审批' | '已通过' | '已驳回' | '已取消' | '已完成' {
+function statusText(status: number): '待审核' | '已通过' | '已驳回' | '已取消' | '已完成' {
   if (status === 2) return '已通过';
   if (status === 3) return '已驳回';
   if (status === 4) return '已取消';
   if (status === 5) return '已完成';
-  return '待审批';
+  return '待审核';
 }
 
 function typeText(type: number): string {
@@ -144,10 +144,10 @@ function priorityText(value: number): string {
 
 function auditActionText(action: number): string {
   if (action === 1) return '提交申请';
-  if (action === 2) return '审批通过';
-  if (action === 3) return '审批驳回';
-  if (action === 4) return '取消预约';
-  if (action === 5) return '完成/签退';
+  if (action === 2) return '审核通过';
+  if (action === 3) return '审核驳回';
+  if (action === 4) return '取消预订';
+  if (action === 5) return '完成/结束';
   return '状态变更';
 }
 
@@ -159,7 +159,7 @@ async function loadPage(): Promise<void> {
     ]);
     state.value = page;
     labs.value = labData.list;
-    message.value = '已加载预约单列表。';
+    message.value = '已加载预订单列表。';
     if (page.list.length && !selected.value) {
       await select(page.list[0].id);
     }
@@ -179,7 +179,7 @@ async function select(id: number): Promise<void> {
     auditComment.value = '';
     rejectReason.value = '';
   } catch (error) {
-    message.value = error instanceof Error ? error.message : '加载预约详情失败。';
+    message.value = error instanceof Error ? error.message : '加载预订详情失败。';
   }
 }
 
@@ -187,18 +187,18 @@ async function handleApprove(): Promise<void> {
   if (!selected.value) return;
   try {
     await approveReservation(selected.value.id, auth.token.value, auditComment.value || undefined);
-    message.value = '已审批通过。';
+    message.value = '已审核通过。';
     selected.value = null;
     await loadPage();
   } catch (error) {
-    message.value = error instanceof Error ? error.message : '审批失败。';
+    message.value = error instanceof Error ? error.message : '审核失败。';
   }
 }
 
 async function handleReject(): Promise<void> {
   if (!selected.value) return;
   if (!rejectReason.value.trim()) {
-    message.value = '驳回原因必填。';
+    message.value = '驳回原因不能为空。';
     return;
   }
   try {
@@ -215,4 +215,5 @@ onMounted(() => {
   void loadPage();
 });
 </script>
+
 

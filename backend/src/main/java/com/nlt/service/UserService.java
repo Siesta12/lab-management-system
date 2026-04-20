@@ -16,8 +16,8 @@ public interface UserService {
      * 查询用户信息列表
      * @param pageNum 页码
      * @param pageSize 每页条数
-     * @param username 参数
-     * @param realName 参数
+     * @param username 用户名
+     * @param realName 真实姓名
      * @param departmentId 部门ID
      * @param status 状态值
      * @return 分页数据
@@ -47,7 +47,7 @@ public interface UserService {
     UserVO update(Long id, UserUpdateRequest request);
 
     /**
-     * 处理用户信息
+     * 获取用户选项列表
      * @param status 状态值
      * @return 数据列表
      */
@@ -60,14 +60,14 @@ public interface UserService {
     void delete(Long id);
 
     /**
-     * 重置用户信息
+     * 重置用户密码
      * @param id 主键ID
      * @param request 请求参数
      */
     void resetPassword(Long id, PasswordResetRequest request);
 
     /**
-     * 更新用户信息
+     * 更新用户状态
      * @param id 主键ID
      * @param status 状态值
      */
@@ -81,7 +81,7 @@ public interface UserService {
     UserVO currentUser(Long userId);
 
     /**
-     * 更新用户信息
+     * 更新用户个人资料
      * @param userId 用户ID
      * @param request 请求参数
      * @return 处理结果
@@ -89,10 +89,11 @@ public interface UserService {
     UserVO updateProfile(Long userId, UserProfileUpdateRequest request);
 
     /**
-     * 更新用户信息
+     * 更新用户密码
      * @param userId 用户ID
      * @param request 请求参数
      */
     void updatePassword(Long userId, PasswordUpdateRequest request);
 
 }
+

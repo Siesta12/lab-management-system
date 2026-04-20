@@ -24,8 +24,8 @@ public class DeviceServiceImpl implements DeviceService {
      * @param pageNum 页码
      * @param pageSize 每页条数
      * @param labId 实验室ID
-     * @param deviceName 参数
-     * @param deviceCode 参数
+     * @param deviceName 设备名称
+     * @param deviceCode 设备编号
      * @param status 状态值
      * @return 分页数据
      */
@@ -33,10 +33,10 @@ public class DeviceServiceImpl implements DeviceService {
     public PageData<DeviceEntity> page(int pageNum, int pageSize, Long labId, String deviceName, String deviceCode, Integer status) {
         int offset = (pageNum - 1) * pageSize;
         return new PageData<>(
-        deviceMapper.selectPage(offset, pageSize, labId, deviceName, deviceCode, status),
-        deviceMapper.countPage(labId, deviceName, deviceCode, status),
-        pageNum,
-        pageSize
+                deviceMapper.selectPage(offset, pageSize, labId, deviceName, deviceCode, status),
+                deviceMapper.countPage(labId, deviceName, deviceCode, status),
+                pageNum,
+                pageSize
         );
     }
 
@@ -53,15 +53,15 @@ public class DeviceServiceImpl implements DeviceService {
     }
 
     /**
-     * 处理设备信息
+     * 获取设备选项列表
      * @param labId 实验室ID
      * @return 数据列表
      */
     @Override
     public List<OptionItem> options(Long labId) {
         return deviceMapper.selectOptions(labId).stream()
-        .map(item -> new OptionItem(item.getDeviceName(), item.getId()))
-        .toList();
+                .map(item -> new OptionItem(item.getDeviceName(), item.getId()))
+                .toList();
     }
 
     /**
@@ -86,9 +86,10 @@ public class DeviceServiceImpl implements DeviceService {
      */
     @Override
     public DeviceEntity update(Long id, DeviceSaveRequest request) {
+        // 验证设备是否存在
+        getById(id);
         DeviceEntity entity = toEntity(request);
         entity.setId(id);
-        getById(id);
         deviceMapper.update(entity);
         return getById(id);
     }
@@ -99,17 +100,19 @@ public class DeviceServiceImpl implements DeviceService {
      */
     @Override
     public void delete(Long id) {
+        // 验证设备是否存在
         getById(id);
         deviceMapper.softDelete(id);
     }
 
     /**
-     * 更新设备信息
+     * 更新设备状态
      * @param id 主键ID
      * @param status 状态值
      */
     @Override
     public void updateStatus(Long id, Integer status) {
+        // 验证设备是否存在
         getById(id);
         deviceMapper.updateStatus(id, status);
     }
@@ -117,7 +120,7 @@ public class DeviceServiceImpl implements DeviceService {
     /**
      * 转换设备信息
      * @param request 请求参数
-     * @return 处理结果
+     * @return 实体对象
      */
     private DeviceEntity toEntity(DeviceSaveRequest request) {
         DeviceEntity entity = new DeviceEntity();
@@ -138,3 +141,4 @@ public class DeviceServiceImpl implements DeviceService {
     }
 
 }
+

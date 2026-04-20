@@ -261,10 +261,11 @@ CREATE TABLE `lab_reservation_slot` (
     `weekday` TINYINT NOT NULL COMMENT '1 Monday to 7 Sunday',
     `period_id` BIGINT NOT NULL COMMENT 'Period id',
     `slot_status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 occupied, 2 canceled',
+    `active_flag` TINYINT GENERATED ALWAYS AS (CASE WHEN `slot_status` = 1 THEN 1 ELSE NULL END) STORED COMMENT 'Generated for unique active occupancy',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated time',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_lab_reservation_slot_lab_date_period` (`lab_id`, `reservation_date`, `period_id`),
+    UNIQUE KEY `uk_lab_reservation_slot_lab_date_period_active` (`lab_id`, `reservation_date`, `period_id`, `active_flag`),
     KEY `idx_lab_reservation_slot_reservation_id` (`reservation_id`),
     KEY `idx_lab_reservation_slot_lab_date` (`lab_id`, `reservation_date`),
     KEY `idx_lab_reservation_slot_period_id` (`period_id`),
@@ -340,10 +341,10 @@ VALUES
 
 INSERT INTO `class_period` (`id`, `period_no`, `period_name`, `start_time`, `end_time`, `sort_order`, `status`)
 VALUES
-    (1, 1, 'Period 1-2', '08:00:00', '09:35:00', 1, 1),
-    (2, 2, 'Period 3-4', '10:00:00', '11:35:00', 2, 1),
-    (3, 3, 'Period 5-6', '14:00:00', '15:35:00', 3, 1),
-    (4, 4, 'Period 7-8', '16:00:00', '17:35:00', 4, 1),
-    (5, 5, 'Period 9-10', '19:00:00', '20:35:00', 5, 1);
+    (1, 1, '第1-2节', '08:00:00', '09:35:00', 1, 1),
+    (2, 2, '第3-4节', '10:00:00', '11:35:00', 2, 1),
+    (3, 3, '第5-6节', '14:00:00', '15:35:00', 3, 1),
+    (4, 4, '第7-8节', '16:00:00', '17:35:00', 4, 1),
+    (5, 5, '第9-10节', '19:00:00', '20:35:00', 5, 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

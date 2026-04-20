@@ -63,3 +63,4 @@ public interface DeviceService {
     void updateStatus(Long id, Integer status);
 
 }
+

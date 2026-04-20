@@ -47,3 +47,4 @@ public class ReservationDetailVo {
     private List<ReservationSlotVo> slots;
 }
 
+

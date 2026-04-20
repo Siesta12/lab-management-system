@@ -1,4 +1,4 @@
-import type { ConsumableDto, PageData } from '../types';
+﻿import type { ConsumableDto, PageData } from '../types';
 import { get } from './http';
 
 export function fetchConsumables(query: { labId?: number; pageNum?: number; pageSize?: number } = {}, token?: string): Promise<PageData<ConsumableDto>> {
@@ -12,3 +12,4 @@ export function fetchConsumables(query: { labId?: number; pageNum?: number; page
 
   return get<PageData<ConsumableDto>>(`/consumables?${params.toString()}`, token);
 }
+

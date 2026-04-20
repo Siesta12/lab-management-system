@@ -10,10 +10,10 @@ public interface RoleMapper {
 
     /**
      * 查询角色信息
-     * @param offset 参数
+     * @param offset 偏移量
      * @param pageSize 每页条数
-     * @param roleName 参数
-     * @param roleCode 参数
+     * @param roleName 角色名称
+     * @param roleCode 角色编码
      * @param status 状态值
      * @return 数据列表
      */
@@ -23,8 +23,8 @@ public interface RoleMapper {
 
     /**
      * 统计角色信息数量
-     * @param roleName 参数
-     * @param roleCode 参数
+     * @param roleName 角色名称
+     * @param roleCode 角色编码
      * @param status 状态值
      * @return 处理结果
      */
@@ -73,3 +73,4 @@ public interface RoleMapper {
     int softDelete(@Param("id") Long id);
 
 }
+

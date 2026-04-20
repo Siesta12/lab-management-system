@@ -14,3 +14,4 @@ public interface ConsumableStockLogMapper {
     int insert(ConsumableStockLogEntity entity);
 
 }
+

@@ -18,3 +18,4 @@ public interface LabOpenSlotMapper {
         @Param("weekday") Integer weekday,
         @Param("periodIds") List<Long> periodIds);
 }
+

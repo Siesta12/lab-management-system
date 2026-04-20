@@ -9,11 +9,11 @@ import org.apache.ibatis.annotations.Param;
 public interface UserMapper {
 
     /**
-     * 查询用户信息
-     * @param offset 参数
+     * 分页查询用户信息
+     * @param offset 偏移量
      * @param pageSize 每页条数
-     * @param username 参数
-     * @param realName 参数
+     * @param username 用户名
+     * @param realName 真实姓名
      * @param departmentId 部门ID
      * @param status 状态值
      * @return 数据列表
@@ -24,8 +24,8 @@ public interface UserMapper {
 
     /**
      * 统计用户信息数量
-     * @param username 参数
-     * @param realName 参数
+     * @param username 用户名
+     * @param realName 真实姓名
      * @param departmentId 部门ID
      * @param status 状态值
      * @return 处理结果
@@ -34,21 +34,21 @@ public interface UserMapper {
     @Param("departmentId") Long departmentId, @Param("status") Integer status);
 
     /**
-     * 查询用户信息
+     * 根据ID查询用户信息
      * @param id 主键ID
      * @return 处理结果
      */
     UserEntity selectById(@Param("id") Long id);
 
     /**
-     * 查询用户信息
-     * @param username 参数
+     * 根据用户名查询用户信息
+     * @param username 用户名
      * @return 处理结果
      */
     UserEntity selectByUsername(@Param("username") String username);
 
     /**
-     * 查询用户信息
+     * 查询用户选项列表
      * @param status 状态值
      * @return 数据列表
      */
@@ -69,22 +69,22 @@ public interface UserMapper {
     int update(UserEntity entity);
 
     /**
-     * 更新用户信息
+     * 更新用户个人资料
      * @param entity 参数
      * @return 处理结果
      */
     int updateProfile(UserEntity entity);
 
     /**
-     * 更新用户信息
+     * 更新用户密码
      * @param id 主键ID
-     * @param password 参数
+     * @param password 密码
      * @return 处理结果
      */
     int updatePassword(@Param("id") Long id, @Param("password") String password);
 
     /**
-     * 更新用户信息
+     * 更新用户状态
      * @param id 主键ID
      * @param status 状态值
      * @return 处理结果
@@ -92,17 +92,18 @@ public interface UserMapper {
     int updateStatus(@Param("id") Long id, @Param("status") Integer status);
 
     /**
-     * 更新用户信息
+     * 更新用户最后登录时间
      * @param id 主键ID
      * @return 处理结果
      */
     int updateLastLoginAt(@Param("id") Long id);
 
     /**
-     * 处理用户信息
+     * 软删除用户信息
      * @param id 主键ID
      * @return 处理结果
      */
     int softDelete(@Param("id") Long id);
 
 }
+

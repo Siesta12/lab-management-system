@@ -12,11 +12,11 @@ public interface ViolationMapper {
 
     /**
      * 查询违规记录
-     * @param offset 参数
+     * @param offset 偏移量
      * @param pageSize 每页条数
      * @param userId 用户ID
      * @param reservationId 预约ID
-     * @param violationType 参数
+     * @param violationType 违规类型
      * @return 数据列表
      */
     List<ViolationRecordEntity> selectPage(@Param("offset") int offset, @Param("pageSize") int pageSize,
@@ -27,7 +27,7 @@ public interface ViolationMapper {
      * 统计违规记录数量
      * @param userId 用户ID
      * @param reservationId 预约ID
-     * @param violationType 参数
+     * @param violationType 违规类型
      * @return 处理结果
      */
     long countPage(@Param("userId") Long userId, @Param("reservationId") Long reservationId,
@@ -41,16 +41,16 @@ public interface ViolationMapper {
     ViolationRecordEntity selectById(@Param("id") Long id);
 
     /**
-     * 查询违规记录
+     * 查询我的违规记录
      * @param userId 用户ID
-     * @param offset 参数
+     * @param offset 偏移量
      * @param pageSize 每页条数
      * @return 数据列表
      */
     List<ViolationRecordEntity> selectMine(@Param("userId") Long userId, @Param("offset") int offset, @Param("pageSize") int pageSize);
 
     /**
-     * 统计违规记录数量
+     * 统计我的违规记录数量
      * @param userId 用户ID
      * @return 处理结果
      */
@@ -71,11 +71,11 @@ public interface ViolationMapper {
     int deleteById(@Param("id") Long id);
 
     /**
-     * 统计违规记录数量
+     * 按类型统计违规记录数量
      * @param startDate 日期参数
      * @param endDate 日期参数
      * @param departmentId 部门ID
-     * @param violationType 参数
+     * @param violationType 违规类型
      * @return 处理结果
      */
     List<Map<String, Object>> countByType(@Param("startDate") LocalDate startDate,
@@ -84,3 +84,4 @@ public interface ViolationMapper {
     @Param("violationType") Integer violationType);
 
 }
+

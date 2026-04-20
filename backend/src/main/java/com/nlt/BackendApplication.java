@@ -7,7 +7,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class BackendApplication {
 
     /**
-     * 处理应用程序
+     * 应用程序入口
      * @param args 参数
      */
     public static void main(String[] args) {
@@ -15,3 +15,4 @@ public class BackendApplication {
     }
 
 }
+

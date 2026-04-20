@@ -1,4 +1,4 @@
-export type NavKey =
+﻿export type NavKey =
   | 'overview'
   | 'users'
   | 'labs'
@@ -39,7 +39,7 @@ export interface LabItem {
   name: string;
   code: string;
   location: string;
-  status: '开放' | '维护' | '关闭';
+  status: '开放' | '关闭' | '维护';
   capacity: number;
   manager: string;
   nextAvailable: string;
@@ -74,7 +74,7 @@ export interface DeviceItem {
   brand: string;
   quantity: number;
   available: number;
-  status: '正常' | '维修中' | '停用';
+  status: '正常' | '维修中' | '已使用';
 }
 
 export interface ConsumableItem {
@@ -380,3 +380,4 @@ export interface SlotRecommendationItem {
   periodName?: string;
   recommendationReason: string;
 }
+

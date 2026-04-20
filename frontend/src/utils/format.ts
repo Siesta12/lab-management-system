@@ -23,3 +23,4 @@ export function chartBars(values: number[]): string {
     .map((value, index) => `<span class="spark-bar" style="--value:${value}; --delay:${index}"></span>`)
     .join('');
 }
+

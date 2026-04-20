@@ -62,6 +62,15 @@
         where reservation_id = #{reservationId}
     </update>
 
+    <delete id="deleteCanceledSlots">
+        delete from lab_reservation_slot
+        where slot_status = 2
+          and (lab_id, reservation_date, period_id) in
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            (#{item.labId}, #{item.reservationDate}, #{item.periodId})
+        </foreach>
+    </delete>
+
     <select id="selectReservedSlots" resultType="com.nlt.domain.vo.schedule.ReservedSlotRow">
         select s.reservation_date as reservationDate,
                s.period_id as periodId,

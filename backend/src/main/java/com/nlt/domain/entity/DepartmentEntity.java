@@ -25,3 +25,4 @@ public class DepartmentEntity {
     private LocalDateTime updatedAt;
 
 }
+

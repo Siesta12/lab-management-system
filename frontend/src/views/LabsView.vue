@@ -1,19 +1,18 @@
-<template>
-  <section class="content-grid split-grid">
-    <BasePanel tag="实验室查询" title="实验室列表与筛选" :note="`共 ${labsState.total} 条`">
+﻿<template>
+  <section class="content-grid">
+    <BasePanel>
       <div class="toolbar">
-        <input v-model="keyword" placeholder="输入实验室名称或编号筛选" />
-        <button type="button" class="ghost-btn" @click="loadLabs">查询</button>
+        <input v-model="keyword" placeholder="输入实验室名称或编号等" @keyup.enter="handleSearch" />
+        <button type="button" class="ghost-btn" @click="handleSearch">查询</button>
+        <button type="button" class="ghost-btn" @click="handleReset">重置</button>
       </div>
-
-      <p v-if="message" class="info-text">{{ message }}</p>
 
       <BaseTable :headers="['名称', '编号', '位置', '开放状态', '运行状态', '容量']">
         <tr
           v-for="lab in displayLabs"
           :key="lab.id"
           class="clickable-row"
-          @click="selectLab(lab.id)"
+          @click="openLabDetail(lab.id)"
         >
           <td>{{ lab.labName }}</td>
           <td>{{ lab.labCode }}</td>
@@ -23,229 +22,308 @@
           <td>{{ lab.capacity }}</td>
         </tr>
       </BaseTable>
-    </BasePanel>
 
-    <BasePanel tag="实验室详情" title="未来三周课表 / 设备 / 耗材" panel-class="detail-panel">
-      <div v-if="selectedLab" class="detail-stack">
-        <div class="detail-card">
-          <h4>{{ selectedLab.labName }}</h4>
-          <p>{{ selectedDepartmentName }} · {{ selectedLab.labType || '类型待补充' }}</p>
-        </div>
-
-        <div class="detail-list">
-          <div><strong>实验室编号</strong><span>{{ selectedLab.labCode }}</span></div>
-          <div><strong>位置</strong><span>{{ buildLocation(selectedLab) }}</span></div>
-          <div><strong>容量</strong><span>{{ selectedLab.capacity }} 人</span></div>
-          <div><strong>开放状态</strong><span>{{ openStatusText(selectedLab.openStatus) }}</span></div>
-          <div><strong>运行状态</strong><span>{{ labStatusText(selectedLab.labStatus) }}</span></div>
-        </div>
-
-        <div class="detail-section">
-          <h5>实验室简介</h5>
-          <p>{{ selectedLab.description || '暂无简介说明。' }}</p>
-        </div>
-
-        <div class="detail-section">
-          <h5>使用规则</h5>
-          <p>{{ selectedLab.usageRule || '暂无使用规则说明。' }}</p>
-        </div>
-
-        <div class="detail-section">
-          <h5>设备配置</h5>
-          <ul class="bullet-list compact-list">
-            <li v-for="device in selectedDevices" :key="device.id">
-              {{ device.deviceName }} · {{ device.availableQuantity }}/{{ device.quantity }} 可用
-            </li>
-          </ul>
-        </div>
-
-        <div class="detail-section">
-          <h5>耗材情况</h5>
-          <ul class="bullet-list compact-list">
-            <li v-for="consumable in selectedConsumables" :key="consumable.id">
-              {{ consumable.consumableName }} · 库存 {{ consumable.stockQuantity }} {{ consumable.unit }}
-            </li>
-          </ul>
-        </div>
-
-        <div class="detail-section">
-          <div class="schedule-head">
-            <h5>未来三周课表（按节次）</h5>
-            <div v-if="isAuthenticated" class="schedule-actions">
-              <label class="mode-pill">
-                <span>模式</span>
-                <select v-model="mode">
-                  <option value="reserve">预约</option>
-                  <option v-if="isAdmin" value="maintenance">维护</option>
-                </select>
-              </label>
-              <button type="button" class="ghost-btn" @click="reloadSchedule">刷新课表</button>
-            </div>
-          </div>
-
-          <p v-if="scheduleMessage" class="info-text">{{ scheduleMessage }}</p>
-
-          <div v-if="schedule" class="schedule-wrap">
-            <div class="legend">
-              <span class="legend-item free">空闲</span>
-              <span class="legend-item reserved">已预约</span>
-              <span class="legend-item pending">待审批</span>
-              <span class="legend-item maintenance">维护中</span>
-              <span class="legend-item closed">不开放</span>
-              <span v-if="selectedKeys.length" class="legend-selected">已选 {{ selectedKeys.length }} 个</span>
-            </div>
-
-            <div class="schedule-table-scroll">
-              <table class="schedule-table">
-                <thead>
-                  <tr>
-                    <th class="sticky-col">节次</th>
-                    <th v-for="day in schedule.days" :key="day.date">
-                      <div class="day-head">
-                        <div class="day-date">{{ day.date.slice(5) }}</div>
-                        <div class="day-week">{{ weekdayText(day.weekday) }}</div>
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="period in schedule.periods" :key="period.id">
-                    <td class="sticky-col period-col">
-                      <div class="period-name">{{ period.periodName }}</div>
-                      <div class="period-time">{{ period.startTime }} - {{ period.endTime }}</div>
-                    </td>
-                    <td
-                      v-for="day in schedule.days"
-                      :key="`${day.date}-${period.id}`"
-                      class="schedule-cell"
-                      :class="cellClass(day, period.id)"
-                      @click="handleCellClick(day, period.id)"
-                    >
-                      <div class="cell-main">
-                        <span class="cell-status">{{ cellStatusText(day, period.id) }}</span>
-                        <span v-if="cell(day, period.id)?.reservationNo" class="cell-sub">#{{ cell(day, period.id)?.reservationNo }}</span>
-                        <span v-if="cell(day, period.id)?.maintenanceReason" class="cell-sub">{{ cell(day, period.id)?.maintenanceReason }}</span>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div v-if="isAuthenticated" class="schedule-forms">
-              <div v-if="mode === 'reserve'" class="form-card">
-                <h6>预约表单</h6>
-                <div class="grid-form">
-                  <label>
-                    <span>预约类型</span>
-                    <select v-model.number="reservationForm.reservationType">
-                      <option :value="1">课程</option>
-                      <option :value="2">科研</option>
-                      <option :value="3">个人</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>优先级</span>
-                    <select v-model.number="reservationForm.priorityLevel">
-                      <option :value="1">高</option>
-                      <option :value="2">中</option>
-                      <option :value="3">低</option>
-                    </select>
-                  </label>
-                  <label class="wide">
-                    <span>用途说明</span>
-                    <input v-model="reservationForm.usagePurpose" placeholder="例如：课程实验 / 科研训练" />
-                  </label>
-                  <label class="wide">
-                    <span>课程/项目名称</span>
-                    <input v-model="reservationForm.courseOrProjectName" placeholder="可选" />
-                  </label>
-                  <label>
-                    <span>参与人数</span>
-                    <input v-model.number="reservationForm.participantCount" type="number" min="1" />
-                  </label>
-                  <label>
-                    <span>联系电话</span>
-                    <input v-model="reservationForm.contactPhone" placeholder="必填" />
-                  </label>
-                </div>
-                <div class="button-row">
-                  <button type="button" class="ghost-btn wide" :disabled="!selectedKeys.length" @click="handleRecommend">
-                    推荐可选节次
-                  </button>
-                  <button type="button" class="primary-btn wide" :disabled="!canSubmitReservation" @click="handleCreateReservation">
-                    提交预约
-                  </button>
-                </div>
-              </div>
-
-              <div v-if="isAdmin && mode === 'maintenance'" class="form-card">
-                <h6>维护设置</h6>
-                <div class="grid-form">
-                  <label class="wide">
-                    <span>维护原因</span>
-                    <input v-model="maintenanceReason" placeholder="例如：设备检修" />
-                  </label>
-                </div>
-                <div class="button-row">
-                  <button type="button" class="primary-btn wide" :disabled="!canSubmitMaintenance" @click="handleCreateMaintenance">
-                    设置维护
-                  </button>
-                  <button type="button" class="ghost-btn wide" @click="clearSelection">清空选择</button>
-                </div>
-                <p class="info-text">提示：点击“维护中”格子会直接取消维护。</p>
-              </div>
-
-              <div v-if="recommendations.length" class="form-card">
-                <h6>推荐结果</h6>
-                <ul class="bullet-list compact-list">
-                  <li v-for="(item, idx) in recommendations" :key="idx">
-                    {{ item.labName }} · {{ item.reservationDate }} · {{ item.periodName || `节次#${item.periodId}` }} · {{ item.recommendationReason }}
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div class="pagination-wrap">
+        <span class="pagination-total">共{{ labsState.total }} 条</span>
+        <button type="button" class="ghost-btn small-btn" :disabled="currentPage <= 1" @click="changePage(currentPage - 1)">
+          上一页
+        </button>
+        <span class="pagination-text">第{{ currentPage }} / {{ totalPages }} 页</span>
+        <button
+          type="button"
+          class="ghost-btn small-btn"
+          :disabled="currentPage >= totalPages"
+          @click="changePage(currentPage + 1)"
+        >
+          下一页
+        </button>
       </div>
-
-      <p v-else class="info-text">请选择左侧实验室查看详情与课表。</p>
     </BasePanel>
   </section>
+
+  <teleport to="body">
+    <div v-if="detailVisible" class="detail-modal-mask" @click.self="closeDetailModal">
+      <div class="detail-modal">
+        <div class="detail-modal-head">
+          <div class="detail-modal-title">
+            <h3>选择节次预约</h3>
+            <p class="detail-modal-subtitle">未来三周课表 · 点击空闲格子选择节次</p>
+          </div>
+          <button type="button" class="ghost-btn small-btn" @click="closeDetailModal">关闭</button>
+        </div>
+        <p v-if="loadingDetail" class="info-text">正在加载实验室详情...</p>
+        <div v-else-if="selectedLab" class="detail-stack">
+          <div class="lab-hero">
+            <div class="lab-hero-main">
+              <h4 class="lab-title">{{ selectedLab.labName }}</h4>
+              <p class="lab-subtitle">{{ selectedDepartmentName }} · {{ selectedLab.labType || '类型暂未设置' }}</p>
+            </div>
+            <div class="lab-hero-meta">
+              <span class="chip">{{ buildLocation(selectedLab) }}</span>
+              <span class="chip">{{ selectedLab.capacity }} 人</span>
+              <span class="chip" :class="getBadgeClass(openStatusText(selectedLab.openStatus))">{{ openStatusText(selectedLab.openStatus) }}</span>
+              <span class="chip" :class="getBadgeClass(labStatusText(selectedLab.labStatus))">{{ labStatusText(selectedLab.labStatus) }}</span>
+              <span class="chip subtle">设备 {{ selectedDevices.length }}</span>
+              <span class="chip subtle">耗材 {{ selectedConsumables.length }}</span>
+            </div>
+          </div>
+
+          <div class="detail-tabs">
+            <button type="button" class="tab-btn" :class="{ active: detailTab === 'schedule' }" @click="detailTab = 'schedule'">
+              未来三周课表
+            </button>
+            <button type="button" class="tab-btn" :class="{ active: detailTab === 'detail' }" @click="detailTab = 'detail'">
+              详情
+            </button>
+          </div>
+
+          <div v-show="detailTab === 'schedule'" class="detail-pane">
+            <div class="schedule-head compact-head">
+              <div class="schedule-head-left">
+                <h5 class="section-title">课表（按节次）</h5>
+                <p class="section-hint">未来 21 天</p>
+              </div>
+              <div v-if="isAuthenticated" class="schedule-actions">
+                <button type="button" class="ghost-btn" @click="reloadSchedule">刷新</button>
+              </div>
+            </div>
+
+            <p v-if="scheduleMessage" class="info-text">{{ scheduleMessage }}</p>
+
+            <div v-if="schedule" class="schedule-wrap">
+              <div class="legend">
+                <span class="legend-item free">空闲</span>
+                <span class="legend-item reserved">已预约</span>
+                <span class="legend-item pending">待审批</span>
+                <span class="legend-item maintenance">维护中</span>
+                <span class="legend-item closed">不开放</span>
+                <span v-if="selectedKeys.length" class="legend-selected">已选 {{ selectedKeys.length }} 个</span>
+              </div>
+
+              <div v-if="selectedKeys.length" class="selection-strip">
+                <div class="selection-left">
+                  <span class="selection-label">已选</span>
+                  <div class="selection-items">
+                    <span v-for="k in selectedKeys" :key="`${k.date}-${k.periodId}`" class="selection-pill">
+                      {{ k.date.slice(5) }} · {{ periodLabel(k.periodId) }}
+                    </span>
+                  </div>
+                </div>
+                <button type="button" class="ghost-btn small-btn" @click="clearSelection">清空</button>
+              </div>
+
+              <div class="schedule-table-scroll">
+                <table class="schedule-table">
+                  <thead>
+                    <tr>
+                      <th class="sticky-col">节次</th>
+                      <th v-for="day in schedule.days" :key="day.date">
+                        <div class="day-head">
+                          <div class="day-date">{{ day.date.slice(5) }}</div>
+                          <div class="day-week">{{ weekdayText(day.weekday) }}</div>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="period in schedule.periods" :key="period.id">
+                      <td class="sticky-col period-col">
+                        <div class="period-name">{{ period.periodName }}</div>
+                        <div class="period-time">{{ period.startTime }} - {{ period.endTime }}</div>
+                      </td>
+                      <td
+                        v-for="day in schedule.days"
+                        :key="`${day.date}-${period.id}`"
+                        class="schedule-cell"
+                        :class="cellClass(day, period.id)"
+                        @click="handleCellClick(day, period.id)"
+                      >
+                        <div class="cell-main">
+                          <span class="cell-status">{{ cellStatusText(day, period.id) }}</span>
+                          <span v-if="cell(day, period.id)?.reservationNo" class="cell-sub">#{{ cell(day, period.id)?.reservationNo }}</span>
+                          <span v-if="cell(day, period.id)?.maintenanceReason" class="cell-sub">{{ cell(day, period.id)?.maintenanceReason }}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div v-if="isAuthenticated" class="schedule-forms">
+                <div class="form-card reservation-form-card">
+                  <div class="form-card-header">
+                    <h6>预约信息</h6>
+                    <p>请填写预约信息，选择可用时间段后提交预约申请。</p>
+                  </div>
+
+                  <p v-if="!selectedKeys.length" class="info-text compact-tip">
+                    先在课表中选择空闲节次，再填写并提交。
+                  </p>
+
+                  <div v-else class="beauty-form">
+                    <label class="field-card">
+                      <span class="field-label">预约类型</span>
+                      <select v-model.number="reservationForm.reservationType">
+                        <option :value="3">个人预约</option>
+                        <option :value="1">课程实验</option>
+                        <option :value="2">科研训练</option>
+                      </select>
+                    </label>
+
+                    <label class="field-card">
+                      <span class="field-label">参与人数</span>
+                      <input v-model.number="reservationForm.participantCount" type="number" min="1" />
+                    </label>
+
+                    <label class="field-card field-full">
+                      <span class="field-label">用途说明</span>
+                      <input
+                          v-model="reservationForm.usagePurpose"
+                          placeholder="例如：课程实验 / 科研训练 / 项目开发 / 设备调试等"
+                      />
+                    </label>
+
+                    <label class="field-card">
+                      <span class="field-label">课程/项目名称</span>
+                      <input
+                          v-model="reservationForm.courseOrProjectName"
+                          placeholder="可选"
+                      />
+                    </label>
+
+                    <label class="field-card">
+                      <span class="field-label">联系电话</span>
+                      <input
+                          v-model="reservationForm.contactPhone"
+                          placeholder="请输入联系电话"
+                      />
+                    </label>
+                  </div>
+
+                  <div class="recommend-box">
+                    <div class="recommend-title">推荐可选节次</div>
+                     <button
+                         type="button"
+                         class="ghost-btn recommend-btn"
+                         :disabled="!selectedKeys.length || submittingReservation"
+                         @click="handleRecommend"
+                     >
+                       刷新推荐
+                     </button>
+                  </div>
+
+                   <button
+                       type="button"
+                       class="primary-btn submit-reservation-btn"
+                       :disabled="!canSubmitReservation || submittingReservation"
+                       @click="handleCreateReservation"
+                   >
+                     {{ submittingReservation ? '正在提交...' : '提交预约申请' }}
+                   </button>
+                 </div>
+
+                <div v-if="recommendations.length" class="form-card">
+                  <h6>推荐结果</h6>
+                  <ul class="bullet-list compact-list">
+                    <li v-for="(item, idx) in recommendations" :key="idx">
+                      {{ item.labName }} · {{ item.reservationDate }} · {{ item.periodName || `节次#${item.periodId}` }} · {{ item.recommendationReason }}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-show="detailTab === 'detail'" class="detail-pane">
+            <div class="detail-kv">
+              <div class="kv">
+                <span class="kv-label">实验室编号</span>
+                <span class="kv-value">{{ selectedLab.labCode }}</span>
+              </div>
+              <div class="kv">
+                <span class="kv-label">使用规则</span>
+                <span class="kv-value">{{ selectedLab.usageRule || '按固定节次预约，进入实验室须遵守安全规范。' }}</span>
+              </div>
+            </div>
+
+            <details class="details-card">
+              <summary>设备（{{ selectedDevices.length }}）</summary>
+              <ul v-if="selectedDevices.length" class="bullet-list compact-list">
+                <li v-for="device in selectedDevices" :key="device.id">
+                  {{ device.deviceName }} · {{ device.availableQuantity }}/{{ device.quantity }} 可用
+                </li>
+              </ul>
+              <p v-else class="info-text">暂无设备数据。</p>
+            </details>
+
+            <details class="details-card">
+              <summary>耗材（{{ selectedConsumables.length }}）</summary>
+              <ul v-if="selectedConsumables.length" class="bullet-list compact-list">
+                <li v-for="consumable in selectedConsumables" :key="consumable.id">
+                  {{ consumable.consumableName }} · 库存 {{ consumable.stockQuantity }} {{ consumable.unit }}
+                </li>
+              </ul>
+              <p v-else class="info-text">暂无耗材数据。</p>
+            </details>
+
+            <details class="details-card">
+              <summary>简介</summary>
+              <p class="info-text">{{ selectedLab.description || '暂无简介说明。' }}</p>
+            </details>
+          </div>
+        </div>
+
+        <p v-else class="info-text">请选择实验室查看详情与课表。</p>
+      </div>
+    </div>
+
+    <div v-if="toast.visible" class="toast" :class="toast.type" role="status" aria-live="polite">
+      {{ toast.text }}
+    </div>
+  </teleport>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
-import { hasRouteAccess } from '../access';
 import { fetchConsumables } from '../api/consumables';
 import { fetchDepartmentOptions } from '../api/departments';
 import { fetchDevices } from '../api/devices';
-import { cancelLabMaintenance, createLabMaintenance, fetchLabById, fetchLabs, fetchLabSchedule } from '../api/labs';
+import { fetchLabById, fetchLabs, fetchLabSchedule } from '../api/labs';
 import { createReservation, recommendSlots } from '../api/reservations';
 import BasePanel from '../components/BasePanel.vue';
 import BaseTable from '../components/BaseTable.vue';
 import { useAuthStore } from '../stores/auth';
-import type { ConsumableDto, DeviceDto, LabDto, LabScheduleDto, OptionItem, ScheduleDayDto, ScheduleCellDto, SlotRecommendationItem } from '../types';
+import type { ConsumableDto, DeviceDto, LabDto, LabScheduleDto, OptionItem, PageData, ScheduleDayDto, ScheduleCellDto, SlotRecommendationItem } from '../types';
 import { getBadgeClass } from '../utils/format';
 
 const auth = useAuthStore();
-const isAdmin = computed(() => hasRouteAccess(auth.currentUser.value?.roleCodes, ['ADMIN']));
 const isAuthenticated = computed(() => Boolean(auth.token.value));
 
 const keyword = ref('');
 const message = ref('');
-const labsState = ref<{ list: LabDto[]; total: number }>({ list: [], total: 0 });
+const labsState = ref<PageData<LabDto>>({ list: [], total: 0, pageNum: 1, pageSize: 6 });
 const departments = ref<OptionItem[]>([]);
 const selectedLab = ref<LabDto | null>(null);
 const selectedDevices = ref<DeviceDto[]>([]);
 const selectedConsumables = ref<ConsumableDto[]>([]);
+const detailVisible = ref(false);
+const loadingDetail = ref(false);
+const detailTab = ref<'schedule' | 'detail'>('schedule');
+const currentPage = ref(1);
+const pageSize = ref(10);
 
 const schedule = ref<LabScheduleDto | null>(null);
 const scheduleMessage = ref('');
-const mode = ref<'reserve' | 'maintenance'>('reserve');
+
 const selectedKeys = ref<Array<{ date: string; periodId: number }>>([]);
 const recommendations = ref<SlotRecommendationItem[]>([]);
-const maintenanceReason = ref('');
+
+const submittingReservation = ref(false);
+const toast = reactive<{ visible: boolean; type: 'success' | 'error'; text: string; timer?: number }>({
+  visible: false,
+  type: 'success',
+  text: '',
+});
 
 const reservationForm = reactive({
   reservationType: 3,
@@ -257,6 +335,10 @@ const reservationForm = reactive({
 });
 
 const displayLabs = computed(() => labsState.value.list);
+const totalPages = computed(() => {
+  const pages = Math.ceil((labsState.value.total || 0) / pageSize.value);
+  return Math.max(pages, 1);
+});
 const selectedDepartmentName = computed(() => {
   if (!selectedLab.value?.departmentId) {
     return '所属学院待补充';
@@ -267,19 +349,16 @@ const selectedDepartmentName = computed(() => {
 const canSubmitReservation = computed(() => {
   return (
     isAuthenticated.value &&
-    mode.value === 'reserve' &&
     selectedKeys.value.length > 0 &&
     reservationForm.usagePurpose.trim().length > 0 &&
     reservationForm.contactPhone.trim().length > 0
   );
 });
 
-const canSubmitMaintenance = computed(() => {
-  return isAdmin.value && mode.value === 'maintenance' && selectedKeys.value.length > 0 && maintenanceReason.value.trim().length > 0;
-});
+
 
 function buildLocation(lab: LabDto): string {
-  return [lab.buildingName, lab.roomNo].filter(Boolean).join(' / ') || '位置待补充';
+  return [lab.buildingName, lab.roomNo].filter(Boolean).join(' / ') || '位置未知';
 }
 
 function openStatusText(status: number): '开放' | '关闭' {
@@ -295,20 +374,69 @@ function weekdayText(weekday: number): string {
   return map[weekday - 1] ?? `星期${weekday}`;
 }
 
-async function loadLabs(): Promise<void> {
+function periodLabel(periodId: number): string {
+  const p = schedule.value?.periods?.find((item) => item.id === periodId);
+  return p?.periodName ?? `节次#${periodId}`;
+}
+
+async function loadLabs(pageNum = currentPage.value): Promise<void> {
+  currentPage.value = Math.max(pageNum, 1);
   try {
-    const data = await fetchLabs({ pageNum: 1, pageSize: 50, labName: keyword.value || undefined }, auth.token.value || undefined);
+    const data = await fetchLabs(
+      { pageNum: currentPage.value, pageSize: pageSize.value, labName: keyword.value.trim() || undefined },
+      auth.token.value || undefined,
+    );
     labsState.value = data;
-    if (data.list.length && !selectedLab.value) {
-      await selectLab(data.list[0].id);
-    }
+    currentPage.value = data.pageNum || currentPage.value;
+    pageSize.value = data.pageSize || pageSize.value;
     message.value = '已加载实验室列表。';
   } catch (error) {
     message.value = error instanceof Error ? `实验室数据加载失败：${error.message}` : '实验室数据加载失败。';
   }
 }
 
-async function selectLab(id: number): Promise<void> {
+function handleSearch(): void {
+  void loadLabs(1);
+}
+
+function handleReset(): void {
+  keyword.value = '';
+  void loadLabs(1);
+}
+
+function changePage(pageNum: number): void {
+  void loadLabs(pageNum);
+}
+
+function closeDetailModal(): void {
+  detailVisible.value = false;
+  // Reset state so next open starts clean.
+  selectedLab.value = null;
+  selectedDevices.value = [];
+  selectedConsumables.value = [];
+  schedule.value = null;
+  scheduleMessage.value = '';
+  recommendations.value = [];
+  clearSelection();
+}
+
+function showToast(type: 'success' | 'error', text: string, durationMs = 1800): void {
+  if (toast.timer) {
+    window.clearTimeout(toast.timer);
+  }
+  toast.visible = true;
+  toast.type = type;
+  toast.text = text;
+  toast.timer = window.setTimeout(() => {
+    toast.visible = false;
+    toast.text = '';
+    toast.timer = undefined;
+  }, durationMs);
+}
+
+async function openLabDetail(id: number): Promise<void> {
+  detailVisible.value = true;
+  loadingDetail.value = true;
   try {
     const [lab, devices, consumables] = await Promise.all([
       fetchLabById(id, auth.token.value || undefined),
@@ -318,11 +446,14 @@ async function selectLab(id: number): Promise<void> {
     selectedLab.value = lab;
     selectedDevices.value = devices.list;
     selectedConsumables.value = consumables.list;
+    detailTab.value = 'schedule';
     clearSelection();
     recommendations.value = [];
     await reloadSchedule();
   } catch (error) {
     message.value = error instanceof Error ? `实验室详情加载失败：${error.message}` : '实验室详情加载失败。';
+  } finally {
+    loadingDetail.value = false;
   }
 }
 
@@ -335,7 +466,7 @@ function cellStatusText(day: ScheduleDayDto, periodId: number): string {
   if (!c) return '--';
   if (c.status === 'FREE') return '空闲';
   if (c.status === 'RESERVED') return '已预约';
-  if (c.status === 'PENDING') return '待审批';
+  if (c.status === 'PENDING') return '待审核';
   if (c.status === 'MAINTENANCE') return '维护';
   return '不开放';
 }
@@ -354,16 +485,18 @@ function cellClass(day: ScheduleDayDto, periodId: number): Record<string, boolea
     maintenance: status === 'MAINTENANCE',
     closed: status === 'CLOSED',
     selected: isSelected(day.date, periodId),
-    clickable: status === 'FREE' || (mode.value === 'maintenance' && status === 'MAINTENANCE'),
+    clickable: status === 'FREE',
   };
 }
 
 function toggleSelection(date: string, periodId: number): void {
   const idx = selectedKeys.value.findIndex((k) => k.date === date && k.periodId === periodId);
   if (idx >= 0) {
-    selectedKeys.value.splice(idx, 1);
+    // 如果点击的是已选中的时间段，则取消选择
+    selectedKeys.value = [];
   } else {
-    selectedKeys.value.push({ date, periodId });
+    // 如果点击的是新的时间段，则先清空已选择的，再添加新的
+    selectedKeys.value = [{ date, periodId }];
   }
 }
 
@@ -371,57 +504,48 @@ async function reloadSchedule(): Promise<void> {
   schedule.value = null;
   scheduleMessage.value = '';
   if (!selectedLab.value || !auth.token.value) {
-    scheduleMessage.value = '登录后可查看未来三周课表并进行预约/维护操作。';
+    scheduleMessage.value = '登录后可查看未来几周预约表并进行预约与管理操作。';
     return;
   }
   try {
     schedule.value = await fetchLabSchedule(selectedLab.value.id, auth.token.value);
-    scheduleMessage.value = '课表已加载。点击空闲格子选择节次。';
+    scheduleMessage.value = '预约已加载，请点击空白格选择时段。';
   } catch (error) {
-    scheduleMessage.value = error instanceof Error ? `课表加载失败：${error.message}` : '课表加载失败。';
+    scheduleMessage.value = error instanceof Error ? `预约加载失败：${error.message}` : '预约加载失败。';
   }
 }
 
 function clearSelection(): void {
   selectedKeys.value = [];
+  scheduleMessage.value = '预约已加载，请点击空白格选择时段。';
 }
 
 async function handleCellClick(day: ScheduleDayDto, periodId: number): Promise<void> {
   const c = cell(day, periodId);
   if (!c) return;
 
-  if (mode.value === 'maintenance') {
-    if (!isAdmin.value) return;
-    if (c.status === 'MAINTENANCE' && c.maintenanceId) {
-      try {
-        await cancelLabMaintenance(selectedLab.value!.id, c.maintenanceId, auth.token.value!);
-        scheduleMessage.value = '已取消维护。';
-        await reloadSchedule();
-      } catch (error) {
-        scheduleMessage.value = error instanceof Error ? error.message : '取消维护失败。';
-      }
-      return;
-    }
-    if (c.status === 'FREE') {
-      toggleSelection(day.date, periodId);
-    }
-    return;
-  }
-
   if (c.status === 'FREE') {
     toggleSelection(day.date, periodId);
+
+    if (selectedKeys.value.length) {
+      scheduleMessage.value = '已选择可预约时段，请填写预约信息并提交。';
+    } else {
+      scheduleMessage.value = '预约已加载，请点击空白格选择时段。';
+    }
     return;
   }
 
-  scheduleMessage.value = '该节次不可预约，可点击“推荐可选节次”获取建议。';
+  scheduleMessage.value = '该时段不可预约，可点击箭头查看可选时段。';
 }
 
 async function handleCreateReservation(): Promise<void> {
   if (!selectedLab.value || !auth.token.value) return;
   if (!canSubmitReservation.value) {
-    scheduleMessage.value = '请先选择空闲节次，并填写用途说明与联系电话。';
+    scheduleMessage.value = '请先选择空闲时段，并填写用途说明与联系电话。';
     return;
   }
+  if (submittingReservation.value) return;
+  submittingReservation.value = true;
   try {
     await createReservation(
       {
@@ -436,47 +560,26 @@ async function handleCreateReservation(): Promise<void> {
       },
       auth.token.value,
     );
-    scheduleMessage.value = '预约提交成功，已刷新课表。';
-    clearSelection();
-    recommendations.value = [];
-    await reloadSchedule();
+    // Use unicode escapes to avoid any potential charset issues in built JS delivery.
+    showToast('success', '\u9884\u7ea6\u63d0\u4ea4\u6210\u529f\uff0c\u5df2\u4e3a\u4f60\u81ea\u52a8\u5173\u95ed\u9884\u7ea6\u7a97\u53e3\u3002', 2600);
+    // Close immediately (the toast stays visible outside the modal).
+    detailVisible.value = false;
+    window.setTimeout(() => closeDetailModal(), 0);
   } catch (error) {
-    scheduleMessage.value = error instanceof Error ? error.message : '预约提交失败。';
+    const text = error instanceof Error ? error.message : '\u9884\u7ea6\u63d0\u4ea4\u5931\u8d25\u3002';
+    scheduleMessage.value = text;
+    showToast('error', text);
+  } finally {
+    submittingReservation.value = false;
   }
 }
 
-async function handleCreateMaintenance(): Promise<void> {
-  if (!selectedLab.value || !auth.token.value) return;
-  if (!canSubmitMaintenance.value) {
-    scheduleMessage.value = '请先选择空闲节次，并填写维护原因。';
-    return;
-  }
-  const groups = new Map<string, number[]>();
-  for (const item of selectedKeys.value) {
-    const list = groups.get(item.date) ?? [];
-    list.push(item.periodId);
-    groups.set(item.date, list);
-  }
-  try {
-    for (const [date, periodIds] of groups.entries()) {
-      await createLabMaintenance(
-        selectedLab.value.id,
-        { maintenanceDate: date, periodIds: Array.from(new Set(periodIds)), reason: maintenanceReason.value },
-        auth.token.value,
-      );
-    }
-    scheduleMessage.value = '维护设置成功，已刷新课表。';
-    clearSelection();
-    await reloadSchedule();
-  } catch (error) {
-    scheduleMessage.value = error instanceof Error ? error.message : '维护设置失败。';
-  }
-}
+
 
 async function handleRecommend(): Promise<void> {
   if (!selectedLab.value || !auth.token.value) return;
   if (!selectedKeys.value.length) {
-    scheduleMessage.value = '请先选择你想预约的节次（或选择一个不可预约的节次，再看推荐）。';
+    scheduleMessage.value = '请先选择您要预约的时段（或选择一个不可预约的时段，再查看推荐）。';
     return;
   }
   try {
@@ -488,7 +591,7 @@ async function handleRecommend(): Promise<void> {
       },
       auth.token.value,
     );
-    scheduleMessage.value = recommendations.value.length ? '已生成推荐结果。' : '暂无可推荐的节次/实验室。';
+    scheduleMessage.value = recommendations.value.length ? '已生成推荐结果。' : '暂无可推荐的时段/实验室。';
   } catch (error) {
     scheduleMessage.value = error instanceof Error ? error.message : '推荐查询失败。';
   }
@@ -505,11 +608,338 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* 表格样式优化 */
+.table-wrap table {
+  font-size: 13px;
+}
+
+.table-wrap th,
+.table-wrap td {
+  padding: 10px 8px;
+}
+
 .schedule-wrap {
   border: 1px solid rgba(15, 23, 42, 0.12);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.66);
   overflow: hidden;
+}
+
+.pagination-wrap {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.pagination-total {
+  margin-right: auto;
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.72);
+}
+
+.pagination-text {
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.8);
+}
+
+.toolbar {
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.toolbar input {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.toolbar button {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.detail-modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 1200;
+  padding: 20px;
+}
+
+.detail-modal {
+  width: min(1200px, 96vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: #ffffff;
+  padding: 16px;
+  box-shadow: 0 28px 48px rgba(15, 23, 42, 0.3);
+}
+
+.toast {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1300;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 22px 42px rgba(15, 23, 42, 0.22);
+  font-size: 14px;
+  font-weight: 650;
+  color: rgba(15, 23, 42, 0.94);
+  max-width: min(640px, 92vw);
+  text-align: center;
+  backdrop-filter: blur(10px);
+  animation: toast-pop 160ms ease-out;
+}
+
+.toast.success {
+  background: rgba(16, 185, 129, 0.92);
+  border-color: rgba(16, 185, 129, 0.55);
+  color: #ffffff;
+}
+
+.toast.error {
+  background: rgba(239, 68, 68, 0.92);
+  border-color: rgba(239, 68, 68, 0.55);
+  color: #ffffff;
+}
+
+@keyframes toast-pop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+.detail-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.detail-modal-head h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.detail-modal-title {
+  display: grid;
+  gap: 2px;
+}
+
+.detail-modal-subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.72);
+}
+
+.detail-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.lab-hero {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.02);
+  padding: 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.lab-title {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: 0.2px;
+}
+
+.lab-subtitle {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.72);
+}
+
+.lab-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.75);
+  line-height: 1.2;
+}
+
+.chip.subtle {
+  background: rgba(15, 23, 42, 0.03);
+  color: rgba(15, 23, 42, 0.72);
+}
+
+.detail-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  width: fit-content;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(15, 23, 42, 0.02);
+}
+
+.tab-btn {
+  border: 0;
+  background: transparent;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: rgba(15, 23, 42, 0.82);
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  background: rgba(15, 23, 42, 0.08);
+  color: rgba(15, 23, 42, 1);
+  font-weight: 650;
+}
+
+.detail-pane {
+  display: grid;
+  gap: 10px;
+}
+
+.compact-head {
+  margin-top: 4px;
+}
+
+.schedule-head-left {
+  display: grid;
+  gap: 2px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 14px;
+}
+
+.section-hint {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.72);
+}
+
+.selection-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(15, 23, 42, 0.02);
+}
+
+.selection-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.selection-label {
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.72);
+  white-space: nowrap;
+}
+
+.selection-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.selection-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.75);
+  white-space: nowrap;
+}
+
+.compact-tip {
+  margin-top: 6px;
+  margin-bottom: 0;
+}
+
+.detail-kv {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.75);
+  display: grid;
+  gap: 10px;
+}
+
+.kv {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kv-label {
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.72);
+  white-space: nowrap;
+}
+
+.kv-value {
+  font-size: 13px;
+  text-align: right;
+  color: rgba(15, 23, 42, 0.92);
+}
+
+.details-card {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.details-card > summary {
+  cursor: pointer;
+  font-weight: 650;
+  list-style: none;
+}
+
+.details-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.details-card[open] > summary {
+  margin-bottom: 8px;
 }
 
 .schedule-head {
@@ -525,14 +955,7 @@ onMounted(async () => {
   gap: 10px;
 }
 
-.mode-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.06);
-}
+
 
 .legend {
   display: flex;
@@ -672,26 +1095,125 @@ onMounted(async () => {
 }
 
 .form-card {
-  border: 1px solid rgba(15, 23, 42, 0.10);
-  border-radius: 12px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  padding: 18px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
 }
 
-.form-card h6 {
-  margin: 0 0 10px;
-  font-size: 13px;
-  opacity: 0.9;
+.reservation-form-card {
+  display: grid;
+  gap: 18px;
 }
 
-.grid-form {
+.form-card-header {
+  display: grid;
+  gap: 6px;
+}
+
+.form-card-header h6 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  color: #1f2a44;
+}
+
+.form-card-header p {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #eef4ff;
+  border: 1px solid #d6e4ff;
+  color: #42526e;
+  font-size: 14px;
+}
+
+.beauty-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 18px 28px;
 }
 
-.grid-form label.wide {
+.field-card {
+  display: grid;
+  gap: 8px;
+}
+
+.field-full {
   grid-column: 1 / -1;
+}
+
+.field-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #23314d;
+}
+
+.beauty-form input,
+.beauty-form select {
+  width: 100%;
+  height: 46px;
+  border: 1px solid #d8dee9;
+  border-radius: 12px;
+  padding: 0 14px;
+  font-size: 15px;
+  color: #1f2937;
+  background: #fff;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.beauty-form input:focus,
+.beauty-form select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.recommend-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #fafbfc;
+}
+
+.recommend-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.recommend-btn {
+  min-width: 120px;
+}
+
+.submit-reservation-btn {
+  width: 100%;
+  height: 54px;
+  border: none;
+  border-radius: 999px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+@media (max-width: 980px) {
+  .beauty-form {
+    grid-template-columns: 1fr;
+  }
+
+  .field-full {
+    grid-column: auto;
+  }
+
+  .recommend-box {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 .legend-item.free {
@@ -711,6 +1233,17 @@ onMounted(async () => {
 }
 
 @media (max-width: 980px) {
+  .lab-hero-meta {
+    justify-content: flex-start;
+  }
+  .detail-tabs {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .tab-btn {
+    flex: 1;
+    text-align: center;
+  }
   .grid-form {
     grid-template-columns: 1fr;
   }
@@ -720,3 +1253,4 @@ onMounted(async () => {
   }
 }
 </style>
+

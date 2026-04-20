@@ -10,3 +10,4 @@ public class StatusUpdateRequest {
     private Integer status;
 
 }
+

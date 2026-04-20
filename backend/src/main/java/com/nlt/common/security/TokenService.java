@@ -30,7 +30,7 @@ public class TokenService {
             @Value("${security.jwt.expiration-ms:86400000}") long expirationMs
     ) {
         if (!StringUtils.hasText(secret) || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
-            throw new IllegalArgumentException("security.jwt.secret must be at least 32 bytes");
+            throw new BusinessException(500, "JWT密钥配置错误：security.jwt.secret 长度至少为32字节");
         }
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationMs = expirationMs;
@@ -46,10 +46,10 @@ public class TokenService {
      */
     public String generateToken(Long userId, String username, List<String> roleCodes) {
         if (userId == null) {
-            throw new IllegalArgumentException("userId cannot be null");
+            throw new BusinessException(400, "用户ID不能为空");
         }
         if (!StringUtils.hasText(username)) {
-            throw new IllegalArgumentException("username cannot be blank");
+            throw new BusinessException(400, "用户名不能为空");
         }
 
         Date issuedAt = new Date();
@@ -83,7 +83,7 @@ public class TokenService {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (JwtException | IllegalArgumentException ex) {
-            throw new BusinessException(401, "无效或已过期的登录令牌");
+            throw new BusinessException(401, "无效或过期的登录令牌");
         }
     }
 
@@ -145,7 +145,7 @@ public class TokenService {
     public String resolveToken(HttpServletRequest request) {
         String authorization = request.getHeader(AUTHORIZATION_HEADER);
         if (!StringUtils.hasText(authorization)) {
-            throw new BusinessException(401, "缺少认证请求头");
+            throw new BusinessException(401, "缺少验证请求头");
         }
 
         String trimmed = authorization.trim();

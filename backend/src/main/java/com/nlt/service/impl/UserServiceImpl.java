@@ -123,10 +123,10 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(404, "用户不存在");
         }
         if (!entity.getPassword().equals(request.getOldPassword())) {
-            throw new BusinessException(400, "原密码错误");
+            throw new BusinessException(400, "旧密码错误");
         }
         if (request.getNewPassword().equals(request.getOldPassword())) {
-            throw new BusinessException(400, "新密码不能与原密码相同");
+            throw new BusinessException(400, "新密码不能与旧密码相同");
         }
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
             throw new BusinessException(400, "两次输入的新密码不一致");
@@ -151,3 +151,4 @@ public class UserServiceImpl implements UserService {
         }
     }
 }
+

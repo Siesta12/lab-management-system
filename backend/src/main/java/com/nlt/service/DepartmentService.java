@@ -48,9 +48,10 @@ public interface DepartmentService {
     void delete(Long id);
 
     /**
-     * 处理部门信息
+     * 获取部门选项列表
      * @return 数据列表
      */
     List<OptionItem> options();
 
 }
+

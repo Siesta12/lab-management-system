@@ -12,7 +12,7 @@ public interface ViolationService {
      * @param pageSize 每页条数
      * @param userId 用户ID
      * @param reservationId 预约ID
-     * @param violationType 参数
+     * @param violationType 违规类型
      * @return 分页数据
      */
     PageData<ViolationRecordEntity> page(int pageNum, int pageSize, Long userId, Long reservationId, Integer violationType);
@@ -47,3 +47,4 @@ public interface ViolationService {
     void delete(Long id);
 
 }
+

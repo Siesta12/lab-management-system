@@ -20,3 +20,4 @@ import BaseTable from '../components/BaseTable.vue';
 import { devices } from '../data/mock';
 import { getBadgeClass } from '../utils/format';
 </script>
+

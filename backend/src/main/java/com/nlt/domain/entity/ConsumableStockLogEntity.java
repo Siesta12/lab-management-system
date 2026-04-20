@@ -25,3 +25,4 @@ public class ConsumableStockLogEntity {
     private LocalDateTime createdAt;
 
 }
+

@@ -16,3 +16,4 @@ public class ReservedSlotRowWithLab {
     private Integer reservationStatus;
 }
 
+

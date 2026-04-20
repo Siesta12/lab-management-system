@@ -60,7 +60,7 @@ public class LabScheduleServiceImpl implements LabScheduleService {
         LocalDate start = startDate == null || startDate.isBlank() ? today : LocalDate.parse(startDate, DATE_FORMATTER);
         // Strict: schedule is always "from today for 21 days".
         if (!start.equals(today)) {
-            throw new BusinessException(400, "startDate must be today (" + today.format(DATE_FORMATTER) + ")");
+            throw new BusinessException(400, "查询起始日期必须为今天 (" + today.format(DATE_FORMATTER) + ")");
         }
         LocalDate end = start.plusDays(20);
 
@@ -68,7 +68,7 @@ public class LabScheduleServiceImpl implements LabScheduleService {
 
         List<ClassPeriodEntity> periods = classPeriodMapper.selectActiveList();
         if (periods.isEmpty()) {
-            throw new BusinessException(400, "No class periods configured");
+            throw new BusinessException(400, "未配置有效的上课节次");
         }
         List<Long> periodIds = periods.stream().map(ClassPeriodEntity::getId).toList();
         List<SchedulePeriodItem> periodItems = periods.stream().map(this::toPeriodItem).toList();
@@ -142,7 +142,7 @@ public class LabScheduleServiceImpl implements LabScheduleService {
 
         List<ClassPeriodEntity> periods = classPeriodMapper.selectActiveList();
         if (periods.isEmpty()) {
-            throw new BusinessException(400, "No class periods configured");
+            throw new BusinessException(400, "未配置有效的上课节次");
         }
         List<Long> periodIds = periods.stream().map(ClassPeriodEntity::getId).toList();
         List<SchedulePeriodItem> periodItems = periods.stream().map(this::toPeriodItem).toList();
@@ -225,14 +225,14 @@ public class LabScheduleServiceImpl implements LabScheduleService {
         List<String> currentRoleCodes) {
         requireAdmin(currentRoleCodes);
         if (operatorUserId == null) {
-            throw new BusinessException(401, "User not logged in");
+            throw new BusinessException(401, "用户未登录");
         }
         labService.getById(labId, operatorUserId, currentRoleCodes);
 
         LocalDate maintenanceDate = LocalDate.parse(request.getMaintenanceDate(), DATE_FORMATTER);
         validateWithinNext21Days(maintenanceDate);
         if (request.getPeriodIds() == null || request.getPeriodIds().isEmpty()) {
-            throw new BusinessException(400, "periodIds is required");
+            throw new BusinessException(400, "节次ID不能为空");
         }
 
         // Disallow maintenance if there is any effective reservation occupying the slot.
@@ -243,7 +243,7 @@ public class LabScheduleServiceImpl implements LabScheduleService {
         }
         for (Long periodId : request.getPeriodIds()) {
             if (reserved.containsKey(key(maintenanceDate, periodId))) {
-                throw new BusinessException(400, "Cannot set maintenance: slot already reserved (periodId=" + periodId + ")");
+                throw new BusinessException(400, "该时段已有预约，无法设置维护（节次ID=" + periodId + "）");
             }
         }
 
@@ -267,12 +267,12 @@ public class LabScheduleServiceImpl implements LabScheduleService {
     public void cancelMaintenance(Long labId, Long maintenanceId, Long operatorUserId, List<String> currentRoleCodes) {
         requireAdmin(currentRoleCodes);
         if (operatorUserId == null) {
-            throw new BusinessException(401, "User not logged in");
+            throw new BusinessException(401, "用户未登录");
         }
         labService.getById(labId, operatorUserId, currentRoleCodes);
         LabMaintenanceEntity entity = labMaintenanceMapper.selectById(maintenanceId);
         if (entity == null || !Objects.equals(entity.getLabId(), labId)) {
-            throw new BusinessException(404, "Maintenance record not found");
+            throw new BusinessException(404, "维护记录不存在或不属于当前实验室");
         }
         labMaintenanceMapper.cancel(maintenanceId, operatorUserId);
     }
@@ -281,7 +281,7 @@ public class LabScheduleServiceImpl implements LabScheduleService {
         LocalDate today = LocalDate.now();
         LocalDate last = today.plusDays(20);
         if (date.isBefore(today) || date.isAfter(last)) {
-            throw new BusinessException(400, "Date out of allowed range (today to next 21 days): " + date.format(DATE_FORMATTER));
+            throw new BusinessException(400, "日期超出允许范围（今天起21天内）: " + date.format(DATE_FORMATTER));
         }
     }
 
@@ -301,7 +301,7 @@ public class LabScheduleServiceImpl implements LabScheduleService {
 
     private void requireAdmin(List<String> roleCodes) {
         if (!hasRole(roleCodes, "ADMIN")) {
-            throw new BusinessException(403, "Admin role required");
+            throw new BusinessException(403, "需要管理员权限");
         }
     }
 
@@ -343,4 +343,5 @@ public class LabScheduleServiceImpl implements LabScheduleService {
         return labId + "#" + periodId;
     }
 }
+
 

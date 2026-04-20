@@ -34,3 +34,4 @@ public interface ReservationService {
 
     List<SlotRecommendationItem> recommend(ReservationRecommendationRequest request, Long currentUserId);
 }
+

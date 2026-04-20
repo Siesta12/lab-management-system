@@ -21,3 +21,4 @@ public class ViolationRecordEntity {
     private LocalDateTime createdAt;
 
 }
+

@@ -25,3 +25,4 @@ public interface LabMaintenanceMapper {
 
     int cancel(@Param("id") Long id, @Param("operatorUserId") Long operatorUserId);
 }
+

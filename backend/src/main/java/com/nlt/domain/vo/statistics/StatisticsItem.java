@@ -14,3 +14,4 @@ public class StatisticsItem {
     private Double rate;
 
 }
+

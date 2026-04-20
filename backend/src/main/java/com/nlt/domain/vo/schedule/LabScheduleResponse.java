@@ -17,3 +17,4 @@ public class LabScheduleResponse {
     private List<ScheduleDayItem> days;
 }
 
+

@@ -1,4 +1,4 @@
-import type { DeviceDto, PageData } from '../types';
+﻿import type { DeviceDto, PageData } from '../types';
 import { get } from './http';
 
 export function fetchDevices(query: { labId?: number; pageNum?: number; pageSize?: number } = {}, token?: string): Promise<PageData<DeviceDto>> {
@@ -12,3 +12,4 @@ export function fetchDevices(query: { labId?: number; pageNum?: number; pageSize
 
   return get<PageData<DeviceDto>>(`/devices?${params.toString()}`, token);
 }
+

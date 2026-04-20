@@ -32,3 +32,4 @@
 import BasePanel from '../components/BasePanel.vue';
 import { usageStatistics } from '../data/mock';
 </script>
+

@@ -26,3 +26,4 @@ public class ClassPeriodEntity {
     private LocalDateTime updatedAt;
 }
 
+

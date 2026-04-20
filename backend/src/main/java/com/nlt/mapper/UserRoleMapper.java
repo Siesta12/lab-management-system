@@ -15,7 +15,7 @@ public interface UserRoleMapper {
     List<Long> selectRoleIdsByUserId(@Param("userId") Long userId);
 
     /**
-     * 查询用户角色映射
+     * 查询用户角色编码
      * @param userId 用户ID
      * @return 数据列表
      */
@@ -37,3 +37,4 @@ public interface UserRoleMapper {
     int insert(@Param("userId") Long userId, @Param("roleId") Long roleId);
 
 }
+

@@ -36,3 +36,4 @@ public class DeviceEntity {
     private LocalDateTime updatedAt;
 
 }
+

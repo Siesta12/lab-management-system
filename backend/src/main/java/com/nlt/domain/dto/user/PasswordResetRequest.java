@@ -10,3 +10,4 @@ public class PasswordResetRequest {
     private String newPassword;
 
 }
+

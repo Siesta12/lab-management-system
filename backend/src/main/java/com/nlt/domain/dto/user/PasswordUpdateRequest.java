@@ -16,3 +16,4 @@ public class PasswordUpdateRequest {
     private String confirmPassword;
 
 }
+

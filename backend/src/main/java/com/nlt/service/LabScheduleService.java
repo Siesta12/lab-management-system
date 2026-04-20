@@ -20,3 +20,4 @@ public interface LabScheduleService {
     void cancelMaintenance(Long labId, Long maintenanceId, Long operatorUserId, List<String> currentRoleCodes);
 }
 
+

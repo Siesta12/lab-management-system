@@ -41,7 +41,7 @@ public class DashboardController {
     }
 
     /**
-     * 处理Dashboard相关数据
+     * 获取实验室使用统计
      * @param request 请求参数
      * @return 响应结果
      */
@@ -51,7 +51,7 @@ public class DashboardController {
     }
 
     /**
-     * 处理Dashboard相关数据
+     * 获取预约状态统计
      * @param request 请求参数
      * @return 响应结果
      */
@@ -61,7 +61,7 @@ public class DashboardController {
     }
 
     /**
-     * 处理Dashboard相关数据
+     * 获取预约类型统计
      * @param request 请求参数
      * @return 响应结果
      */
@@ -71,7 +71,7 @@ public class DashboardController {
     }
 
     /**
-     * 处理Dashboard相关数据
+     * 获取时间段分布统计
      * @param request 请求参数
      * @return 响应结果
      */
@@ -81,7 +81,7 @@ public class DashboardController {
     }
 
     /**
-     * 处理Dashboard相关数据
+     * 获取违规统计
      * @param request 请求参数
      * @return 响应结果
      */
@@ -91,3 +91,4 @@ public class DashboardController {
     }
 
 }
+

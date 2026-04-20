@@ -93,7 +93,7 @@ public class RoleServiceImpl implements RoleService {
     }
 
     /**
-     * 处理角色信息
+     * 获取角色选项列表
      * @return 数据列表
      */
     @Override
@@ -104,3 +104,4 @@ public class RoleServiceImpl implements RoleService {
     }
 
 }
+

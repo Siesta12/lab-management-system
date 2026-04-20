@@ -19,7 +19,7 @@ public class ReservationAuditLogController {
      * @param pageNum 页码
      * @param pageSize 每页条数
      * @param reservationId 预约ID
-     * @param auditUserId auditUserID
+     * @param auditUserId 审核人ID
      * @return 响应结果
      */
     @GetMapping("/reservation-audit-logs")
@@ -31,8 +31,8 @@ public class ReservationAuditLogController {
     }
 
     /**
-     * 处理预约审核日志
-     * @param id 主键ID
+     * 根据预约ID查询审核日志
+     * @param id 预约ID
      * @return 响应结果
      */
     @GetMapping("/reservations/{id}/audit-logs")
@@ -41,7 +41,7 @@ public class ReservationAuditLogController {
     }
 
     /**
-     * 查询预约审核日志
+     * 查询预约审核日志详情
      * @param id 主键ID
      * @return 响应结果
      */
@@ -51,3 +51,4 @@ public class ReservationAuditLogController {
     }
 
 }
+

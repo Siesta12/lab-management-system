@@ -16,11 +16,11 @@ public class ApiResponse<T> {
     private T data;
 
     public static <T> ApiResponse<T> success(T data) {
-        return new ApiResponse<>(200, "鎴愬姛", data);
+        return new ApiResponse<>(200, "操作成功", data);
     }
 
     public static ApiResponse<Void> success() {
-        return new ApiResponse<>(200, "鎴愬姛", null);
+        return new ApiResponse<>(200, "操作成功", null);
     }
 
     public static <T> ApiResponse<T> success(int code, String message, T data) {
@@ -28,10 +28,11 @@ public class ApiResponse<T> {
     }
 
     public static <T> ApiResponse<T> created(T data) {
-        return new ApiResponse<>(201, "鍒涘缓鎴愬姛", data);
+        return new ApiResponse<>(201, "创建成功", data);
     }
 
     public static ApiResponse<Void> error(int code, String message) {
         return new ApiResponse<>(code, message, null);
     }
 }
+

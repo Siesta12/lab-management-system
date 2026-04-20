@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   PageData,
   PasswordUpdatePayload,
   UserProfileUpdatePayload,
@@ -22,3 +22,4 @@ export function updateMyPassword(payload: PasswordUpdatePayload, token: string):
 export function fetchUserViolations(id: number, token: string, pageNum = 1, pageSize = 20): Promise<PageData<ViolationRecordDto>> {
   return get<PageData<ViolationRecordDto>>(`/users/${id}/violations?pageNum=${pageNum}&pageSize=${pageSize}`, token);
 }
+

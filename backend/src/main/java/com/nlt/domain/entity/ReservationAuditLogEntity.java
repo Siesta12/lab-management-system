@@ -19,3 +19,4 @@ public class ReservationAuditLogEntity {
     private LocalDateTime createdAt;
 
 }
+

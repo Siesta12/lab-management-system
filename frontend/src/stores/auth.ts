@@ -65,3 +65,4 @@ export function useAuthStore() {
     logout: clearAuth,
   };
 }
+

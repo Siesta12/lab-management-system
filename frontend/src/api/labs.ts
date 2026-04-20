@@ -1,4 +1,4 @@
-import type { DailyScheduleDto, LabDto, LabMaintenanceDto, LabScheduleDto, PageData } from '../types';
+﻿import type { DailyScheduleDto, LabDto, LabMaintenanceDto, LabScheduleDto, PageData } from '../types';
 import { get, post, put } from './http';
 
 export interface LabQuery {
@@ -28,6 +28,8 @@ export function fetchLabSchedule(labId: number, token: string, startDate?: strin
   if (startDate) {
     params.set('startDate', startDate);
   }
+  // Add timestamp to prevent browser caching
+  params.set('_t', Date.now().toString());
   const suffix = params.toString() ? `?${params.toString()}` : '';
   return get<LabScheduleDto>(`/labs/${labId}/schedule${suffix}`, token);
 }
@@ -53,4 +55,5 @@ export function createLabMaintenance(
 export function cancelLabMaintenance(labId: number, maintenanceId: number, token: string): Promise<void> {
   return put<void>(`/labs/${labId}/maintenance/${maintenanceId}/cancel`, undefined, token);
 }
+
 

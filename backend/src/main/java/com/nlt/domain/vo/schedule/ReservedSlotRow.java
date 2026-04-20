@@ -17,3 +17,4 @@ public class ReservedSlotRow {
     private Integer reservationStatus;
 }
 
+

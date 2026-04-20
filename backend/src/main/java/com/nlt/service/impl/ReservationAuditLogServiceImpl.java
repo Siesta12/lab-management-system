@@ -20,22 +20,22 @@ public class ReservationAuditLogServiceImpl implements ReservationAuditLogServic
      * @param pageNum 页码
      * @param pageSize 每页条数
      * @param reservationId 预约ID
-     * @param auditUserId auditUserID
+     * @param auditUserId 审核用户ID
      * @return 分页数据
      */
     @Override
     public PageData<ReservationAuditLogEntity> page(int pageNum, int pageSize, Long reservationId, Long auditUserId) {
         int offset = (pageNum - 1) * pageSize;
         return new PageData<>(
-        reservationAuditLogMapper.selectPage(offset, pageSize, reservationId, auditUserId),
-        reservationAuditLogMapper.countPage(reservationId, auditUserId),
-        pageNum,
-        pageSize
+                reservationAuditLogMapper.selectPage(offset, pageSize, reservationId, auditUserId),
+                reservationAuditLogMapper.countPage(reservationId, auditUserId),
+                pageNum,
+                pageSize
         );
     }
 
     /**
-     * 处理预约审核日志
+     * 根据预约ID查询审核日志
      * @param reservationId 预约ID
      * @return 数据列表
      */
@@ -47,15 +47,16 @@ public class ReservationAuditLogServiceImpl implements ReservationAuditLogServic
     /**
      * 查询预约审核日志
      * @param id 主键ID
-     * @return 处理结果
+     * @return 审核日志实体
      */
     @Override
     public ReservationAuditLogEntity getById(Long id) {
         ReservationAuditLogEntity entity = reservationAuditLogMapper.selectById(id);
         if (entity == null) {
-            throw new BusinessException(404, "预约审核日志不存在");
+            throw new BusinessException(404, "预订审核日志不存在");
         }
         return entity;
     }
 
 }
+

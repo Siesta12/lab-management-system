@@ -14,3 +14,4 @@ public class ReservationTypeStatisticsRequest {
     private Integer reservationType;
 
 }
+

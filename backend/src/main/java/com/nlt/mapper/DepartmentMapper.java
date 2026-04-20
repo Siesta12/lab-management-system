@@ -9,39 +9,39 @@ import org.apache.ibatis.annotations.Param;
 public interface DepartmentMapper {
 
     /**
-     * 查询部门信息
-     * @param offset 参数
+     * 分页查询部门信息
+     * @param offset 偏移量
      * @param pageSize 每页条数
-     * @param departmentName 参数
-     * @param departmentCode 参数
+     * @param departmentName 部门名称
+     * @param departmentCode 部门编码
      * @param status 状态值
      * @return 数据列表
      */
     List<DepartmentEntity> selectPage(@Param("offset") int offset, @Param("pageSize") int pageSize,
-    @Param("departmentName") String departmentName,
-    @Param("departmentCode") String departmentCode,
-    @Param("status") Integer status);
+                                      @Param("departmentName") String departmentName,
+                                      @Param("departmentCode") String departmentCode,
+                                      @Param("status") Integer status);
 
     /**
      * 统计部门信息数量
-     * @param departmentName 参数
-     * @param departmentCode 参数
+     * @param departmentName 部门名称
+     * @param departmentCode 部门编码
      * @param status 状态值
      * @return 处理结果
      */
     long countPage(@Param("departmentName") String departmentName,
-    @Param("departmentCode") String departmentCode,
-    @Param("status") Integer status);
+                   @Param("departmentCode") String departmentCode,
+                   @Param("status") Integer status);
 
     /**
-     * 查询部门信息
+     * 根据ID查询部门信息
      * @param id 主键ID
      * @return 处理结果
      */
     DepartmentEntity selectById(@Param("id") Long id);
 
     /**
-     * 查询部门信息
+     * 查询部门选项列表
      * @return 数据列表
      */
     List<DepartmentEntity> selectOptions();
@@ -61,10 +61,11 @@ public interface DepartmentMapper {
     int update(DepartmentEntity entity);
 
     /**
-     * 处理部门信息
+     * 逻辑删除部门信息
      * @param id 主键ID
      * @return 处理结果
      */
     int softDelete(@Param("id") Long id);
 
 }
+

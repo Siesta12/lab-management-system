@@ -39,3 +39,4 @@ public class UserEntity {
     private LocalDateTime updatedAt;
 
 }
+

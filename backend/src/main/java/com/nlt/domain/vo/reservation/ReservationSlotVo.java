@@ -23,3 +23,4 @@ public class ReservationSlotVo {
 
     private Integer slotStatus;
 }
+

@@ -22,17 +22,17 @@ public class ViolationServiceImpl implements ViolationService {
      * @param pageSize 每页条数
      * @param userId 用户ID
      * @param reservationId 预约ID
-     * @param violationType 参数
+     * @param violationType 违规类型
      * @return 分页数据
      */
     @Override
     public PageData<ViolationRecordEntity> page(int pageNum, int pageSize, Long userId, Long reservationId, Integer violationType) {
         int offset = (pageNum - 1) * pageSize;
         return new PageData<>(
-        violationMapper.selectPage(offset, pageSize, userId, reservationId, violationType),
-        violationMapper.countPage(userId, reservationId, violationType),
-        pageNum,
-        pageSize
+                violationMapper.selectPage(offset, pageSize, userId, reservationId, violationType),
+                violationMapper.countPage(userId, reservationId, violationType),
+                pageNum,
+                pageSize
         );
     }
 
@@ -58,7 +58,7 @@ public class ViolationServiceImpl implements ViolationService {
     public ViolationRecordEntity getById(Long id) {
         ViolationRecordEntity entity = violationMapper.selectById(id);
         if (entity == null) {
-            throw new BusinessException(404, "违规记录不存在");
+            throw new BusinessException(404, "违纪记录不存在");
         }
         return entity;
     }
@@ -87,3 +87,4 @@ public class ViolationServiceImpl implements ViolationService {
     }
 
 }
+

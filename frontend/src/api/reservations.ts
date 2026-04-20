@@ -1,4 +1,4 @@
-import type { PageData, ReservationCreatePayload, ReservationDto, SlotRecommendationItem } from '../types';
+﻿import type { PageData, ReservationCreatePayload, ReservationDto, SlotRecommendationItem } from '../types';
 import { get, post, put } from './http';
 
 export interface ReservationQuery {
@@ -46,4 +46,5 @@ export function recommendSlots(
 ): Promise<SlotRecommendationItem[]> {
   return post<SlotRecommendationItem[]>('/reservations/recommendations', payload, token);
 }
+
 

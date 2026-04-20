@@ -114,7 +114,7 @@ public class ConsumableServiceImpl implements ConsumableService {
     }
 
     /**
-     * 更新耗材信息
+     * 更新耗材库存
      * @param id 主键ID
      * @param request 请求参数
      * @param operatorUserId 操作人用户ID
@@ -143,3 +143,4 @@ public class ConsumableServiceImpl implements ConsumableService {
     }
 
 }
+

@@ -41,3 +41,4 @@ public class ReservationCreateRequest {
         private Long periodId;
     }
 }
+

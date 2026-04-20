@@ -31,3 +31,4 @@ public class DeviceSaveRequest {
     private String remark;
 
 }
+

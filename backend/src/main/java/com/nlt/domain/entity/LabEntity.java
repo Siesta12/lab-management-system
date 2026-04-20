@@ -39,3 +39,4 @@ public class LabEntity {
     private LocalDateTime updatedAt;
 
 }
+

@@ -31,10 +31,10 @@ public class DepartmentServiceImpl implements DepartmentService {
     public PageData<DepartmentEntity> page(int pageNum, int pageSize, String departmentName, String departmentCode, Integer status) {
         int offset = (pageNum - 1) * pageSize;
         return new PageData<>(
-        departmentMapper.selectPage(offset, pageSize, departmentName, departmentCode, status),
-        departmentMapper.countPage(departmentName, departmentCode, status),
-        pageNum,
-        pageSize
+                departmentMapper.selectPage(offset, pageSize, departmentName, departmentCode, status),
+                departmentMapper.countPage(departmentName, departmentCode, status),
+                pageNum,
+                pageSize
         );
     }
 
@@ -93,14 +93,15 @@ public class DepartmentServiceImpl implements DepartmentService {
     }
 
     /**
-     * 处理部门信息
+     * 获取部门选项列表
      * @return 数据列表
      */
     @Override
     public List<OptionItem> options() {
         return departmentMapper.selectOptions().stream()
-        .map(item -> new OptionItem(item.getDepartmentName(), item.getId()))
-        .toList();
+                .map(item -> new OptionItem(item.getDepartmentName(), item.getId()))
+                .toList();
     }
 
 }
+

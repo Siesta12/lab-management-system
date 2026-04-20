@@ -20,14 +20,14 @@ public class DeviceController {
     private final DeviceService deviceService;
 
     /**
-     * 鏌ヨ璁惧淇℃伅鍒楄〃
-     * @param pageNum 椤电爜
-     * @param pageSize 姣忛〉鏉℃暟
-     * @param labId 瀹為獙瀹D
-     * @param deviceName 鍙傛暟
-     * @param deviceCode 鍙傛暟
-     * @param status 鐘舵€佸€?
-     * @return 鍝嶅簲缁撴灉
+     * 分页查询设备列表
+     * @param pageNum 页码
+     * @param pageSize 每页大小
+     * @param labId 实验室ID
+     * @param deviceName 设备名称
+     * @param deviceCode 设备编号
+     * @param status 状态
+     * @return 分页数据
      */
     @GetMapping
     public ApiResponse<PageData<DeviceEntity>> page(@RequestParam(defaultValue = "1") int pageNum,
@@ -40,9 +40,9 @@ public class DeviceController {
     }
 
     /**
-     * 鏂板璁惧淇℃伅
-     * @param request 璇锋眰鍙傛暟
-     * @return 鍝嶅簲缁撴灉
+     * 创建设备
+     * @param request 请求参数
+     * @return 创建结果
      */
     @PostMapping
     public ApiResponse<DeviceEntity> create(@Valid @RequestBody DeviceSaveRequest request) {
@@ -50,9 +50,9 @@ public class DeviceController {
     }
 
     /**
-     * 澶勭悊璁惧淇℃伅
-     * @param labId 瀹為獙瀹D
-     * @return 鍝嶅簲缁撴灉
+     * 获取设备选项列表
+     * @param labId 实验室ID
+     * @return 选项列表
      */
     @GetMapping("/options")
     public ApiResponse<List<OptionItem>> options(@RequestParam(required = false) Long labId) {
@@ -60,9 +60,9 @@ public class DeviceController {
     }
 
     /**
-     * 鏌ヨ璁惧淇℃伅
-     * @param id 涓婚敭ID
-     * @return 鍝嶅簲缁撴灉
+     * 根据ID查询设备详情
+     * @param id 设备ID
+     * @return 设备详情
      */
     @GetMapping("/{id}")
     public ApiResponse<DeviceEntity> getById(@PathVariable Long id) {
@@ -70,10 +70,10 @@ public class DeviceController {
     }
 
     /**
-     * 鏇存柊璁惧淇℃伅
-     * @param id 涓婚敭ID
-     * @param request 璇锋眰鍙傛暟
-     * @return 鍝嶅簲缁撴灉
+     * 更新设备信息
+     * @param id 设备ID
+     * @param request 请求参数
+     * @return 更新结果
      */
     @PutMapping("/{id}")
     public ApiResponse<DeviceEntity> update(@PathVariable Long id,
@@ -82,9 +82,9 @@ public class DeviceController {
     }
 
     /**
-     * 鍒犻櫎璁惧淇℃伅
-     * @param id 涓婚敭ID
-     * @return 鍝嶅簲缁撴灉
+     * 删除设备
+     * @param id 设备ID
+     * @return 删除结果
      */
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
@@ -93,10 +93,10 @@ public class DeviceController {
     }
 
     /**
-     * 鏇存柊璁惧淇℃伅
-     * @param id 涓婚敭ID
-     * @param request 璇锋眰鍙傛暟
-     * @return 鍝嶅簲缁撴灉
+     * 更新设备状态
+     * @param id 设备ID
+     * @param request 请求参数
+     * @return 更新结果
      */
     @PatchMapping("/{id}/status")
     public ApiResponse<Void> updateStatus(@PathVariable Long id,
@@ -106,3 +106,4 @@ public class DeviceController {
     }
 
 }
+
