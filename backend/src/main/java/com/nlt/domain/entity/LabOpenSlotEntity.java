@@ -1,11 +1,10 @@
 package com.nlt.domain.entity;
 
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import lombok.Data;
 
 @Data
-public class LabOpenRuleEntity {
+public class LabOpenSlotEntity {
 
     private Long id;
 
@@ -13,20 +12,16 @@ public class LabOpenRuleEntity {
 
     private Integer weekday;
 
-    private LocalTime startTime;
-
-    private LocalTime endTime;
+    private Long periodId;
 
     private Integer allowStudent;
 
     private Integer allowTeacher;
-
-    private Integer maxReservationHours;
 
     private Integer status;
 
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
-
 }
+

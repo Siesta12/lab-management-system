@@ -19,13 +19,13 @@ public class RoleController {
     private final RoleService roleService;
 
     /**
-     * 查询角色信息列表
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @param roleName 参数
-     * @param roleCode 参数
-     * @param status 状态值
-     * @return 响应结果
+     * 鏌ヨ瑙掕壊淇℃伅鍒楄〃
+     * @param pageNum 椤电爜
+     * @param pageSize 姣忛〉鏉℃暟
+     * @param roleName 鍙傛暟
+     * @param roleCode 鍙傛暟
+     * @param status 鐘舵€佸€?
+     * @return 鍝嶅簲缁撴灉
      */
     @GetMapping
     public ApiResponse<PageData<RoleEntity>> page(@RequestParam(defaultValue = "1") int pageNum,
@@ -37,18 +37,18 @@ public class RoleController {
     }
 
     /**
-     * 新增角色信息
-     * @param request 请求参数
-     * @return 响应结果
+     * 鏂板瑙掕壊淇℃伅
+     * @param request 璇锋眰鍙傛暟
+     * @return 鍝嶅簲缁撴灉
      */
     @PostMapping
     public ApiResponse<RoleEntity> create(@Valid @RequestBody RoleSaveRequest request) {
-        return ApiResponse.success(roleService.create(request));
+        return ApiResponse.created(roleService.create(request));
     }
 
     /**
-     * 处理角色信息
-     * @return 响应结果
+     * 澶勭悊瑙掕壊淇℃伅
+     * @return 鍝嶅簲缁撴灉
      */
     @GetMapping("/options")
     public ApiResponse<List<OptionItem>> options() {
@@ -56,9 +56,9 @@ public class RoleController {
     }
 
     /**
-     * 查询角色信息
-     * @param id 主键ID
-     * @return 响应结果
+     * 鏌ヨ瑙掕壊淇℃伅
+     * @param id 涓婚敭ID
+     * @return 鍝嶅簲缁撴灉
      */
     @GetMapping("/{id}")
     public ApiResponse<RoleEntity> getById(@PathVariable Long id) {
@@ -66,10 +66,10 @@ public class RoleController {
     }
 
     /**
-     * 更新角色信息
-     * @param id 主键ID
-     * @param request 请求参数
-     * @return 响应结果
+     * 鏇存柊瑙掕壊淇℃伅
+     * @param id 涓婚敭ID
+     * @param request 璇锋眰鍙傛暟
+     * @return 鍝嶅簲缁撴灉
      */
     @PutMapping("/{id}")
     public ApiResponse<RoleEntity> update(@PathVariable Long id,
@@ -78,9 +78,9 @@ public class RoleController {
     }
 
     /**
-     * 删除角色信息
-     * @param id 主键ID
-     * @return 响应结果
+     * 鍒犻櫎瑙掕壊淇℃伅
+     * @param id 涓婚敭ID
+     * @return 鍝嶅簲缁撴灉
      */
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {

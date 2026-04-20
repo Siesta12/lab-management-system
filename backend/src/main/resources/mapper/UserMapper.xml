@@ -112,10 +112,20 @@
 
     <update id="updateProfile" parameterType="com.nlt.domain.entity.UserEntity">
         update sys_user
-        set real_name = #{realName},
+        <set>
+            <if test="realName != null">
+                real_name = #{realName},
+            </if>
+            <if test="gender != null">
                 gender = #{gender},
+            </if>
+            <if test="phone != null">
                 phone = #{phone},
-                email = #{email}
+            </if>
+            <if test="email != null">
+                email = #{email},
+            </if>
+        </set>
         where id = #{id}
             and deleted = 0
     </update>

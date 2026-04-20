@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nlt.mapper.LabMaintenanceMapper">
+    <insert id="upsertBatch">
+        insert into lab_maintenance(
+            lab_id,
+            maintenance_date,
+            period_id,
+            reason,
+            status,
+            operator_user_id
+        )
+        values
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.labId},
+                #{item.maintenanceDate},
+                #{item.periodId},
+                #{item.reason},
+                #{item.status},
+                #{item.operatorUserId}
+            )
+        </foreach>
+        on duplicate key update
+            reason = values(reason),
+            status = values(status),
+            operator_user_id = values(operator_user_id),
+            updated_at = current_timestamp
+    </insert>
+
+    <select id="selectById" resultType="com.nlt.domain.entity.LabMaintenanceEntity">
+        select *
+        from lab_maintenance
+        where id = #{id}
+    </select>
+
+    <select id="selectByLabAndDateRange" resultType="com.nlt.domain.entity.LabMaintenanceEntity">
+        select *
+        from lab_maintenance
+        where lab_id = #{labId}
+            and maintenance_date <![CDATA[ >= ]]> #{startDate}
+            and maintenance_date <![CDATA[ <= ]]> #{endDate}
+        order by maintenance_date asc, period_id asc, id asc
+    </select>
+
+    <select id="selectActiveByLabAndDateAndPeriods" resultType="com.nlt.domain.entity.LabMaintenanceEntity">
+        select *
+        from lab_maintenance
+        where lab_id = #{labId}
+            and status = 1
+            and maintenance_date = #{maintenanceDate}
+            and period_id in
+            <foreach collection="periodIds" item="pid" open="(" separator="," close=")">
+                #{pid}
+            </foreach>
+    </select>
+
+    <select id="selectActiveByDate" resultType="com.nlt.domain.entity.LabMaintenanceEntity">
+        select *
+        from lab_maintenance
+        where status = 1
+            and maintenance_date = #{maintenanceDate}
+    </select>
+
+    <update id="cancel">
+        update lab_maintenance
+        set status = 2,
+            operator_user_id = #{operatorUserId}
+        where id = #{id}
+            and status = 1
+    </update>
+</mapper>

@@ -1,12 +1,5 @@
-﻿import type {
-  ConflictCheckData,
-  LabRecommendationDto,
-  PageData,
-  ReservationCreatePayload,
-  ReservationDto,
-  TimeRecommendationDto,
-} from '../types';
-import { get, post } from './http';
+import type { PageData, ReservationCreatePayload, ReservationDto, SlotRecommendationItem } from '../types';
+import { get, post, put } from './http';
 
 export interface ReservationQuery {
   pageNum?: number;
@@ -24,30 +17,33 @@ export function fetchMyReservations(query: ReservationQuery = {}, token: string)
   const params = new URLSearchParams();
   params.set('pageNum', String(query.pageNum ?? 1));
   params.set('pageSize', String(query.pageSize ?? 10));
-  return get<PageData<ReservationDto>>(`/reservations/mine?${params.toString()}`, token);
+  return get<PageData<ReservationDto>>(`/reservations/my?${params.toString()}`, token);
 }
 
 export function createReservation(payload: ReservationCreatePayload, token: string): Promise<ReservationDto> {
   return post<ReservationDto>('/reservations', payload, token);
 }
 
-export function checkReservationConflict(
-  payload: Pick<ReservationCreatePayload, 'labId' | 'startTime' | 'endTime'>,
-  token?: string,
-): Promise<ConflictCheckData> {
-  return post<ConflictCheckData>('/reservations/conflict-check', payload, token);
+export function fetchReservationById(id: number, token: string): Promise<ReservationDto> {
+  return get<ReservationDto>(`/reservations/${id}`, token);
 }
 
-export function recommendTimes(
-  payload: Pick<ReservationCreatePayload, 'labId' | 'reservationDate' | 'startTime' | 'endTime' | 'participantCount'>,
-  token?: string,
-): Promise<TimeRecommendationDto[]> {
-  return post<TimeRecommendationDto[]>('/reservations/recommend-time', payload, token);
+export function cancelReservation(id: number, token: string): Promise<ReservationDto> {
+  return put<ReservationDto>(`/reservations/${id}/cancel`, undefined, token);
 }
 
-export function recommendLabs(
-  payload: Pick<ReservationCreatePayload, 'labId' | 'reservationDate' | 'startTime' | 'endTime' | 'participantCount'>,
-  token?: string,
-): Promise<LabRecommendationDto[]> {
-  return post<LabRecommendationDto[]>('/reservations/recommend-labs', payload, token);
+export function approveReservation(id: number, token: string, auditComment?: string): Promise<ReservationDto> {
+  return put<ReservationDto>(`/reservations/${id}/approve`, auditComment ? { auditComment } : undefined, token);
 }
+
+export function rejectReservation(id: number, token: string, rejectReason: string, auditComment?: string): Promise<ReservationDto> {
+  return put<ReservationDto>(`/reservations/${id}/reject`, { rejectReason, auditComment }, token);
+}
+
+export function recommendSlots(
+  payload: Pick<ReservationCreatePayload, 'labId' | 'participantCount' | 'slots'>,
+  token: string,
+): Promise<SlotRecommendationItem[]> {
+  return post<SlotRecommendationItem[]>('/reservations/recommendations', payload, token);
+}
+

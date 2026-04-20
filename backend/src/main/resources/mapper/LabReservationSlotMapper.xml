@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nlt.mapper.LabReservationSlotMapper">
+    <insert id="insertBatch">
+        insert into lab_reservation_slot(
+            reservation_id,
+            lab_id,
+            reservation_date,
+            weekday,
+            period_id,
+            slot_status
+        )
+        values
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.reservationId},
+                #{item.labId},
+                #{item.reservationDate},
+                #{item.weekday},
+                #{item.periodId},
+                #{item.slotStatus}
+            )
+        </foreach>
+    </insert>
+
+    <select id="selectDetailByReservationId" resultType="com.nlt.domain.vo.reservation.ReservationSlotVo">
+        select s.id,
+               s.reservation_id as reservationId,
+               date_format(s.reservation_date, '%Y-%m-%d') as reservationDate,
+               s.weekday,
+               s.period_id as periodId,
+               p.period_no as periodNo,
+               p.period_name as periodName,
+               s.slot_status as slotStatus
+        from lab_reservation_slot s
+        join class_period p on p.id = s.period_id
+        where s.reservation_id = #{reservationId}
+        order by s.reservation_date asc, p.sort_order asc, p.period_no asc, s.id asc
+    </select>
+
+    <select id="selectDetailByReservationIds" resultType="com.nlt.domain.vo.reservation.ReservationSlotVo">
+        select s.id,
+               s.reservation_id as reservationId,
+               date_format(s.reservation_date, '%Y-%m-%d') as reservationDate,
+               s.weekday,
+               s.period_id as periodId,
+               p.period_no as periodNo,
+               p.period_name as periodName,
+               s.slot_status as slotStatus
+        from lab_reservation_slot s
+        join class_period p on p.id = s.period_id
+        where s.reservation_id in
+        <foreach collection="reservationIds" item="rid" open="(" separator="," close=")">
+            #{rid}
+        </foreach>
+        order by s.reservation_id desc, s.reservation_date asc, p.sort_order asc, p.period_no asc, s.id asc
+    </select>
+
+    <update id="cancelByReservationId">
+        update lab_reservation_slot
+        set slot_status = 2
+        where reservation_id = #{reservationId}
+    </update>
+
+    <select id="selectReservedSlots" resultType="com.nlt.domain.vo.schedule.ReservedSlotRow">
+        select s.reservation_date as reservationDate,
+               s.period_id as periodId,
+               s.reservation_id as reservationId,
+               r.reservation_no as reservationNo,
+               r.status as reservationStatus
+        from lab_reservation_slot s
+        join lab_reservation r on r.id = s.reservation_id
+        where s.lab_id = #{labId}
+            and s.slot_status = 1
+            and r.status in (1, 2, 5)
+            and s.reservation_date <![CDATA[ >= ]]> #{startDate}
+            and s.reservation_date <![CDATA[ <= ]]> #{endDate}
+    </select>
+
+    <select id="selectReservedSlotsForDate" resultType="com.nlt.domain.vo.schedule.ReservedSlotRowWithLab">
+        select s.lab_id as labId,
+               s.period_id as periodId,
+               s.reservation_id as reservationId,
+               r.reservation_no as reservationNo,
+               r.status as reservationStatus
+        from lab_reservation_slot s
+        join lab_reservation r on r.id = s.reservation_id
+        where s.slot_status = 1
+            and r.status in (1, 2, 5)
+            and s.reservation_date = #{reservationDate}
+    </select>
+</mapper>

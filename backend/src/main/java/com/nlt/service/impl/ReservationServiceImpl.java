@@ -2,27 +2,42 @@ package com.nlt.service.impl;
 
 import com.nlt.common.api.PageData;
 import com.nlt.common.exception.BusinessException;
-import com.nlt.domain.dto.reservation.ConflictCheckRequest;
-import com.nlt.domain.dto.reservation.RecommendationRequest;
-import com.nlt.domain.dto.reservation.ReservationAuditRequest;
+import com.nlt.domain.dto.reservation.ReservationApproveRequest;
 import com.nlt.domain.dto.reservation.ReservationCreateRequest;
+import com.nlt.domain.dto.reservation.ReservationRecommendationRequest;
+import com.nlt.domain.dto.reservation.ReservationRejectRequest;
+import com.nlt.domain.entity.ClassPeriodEntity;
 import com.nlt.domain.entity.LabEntity;
+import com.nlt.domain.entity.LabMaintenanceEntity;
+import com.nlt.domain.entity.LabOpenSlotEntity;
+import com.nlt.domain.entity.LabReservationSlotEntity;
 import com.nlt.domain.entity.ReservationAuditLogEntity;
 import com.nlt.domain.entity.ReservationEntity;
-import com.nlt.domain.vo.reservation.ConflictCheckData;
-import com.nlt.domain.vo.reservation.LabRecommendationItem;
-import com.nlt.domain.vo.reservation.TimeRecommendationItem;
+import com.nlt.domain.vo.reservation.ReservationDetailVo;
+import com.nlt.domain.vo.reservation.ReservationSlotVo;
+import com.nlt.domain.vo.reservation.SlotRecommendationItem;
+import com.nlt.mapper.ClassPeriodMapper;
+import com.nlt.mapper.LabMaintenanceMapper;
 import com.nlt.mapper.LabMapper;
+import com.nlt.mapper.LabOpenSlotMapper;
+import com.nlt.mapper.LabReservationSlotMapper;
 import com.nlt.mapper.ReservationAuditLogMapper;
 import com.nlt.mapper.ReservationMapper;
+import com.nlt.mapper.UserRoleMapper;
 import com.nlt.service.ReservationService;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,252 +46,559 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReservationServiceImpl implements ReservationService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
-
-    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd['T'][ ]HH:mm:ss");
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final ReservationMapper reservationMapper;
-
     private final ReservationAuditLogMapper reservationAuditLogMapper;
-
+    private final LabReservationSlotMapper labReservationSlotMapper;
+    private final LabMaintenanceMapper labMaintenanceMapper;
+    private final LabOpenSlotMapper labOpenSlotMapper;
     private final LabMapper labMapper;
+    private final UserRoleMapper userRoleMapper;
 
-    /**
-     * 查询预约信息列表
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @param reservationNo 预约编号
-     * @param labId 实验室ID
-     * @param applicantUserId 申请人用户ID
-     * @param approverUserId 审批人用户ID
-     * @param status 状态值
-     * @param reservationDate 预约日期
-     * @return 分页数据
-     */
+    // Keep for future extension (period name joins are handled in slot mapper)
+    @SuppressWarnings("unused")
+    private final ClassPeriodMapper classPeriodMapper;
+
     @Override
-    public PageData<ReservationEntity> page(int pageNum, int pageSize, String reservationNo, Long labId,
-    Long applicantUserId, Long approverUserId, Integer status,
-    String reservationDate) {
+    public PageData<ReservationDetailVo> page(int pageNum, int pageSize, String reservationNo, Long labId,
+        Long applicantUserId, Long approverUserId, Integer status, String reservationDate) {
         int offset = (pageNum - 1) * pageSize;
         LocalDate date = reservationDate == null || reservationDate.isBlank() ? null : LocalDate.parse(reservationDate, DATE_FORMATTER);
-        return new PageData<>(
-        reservationMapper.selectPage(offset, pageSize, reservationNo, labId, applicantUserId, approverUserId, status, date),
-        reservationMapper.countPage(reservationNo, labId, applicantUserId, approverUserId, status, date),
-        pageNum,
-        pageSize
-        );
+        List<ReservationEntity> list = reservationMapper.selectPage(offset, pageSize, reservationNo, labId,
+            applicantUserId, approverUserId, status, date);
+        long total = reservationMapper.countPage(reservationNo, labId, applicantUserId, approverUserId, status, date);
+        return new PageData<>(attachSlots(list), total, pageNum, pageSize);
     }
 
-    /**
-     * 查询当前用户预约信息列表
-     * @param userId 用户ID
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @return 分页数据
-     */
     @Override
-    public PageData<ReservationEntity> mine(Long userId, int pageNum, int pageSize) {
+    public PageData<ReservationDetailVo> mine(Long userId, int pageNum, int pageSize) {
         int offset = (pageNum - 1) * pageSize;
-        return new PageData<>(reservationMapper.selectMine(userId, offset, pageSize), reservationMapper.countMine(userId), pageNum, pageSize);
+        List<ReservationEntity> list = reservationMapper.selectMine(userId, offset, pageSize);
+        long total = reservationMapper.countMine(userId);
+        return new PageData<>(attachSlots(list), total, pageNum, pageSize);
     }
 
-    /**
-     * 查询待审批预约信息列表
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @return 分页数据
-     */
     @Override
-    public PageData<ReservationEntity> pendingAudit(int pageNum, int pageSize) {
+    public PageData<ReservationDetailVo> pendingAudit(int pageNum, int pageSize) {
         int offset = (pageNum - 1) * pageSize;
-        return new PageData<>(reservationMapper.selectPendingAudit(offset, pageSize), reservationMapper.countPendingAudit(), pageNum, pageSize);
+        List<ReservationEntity> list = reservationMapper.selectPendingAudit(offset, pageSize);
+        long total = reservationMapper.countPendingAudit();
+        return new PageData<>(attachSlots(list), total, pageNum, pageSize);
     }
 
-    /**
-     * 查询预约信息
-     * @param id 主键ID
-     * @return 处理结果
-     */
     @Override
-    public ReservationEntity getById(Long id) {
+    public ReservationDetailVo getById(Long id) {
         ReservationEntity entity = reservationMapper.selectById(id);
         if (entity == null) {
-            throw new BusinessException(404, "预约记录不存在");
+            throw new BusinessException(404, "Reservation not found");
         }
-        return entity;
+        List<ReservationSlotVo> slots = labReservationSlotMapper.selectDetailByReservationId(id);
+        return toDetail(entity, slots);
     }
 
-    /**
-     * 新增预约信息
-     * @param request 请求参数
-     * @param currentUserId currentUserID
-     * @return 处理结果
-     */
     @Transactional
     @Override
-    public ReservationEntity create(ReservationCreateRequest request, Long currentUserId) {
-        LocalDateTime startTime = parseDateTime(request.getStartTime());
-        LocalDateTime endTime = parseDateTime(request.getEndTime());
-        if (!endTime.isAfter(startTime)) {
-            throw new BusinessException(400, "结束时间必须晚于开始时间");
+    public ReservationDetailVo create(ReservationCreateRequest request, Long currentUserId) {
+        if (currentUserId == null) {
+            throw new BusinessException(401, "User not logged in");
         }
-        int conflictCount = reservationMapper.countConflict(request.getLabId(), startTime, endTime);
-        if (conflictCount > 0) {
-            throw new BusinessException(400, "预约时间与已有预约冲突");
-        }
+        LabEntity lab = loadAndValidateLab(request.getLabId());
+
+        List<SlotKey> requestedSlots = normalizeRequestedSlots(request);
+        validateWithinNext21Days(requestedSlots);
+
+        Map<SlotKey, LabOpenSlotEntity> openSlotMap = loadOpenSlots(request.getLabId(), requestedSlots);
+        validateRoleAllowed(openSlotMap, requestedSlots, currentUserId);
+        validateNoMaintenance(lab.getId(), requestedSlots);
+        validateNoReservationConflict(lab.getId(), requestedSlots);
+
         ReservationEntity entity = new ReservationEntity();
         entity.setReservationNo("RES" + System.currentTimeMillis());
         entity.setLabId(request.getLabId());
         entity.setApplicantUserId(currentUserId);
+        entity.setApproverUserId(null);
         entity.setReservationType(request.getReservationType() == null ? 3 : request.getReservationType());
         entity.setPriorityLevel(request.getPriorityLevel() == null ? 3 : request.getPriorityLevel());
-        entity.setReservationDate(LocalDate.parse(request.getReservationDate(), DATE_FORMATTER));
-        entity.setStartTime(startTime);
-        entity.setEndTime(endTime);
         entity.setUsagePurpose(request.getUsagePurpose());
         entity.setCourseOrProjectName(request.getCourseOrProjectName());
         entity.setParticipantCount(request.getParticipantCount() == null ? 1 : request.getParticipantCount());
         entity.setContactPhone(request.getContactPhone());
         entity.setStatus(1);
+        entity.setRejectReason(null);
+        entity.setCheckInTime(null);
+        entity.setCheckOutTime(null);
         reservationMapper.insert(entity);
-        insertAuditLog(entity.getId(), currentUserId, 1, "提交预约");
+
+        List<LabReservationSlotEntity> slotEntities = requestedSlots.stream().map(key -> {
+            LabReservationSlotEntity slot = new LabReservationSlotEntity();
+            slot.setReservationId(entity.getId());
+            slot.setLabId(entity.getLabId());
+            slot.setReservationDate(key.reservationDate());
+            slot.setWeekday(key.weekday());
+            slot.setPeriodId(key.periodId());
+            slot.setSlotStatus(1);
+            return slot;
+        }).toList();
+
+        try {
+            labReservationSlotMapper.insertBatch(slotEntities);
+        } catch (DuplicateKeyException ex) {
+            throw new BusinessException(400, "Slot conflict: the lab is already reserved for one of the selected periods");
+        }
+
+        insertAuditLog(entity.getId(), currentUserId, 1, "Submit reservation request");
         return getById(entity.getId());
     }
 
-    /**
-     * 检查预约冲突情况
-     * @param request 请求参数
-     * @return 处理结果
-     */
+    @Transactional
     @Override
-    public ConflictCheckData conflictCheck(ConflictCheckRequest request) {
-        int count = reservationMapper.countConflict(request.getLabId(), parseDateTime(request.getStartTime()), parseDateTime(request.getEndTime()));
-        return new ConflictCheckData(count > 0, count, count > 0 ? "该时间段已被占用" : "该时间段可以预约");
+    public ReservationDetailVo approve(Long id, ReservationApproveRequest request, Long currentUserId) {
+        requireAdmin(currentUserId);
+        ReservationEntity entity = requireReservation(id);
+        if (!Objects.equals(entity.getStatus(), 1)) {
+            throw new BusinessException(400, "Only pending reservations can be approved");
+        }
+        entity.setApproverUserId(currentUserId);
+        entity.setStatus(2);
+        entity.setRejectReason(null);
+        reservationMapper.updateAuditResult(entity);
+        insertAuditLog(id, currentUserId, 2, request == null ? null : request.getAuditComment());
+        return getById(id);
     }
 
-    /**
-     * 推荐可用时间段
-     * @param request 请求参数
-     * @return 数据列表
-     */
+    @Transactional
     @Override
-    public List<TimeRecommendationItem> recommendTime(RecommendationRequest request) {
-        LocalDate date = LocalDate.parse(request.getReservationDate(), DATE_FORMATTER);
-        LocalDateTime startTime = parseDateTime(request.getStartTime());
-        LocalDateTime endTime = parseDateTime(request.getEndTime());
-        long minutes = Duration.between(startTime, endTime).toMinutes();
-        List<TimeRecommendationItem> result = new ArrayList<>();
-        List<ReservationEntity> reservations = reservationMapper.selectByLabAndDate(request.getLabId(), date);
-        for (int i = 1; i <= 3; i++) {
-            LocalDateTime newStart = startTime.plusMinutes(minutes * i);
-            LocalDateTime newEnd = newStart.plusMinutes(minutes);
-            if (reservationMapper.countConflict(request.getLabId(), newStart, newEnd) == 0) {
-                result.add(new TimeRecommendationItem(newStart.toString(), newEnd.toString(), "后续可用时段"));
+    public ReservationDetailVo reject(Long id, ReservationRejectRequest request, Long currentUserId) {
+        requireAdmin(currentUserId);
+        ReservationEntity entity = requireReservation(id);
+        if (!Objects.equals(entity.getStatus(), 1)) {
+            throw new BusinessException(400, "Only pending reservations can be rejected");
+        }
+        entity.setApproverUserId(currentUserId);
+        entity.setStatus(3);
+        entity.setRejectReason(request == null ? null : request.getRejectReason());
+        reservationMapper.updateAuditResult(entity);
+        labReservationSlotMapper.cancelByReservationId(id);
+        insertAuditLog(id, currentUserId, 3, request == null ? null : request.getAuditComment());
+        return getById(id);
+    }
+
+    @Transactional
+    @Override
+    public ReservationDetailVo cancel(Long id, Long currentUserId) {
+        if (currentUserId == null) {
+            throw new BusinessException(401, "User not logged in");
+        }
+        ReservationEntity entity = requireReservation(id);
+        boolean isAdmin = isAdmin(currentUserId);
+        if (!isAdmin && !Objects.equals(entity.getApplicantUserId(), currentUserId)) {
+            throw new BusinessException(403, "Only the applicant or admin can cancel this reservation");
+        }
+        if (entity.getStatus() == null || (entity.getStatus() != 1 && entity.getStatus() != 2)) {
+            throw new BusinessException(400, "Only pending or approved reservations can be canceled");
+        }
+        reservationMapper.cancel(id);
+        labReservationSlotMapper.cancelByReservationId(id);
+        insertAuditLog(id, currentUserId, 4, "Cancel reservation");
+        return getById(id);
+    }
+
+    @Transactional
+    @Override
+    public ReservationDetailVo checkIn(Long id, Long currentUserId) {
+        requireReservation(id);
+        reservationMapper.checkIn(id);
+        insertAuditLog(id, currentUserId, 5, "Check in");
+        return getById(id);
+    }
+
+    @Transactional
+    @Override
+    public ReservationDetailVo checkOut(Long id, Long currentUserId) {
+        requireReservation(id);
+        reservationMapper.checkOut(id);
+        insertAuditLog(id, currentUserId, 5, "Check out / complete");
+        return getById(id);
+    }
+
+    @Override
+    public List<SlotRecommendationItem> recommend(ReservationRecommendationRequest request, Long currentUserId) {
+        if (request == null || request.getLabId() == null) {
+            throw new BusinessException(400, "labId is required");
+        }
+        if (currentUserId == null) {
+            throw new BusinessException(401, "User not logged in");
+        }
+
+        LabEntity baseLab = loadAndValidateLab(request.getLabId());
+        List<SlotKey> requestedSlots = request.getSlots().stream().map(item -> {
+            LocalDate date = LocalDate.parse(item.getReservationDate(), DATE_FORMATTER);
+            int weekday = date.getDayOfWeek().getValue();
+            return new SlotKey(date, weekday, item.getPeriodId());
+        }).distinct().toList();
+        validateWithinNext21Days(requestedSlots);
+
+        List<ClassPeriodEntity> periods = classPeriodMapper.selectActiveList();
+        if (periods.isEmpty()) {
+            throw new BusinessException(400, "No class periods configured");
+        }
+        List<Long> allPeriodIds = periods.stream().map(ClassPeriodEntity::getId).toList();
+        Map<Long, ClassPeriodEntity> periodMap = periods.stream()
+            .collect(Collectors.toMap(ClassPeriodEntity::getId, p -> p, (a, b) -> a));
+
+        RoleFlags flags = loadRoleFlags(currentUserId);
+        AvailabilityCache cache = new AvailabilityCache(allPeriodIds, flags);
+
+        List<SlotRecommendationItem> output = new ArrayList<>();
+        for (SlotKey blocked : requestedSlots) {
+            if (cache.isAvailable(baseLab.getId(), blocked)) {
+                continue;
+            }
+            List<SlotRecommendationItem> slotRecs = new ArrayList<>();
+
+            // 1) Same lab adjacent free periods
+            for (Long candidatePeriodId : adjacentPeriodIds(periods, blocked.periodId())) {
+                SlotKey candidate = new SlotKey(blocked.reservationDate(), blocked.weekday(), candidatePeriodId);
+                if (cache.isAvailable(baseLab.getId(), candidate)) {
+                    slotRecs.add(new SlotRecommendationItem(baseLab.getId(), baseLab.getLabName(),
+                        blocked.reservationDate().format(DATE_FORMATTER),
+                        candidatePeriodId,
+                        periodName(periodMap, candidatePeriodId),
+                        "Same lab adjacent free period"));
+                }
+            }
+            if (!slotRecs.isEmpty()) {
+                output.addAll(slotRecs);
+                continue;
+            }
+
+            // 2) Same department & lab type, same date & same period
+            List<LabEntity> sameDeptTypeLabs = labMapper.selectRecommendationCandidates(baseLab.getId(), request.getParticipantCount()).stream()
+                .filter(l -> Objects.equals(l.getDepartmentId(), baseLab.getDepartmentId()))
+                .filter(l -> Objects.equals(l.getLabType(), baseLab.getLabType()))
+                .toList();
+            for (LabEntity lab : sameDeptTypeLabs) {
+                if (cache.isAvailable(lab.getId(), blocked)) {
+                    slotRecs.add(new SlotRecommendationItem(lab.getId(), lab.getLabName(),
+                        blocked.reservationDate().format(DATE_FORMATTER),
+                        blocked.periodId(),
+                        periodName(periodMap, blocked.periodId()),
+                        "Same department & type lab, same period"));
+                }
+                if (slotRecs.size() >= 5) {
+                    break;
+                }
+            }
+            if (!slotRecs.isEmpty()) {
+                output.addAll(slotRecs);
+                continue;
+            }
+
+            // 3) Other labs, same period; otherwise adjacent periods
+            List<LabEntity> anyLabs = labMapper.selectRecommendationCandidates(baseLab.getId(), request.getParticipantCount());
+            for (LabEntity lab : anyLabs) {
+                if (cache.isAvailable(lab.getId(), blocked)) {
+                    slotRecs.add(new SlotRecommendationItem(lab.getId(), lab.getLabName(),
+                        blocked.reservationDate().format(DATE_FORMATTER),
+                        blocked.periodId(),
+                        periodName(periodMap, blocked.periodId()),
+                        "Other available lab, same period"));
+                } else {
+                    for (Long candidatePeriodId : adjacentPeriodIds(periods, blocked.periodId())) {
+                        SlotKey candidate = new SlotKey(blocked.reservationDate(), blocked.weekday(), candidatePeriodId);
+                        if (cache.isAvailable(lab.getId(), candidate)) {
+                            slotRecs.add(new SlotRecommendationItem(lab.getId(), lab.getLabName(),
+                                blocked.reservationDate().format(DATE_FORMATTER),
+                                candidatePeriodId,
+                                periodName(periodMap, candidatePeriodId),
+                                "Other available lab, nearby period"));
+                        }
+                        if (slotRecs.size() >= 5) {
+                            break;
+                        }
+                    }
+                }
+                if (slotRecs.size() >= 5) {
+                    break;
+                }
+            }
+            output.addAll(slotRecs);
+        }
+
+        return output.stream().limit(10).toList();
+    }
+
+    private RoleFlags loadRoleFlags(Long currentUserId) {
+        List<String> roleCodes = userRoleMapper.selectRoleCodesByUserId(currentUserId);
+        boolean isStudent = hasRole(roleCodes, "STUDENT");
+        boolean isTeacher = hasRole(roleCodes, "TEACHER");
+        return new RoleFlags(isStudent, isTeacher);
+    }
+
+    private String periodName(Map<Long, ClassPeriodEntity> periodMap, Long periodId) {
+        ClassPeriodEntity p = periodMap.get(periodId);
+        return p == null ? null : p.getPeriodName();
+    }
+
+    private List<Long> adjacentPeriodIds(List<ClassPeriodEntity> periods, Long periodId) {
+        int idx = -1;
+        for (int i = 0; i < periods.size(); i++) {
+            if (Objects.equals(periods.get(i).getId(), periodId)) {
+                idx = i;
+                break;
             }
         }
-        for (int i = 1; i <= 3; i++) {
-            LocalDateTime newEnd = startTime.minusMinutes(minutes * i);
-            LocalDateTime newStart = newEnd.minusMinutes(minutes);
-            if (reservationMapper.countConflict(request.getLabId(), newStart, newEnd) == 0) {
-                result.add(new TimeRecommendationItem(newStart.toString(), newEnd.toString(), "前序可用时段"));
-            }
+        if (idx < 0) {
+            return List.of();
         }
-        if (result.isEmpty() && reservations.isEmpty()) {
-            result.add(new TimeRecommendationItem(startTime.toString(), endTime.toString(), "当天暂无预约记录"));
+        List<Long> result = new ArrayList<>();
+        if (idx - 1 >= 0) {
+            result.add(periods.get(idx - 1).getId());
+        }
+        if (idx + 1 < periods.size()) {
+            result.add(periods.get(idx + 1).getId());
         }
         return result;
     }
 
-    /**
-     * 推荐可用实验室
-     * @param request 请求参数
-     * @return 数据列表
-     */
-    @Override
-    public List<LabRecommendationItem> recommendLabs(RecommendationRequest request) {
-        LocalDateTime startTime = parseDateTime(request.getStartTime());
-        LocalDateTime endTime = parseDateTime(request.getEndTime());
-        return labMapper.selectRecommendationCandidates(request.getLabId(), request.getParticipantCount()).stream()
-        .filter(lab -> reservationMapper.countConflict(lab.getId(), startTime, endTime) == 0)
-        .limit(5)
-        .map(lab -> toLabRecommendation(lab, startTime, endTime))
-        .toList();
-    }
+    private class AvailabilityCache {
+        private final List<Long> allPeriodIds;
+        private final RoleFlags roleFlags;
+        private final Map<String, Map<Long, LabOpenSlotEntity>> openSlotCache = new HashMap<>();
+        private final Map<String, Set<Long>> maintenanceCache = new HashMap<>();
+        private final Map<String, Set<Long>> reservedCache = new HashMap<>();
 
-    /**
-     * 审批预约信息
-     * @param id 主键ID
-     * @param request 请求参数
-     * @param currentUserId currentUserID
-     * @return 处理结果
-     */
-    @Transactional
-    @Override
-    public ReservationEntity audit(Long id, ReservationAuditRequest request, Long currentUserId) {
-        ReservationEntity entity = getById(id);
-        if (request.getAuditAction() == null || (request.getAuditAction() != 2 && request.getAuditAction() != 3)) {
-            throw new BusinessException(400, "审核操作仅支持通过或驳回");
+        private AvailabilityCache(List<Long> allPeriodIds, RoleFlags roleFlags) {
+            this.allPeriodIds = allPeriodIds;
+            this.roleFlags = roleFlags;
         }
-        entity.setApproverUserId(currentUserId);
-        entity.setStatus(request.getAuditAction() == 2 ? 2 : 3);
-        entity.setRejectReason(request.getRejectReason());
-        reservationMapper.updateAuditResult(entity);
-        insertAuditLog(id, currentUserId, request.getAuditAction(), request.getAuditComment());
-        return getById(id);
+
+        private boolean isAvailable(Long labId, SlotKey slot) {
+            if (!isOpenAndAllowed(labId, slot.weekday(), slot.periodId())) {
+                return false;
+            }
+            if (isMaintenance(labId, slot.reservationDate(), slot.periodId())) {
+                return false;
+            }
+            return !isReserved(labId, slot.reservationDate(), slot.periodId());
+        }
+
+        private boolean isOpenAndAllowed(Long labId, int weekday, Long periodId) {
+            Map<Long, LabOpenSlotEntity> openByPeriod = openSlotCache.computeIfAbsent(labId + "#" + weekday, k -> {
+                List<LabOpenSlotEntity> list = labOpenSlotMapper.selectActiveByLabAndWeekdaysAndPeriods(labId, List.of(weekday), allPeriodIds);
+                return list.stream().collect(Collectors.toMap(LabOpenSlotEntity::getPeriodId, s -> s, (a, b) -> a));
+            });
+            LabOpenSlotEntity open = openByPeriod.get(periodId);
+            if (open == null) {
+                return false;
+            }
+            if (!roleFlags.isStudent() && !roleFlags.isTeacher()) {
+                return true;
+            }
+            boolean allowStudent = open.getAllowStudent() != null && open.getAllowStudent() == 1;
+            boolean allowTeacher = open.getAllowTeacher() != null && open.getAllowTeacher() == 1;
+            if (roleFlags.isStudent() && roleFlags.isTeacher()) {
+                return allowStudent || allowTeacher;
+            }
+            if (roleFlags.isStudent()) {
+                return allowStudent;
+            }
+            return allowTeacher;
+        }
+
+        private boolean isMaintenance(Long labId, LocalDate date, Long periodId) {
+            Set<Long> set = maintenanceCache.computeIfAbsent(labId + "#" + date, k -> {
+                return labMaintenanceMapper.selectByLabAndDateRange(labId, date, date).stream()
+                    .filter(m -> m.getStatus() != null && m.getStatus() == 1)
+                    .map(LabMaintenanceEntity::getPeriodId)
+                    .collect(Collectors.toSet());
+            });
+            return set.contains(periodId);
+        }
+
+        private boolean isReserved(Long labId, LocalDate date, Long periodId) {
+            Set<Long> set = reservedCache.computeIfAbsent(labId + "#" + date, k -> {
+                return labReservationSlotMapper.selectReservedSlots(labId, date, date).stream()
+                    .map(r -> r.getPeriodId())
+                    .collect(Collectors.toSet());
+            });
+            return set.contains(periodId);
+        }
     }
 
-    /**
-     * 取消预约信息
-     * @param id 主键ID
-     * @param currentUserId currentUserID
-     * @return 处理结果
-     */
-    @Transactional
-    @Override
-    public ReservationEntity cancel(Long id, Long currentUserId) {
-        getById(id);
-        reservationMapper.cancel(id);
-        insertAuditLog(id, currentUserId, 4, "取消预约");
-        return getById(id);
+    private record RoleFlags(boolean isStudent, boolean isTeacher) { }
+
+    private List<ReservationDetailVo> attachSlots(List<ReservationEntity> reservations) {
+        if (reservations == null || reservations.isEmpty()) {
+            return List.of();
+        }
+        List<Long> reservationIds = reservations.stream().map(ReservationEntity::getId).filter(Objects::nonNull).toList();
+        List<ReservationSlotVo> slotVos = labReservationSlotMapper.selectDetailByReservationIds(reservationIds);
+        Map<Long, List<ReservationSlotVo>> slotsByReservationId = slotVos.stream()
+            .collect(Collectors.groupingBy(ReservationSlotVo::getReservationId));
+        return reservations.stream()
+            .map(r -> toDetail(r, slotsByReservationId.getOrDefault(r.getId(), List.of())))
+            .toList();
     }
 
-    /**
-     * 预约信息签到
-     * @param id 主键ID
-     * @param currentUserId currentUserID
-     * @return 处理结果
-     */
-    @Transactional
-    @Override
-    public ReservationEntity checkIn(Long id, Long currentUserId) {
-        getById(id);
-        reservationMapper.checkIn(id);
-        insertAuditLog(id, currentUserId, 5, "签到");
-        return getById(id);
+    private ReservationDetailVo toDetail(ReservationEntity entity, List<ReservationSlotVo> slots) {
+        return new ReservationDetailVo(
+            entity.getId(),
+            entity.getReservationNo(),
+            entity.getLabId(),
+            entity.getApplicantUserId(),
+            entity.getApproverUserId(),
+            entity.getReservationType(),
+            entity.getPriorityLevel(),
+            entity.getUsagePurpose(),
+            entity.getCourseOrProjectName(),
+            entity.getParticipantCount(),
+            entity.getContactPhone(),
+            entity.getStatus(),
+            entity.getRejectReason(),
+            formatDateTime(entity.getCheckInTime()),
+            formatDateTime(entity.getCheckOutTime()),
+            formatDateTime(entity.getCreatedAt()),
+            formatDateTime(entity.getUpdatedAt()),
+            slots
+        );
     }
 
-    /**
-     * 预约信息签退
-     * @param id 主键ID
-     * @param currentUserId currentUserID
-     * @return 处理结果
-     */
-    @Transactional
-    @Override
-    public ReservationEntity checkOut(Long id, Long currentUserId) {
-        getById(id);
-        reservationMapper.checkOut(id);
-        insertAuditLog(id, currentUserId, 5, "签退并完成");
-        return getById(id);
+    private String formatDateTime(LocalDateTime value) {
+        return value == null ? null : value.format(DATE_TIME_FORMATTER);
     }
 
-    /**
-     * 新增预约信息
-     * @param reservationId 预约ID
-     * @param currentUserId currentUserID
-     * @param action 参数
-     * @param comment 参数
-     */
+    private ReservationEntity requireReservation(Long id) {
+        ReservationEntity entity = reservationMapper.selectById(id);
+        if (entity == null) {
+            throw new BusinessException(404, "Reservation not found");
+        }
+        return entity;
+    }
+
+    private LabEntity loadAndValidateLab(Long labId) {
+        if (labId == null) {
+            throw new BusinessException(400, "labId is required");
+        }
+        LabEntity lab = labMapper.selectById(labId);
+        if (lab == null) {
+            throw new BusinessException(404, "Lab not found");
+        }
+        if (lab.getDeleted() != null && lab.getDeleted() == 1) {
+            throw new BusinessException(400, "Lab is deleted");
+        }
+        if (lab.getOpenStatus() == null || lab.getOpenStatus() != 1) {
+            throw new BusinessException(400, "Lab is closed");
+        }
+        if (lab.getLabStatus() == null || lab.getLabStatus() != 1) {
+            throw new BusinessException(400, "Lab is under maintenance");
+        }
+        return lab;
+    }
+
+    private List<SlotKey> normalizeRequestedSlots(ReservationCreateRequest request) {
+        if (request.getSlots() == null || request.getSlots().isEmpty()) {
+            throw new BusinessException(400, "slots is required");
+        }
+        return request.getSlots().stream().map(item -> {
+            LocalDate date = LocalDate.parse(item.getReservationDate(), DATE_FORMATTER);
+            int weekday = date.getDayOfWeek().getValue();
+            return new SlotKey(date, weekday, item.getPeriodId());
+        }).distinct().toList();
+    }
+
+    private void validateWithinNext21Days(List<SlotKey> slots) {
+        LocalDate today = LocalDate.now();
+        LocalDate last = today.plusDays(20);
+        for (SlotKey key : slots) {
+            if (key.reservationDate().isBefore(today) || key.reservationDate().isAfter(last)) {
+                throw new BusinessException(400,
+                    "Date out of allowed range (today to next 21 days): " + key.reservationDate().format(DATE_FORMATTER));
+            }
+        }
+    }
+
+    private Map<SlotKey, LabOpenSlotEntity> loadOpenSlots(Long labId, List<SlotKey> requestedSlots) {
+        Set<Integer> weekdays = requestedSlots.stream().map(SlotKey::weekday).collect(Collectors.toSet());
+        Set<Long> periodIds = requestedSlots.stream().map(SlotKey::periodId).collect(Collectors.toSet());
+        List<LabOpenSlotEntity> openSlots = labOpenSlotMapper.selectActiveByLabAndWeekdaysAndPeriods(labId,
+            weekdays.stream().toList(), periodIds.stream().toList());
+        Map<SlotKey, LabOpenSlotEntity> map = new HashMap<>();
+        for (LabOpenSlotEntity slot : openSlots) {
+            map.put(new SlotKey(null, slot.getWeekday(), slot.getPeriodId()), slot);
+        }
+        for (SlotKey key : requestedSlots) {
+            LabOpenSlotEntity matched = map.get(new SlotKey(null, key.weekday(), key.periodId()));
+            if (matched == null) {
+                throw new BusinessException(400, "Slot not open: weekday=" + key.weekday() + ", periodId=" + key.periodId());
+            }
+        }
+        return map;
+    }
+
+    private void validateRoleAllowed(Map<SlotKey, LabOpenSlotEntity> openSlotMap, List<SlotKey> requestedSlots, Long currentUserId) {
+        List<String> roleCodes = userRoleMapper.selectRoleCodesByUserId(currentUserId);
+        boolean isStudent = hasRole(roleCodes, "STUDENT");
+        boolean isTeacher = hasRole(roleCodes, "TEACHER");
+        if (!isStudent && !isTeacher) {
+            return;
+        }
+        for (SlotKey key : requestedSlots) {
+            LabOpenSlotEntity slot = openSlotMap.get(new SlotKey(null, key.weekday(), key.periodId()));
+            if (slot == null) {
+                continue;
+            }
+            boolean allowStudent = slot.getAllowStudent() != null && slot.getAllowStudent() == 1;
+            boolean allowTeacher = slot.getAllowTeacher() != null && slot.getAllowTeacher() == 1;
+            if (isStudent && isTeacher) {
+                if (!allowStudent && !allowTeacher) {
+                    throw new BusinessException(400, "Slot not allowed for current user roles");
+                }
+            } else if (isStudent && !allowStudent) {
+                throw new BusinessException(400, "Slot not allowed for students");
+            } else if (isTeacher && !allowTeacher) {
+                throw new BusinessException(400, "Slot not allowed for teachers");
+            }
+        }
+    }
+
+    private void validateNoMaintenance(Long labId, List<SlotKey> requestedSlots) {
+        LocalDate min = requestedSlots.stream().map(SlotKey::reservationDate).min(LocalDate::compareTo).orElseThrow();
+        LocalDate max = requestedSlots.stream().map(SlotKey::reservationDate).max(LocalDate::compareTo).orElseThrow();
+        List<LabMaintenanceEntity> maintenances = labMaintenanceMapper.selectByLabAndDateRange(labId, min, max).stream()
+            .filter(m -> m.getStatus() != null && m.getStatus() == 1)
+            .toList();
+        if (maintenances.isEmpty()) {
+            return;
+        }
+        Map<String, LabMaintenanceEntity> map = maintenances.stream()
+            .collect(Collectors.toMap(m -> key(m.getMaintenanceDate(), m.getPeriodId()), m -> m, (a, b) -> a));
+        for (SlotKey key : requestedSlots) {
+            if (map.containsKey(key(key.reservationDate(), key.periodId()))) {
+                throw new BusinessException(400, "Slot under maintenance: " + key.reservationDate().format(DATE_FORMATTER)
+                    + ", periodId=" + key.periodId());
+            }
+        }
+    }
+
+    private void validateNoReservationConflict(Long labId, List<SlotKey> requestedSlots) {
+        LocalDate min = requestedSlots.stream().map(SlotKey::reservationDate).min(LocalDate::compareTo).orElseThrow();
+        LocalDate max = requestedSlots.stream().map(SlotKey::reservationDate).max(LocalDate::compareTo).orElseThrow();
+        Map<String, Boolean> reservedMap = labReservationSlotMapper.selectReservedSlots(labId, min, max).stream()
+            .collect(Collectors.toMap(r -> key(r.getReservationDate(), r.getPeriodId()), r -> true, (a, b) -> a));
+        for (SlotKey key : requestedSlots) {
+            if (reservedMap.containsKey(key(key.reservationDate(), key.periodId()))) {
+                throw new BusinessException(400, "Slot conflict: already reserved (" + key.reservationDate().format(DATE_FORMATTER)
+                    + ", periodId=" + key.periodId() + ")");
+            }
+        }
+    }
+
     private void insertAuditLog(Long reservationId, Long currentUserId, Integer action, String comment) {
+        if (currentUserId == null) {
+            return;
+        }
         ReservationAuditLogEntity logEntity = new ReservationAuditLogEntity();
         logEntity.setReservationId(reservationId);
         logEntity.setAuditUserId(currentUserId);
@@ -285,34 +607,31 @@ public class ReservationServiceImpl implements ReservationService {
         reservationAuditLogMapper.insert(logEntity);
     }
 
-    /**
-     * 处理预约信息
-     * @param value 参数
-     * @return 处理结果
-     */
-    private LocalDateTime parseDateTime(String value) {
-        String normalized = value.replace("T", " ");
-        return LocalDateTime.parse(normalized, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+    private void requireAdmin(Long currentUserId) {
+        if (currentUserId == null) {
+            throw new BusinessException(401, "User not logged in");
+        }
+        if (!isAdmin(currentUserId)) {
+            throw new BusinessException(403, "Admin role required");
+        }
     }
 
-    /**
-     * 转换预约信息
-     * @param lab 参数
-     * @param startTime 时间参数
-     * @param endTime 时间参数
-     * @return 处理结果
-     */
-    private LabRecommendationItem toLabRecommendation(LabEntity lab, LocalDateTime startTime, LocalDateTime endTime) {
-        return new LabRecommendationItem(
-        lab.getId(),
-        lab.getLabCode(),
-        lab.getLabName(),
-        lab.getBuildingName(),
-        lab.getRoomNo(),
-        startTime.toString(),
-        endTime.toString(),
-        "可预约的备选实验室"
-        );
+    private boolean isAdmin(Long userId) {
+        List<String> roleCodes = userRoleMapper.selectRoleCodesByUserId(userId);
+        return hasRole(roleCodes, "ADMIN");
     }
 
+    private boolean hasRole(List<String> roleCodes, String roleCode) {
+        if (roleCodes == null || roleCodes.isEmpty()) {
+            return false;
+        }
+        return roleCodes.stream().anyMatch(code ->
+            roleCode.equalsIgnoreCase(code) || ("ROLE_" + roleCode).equalsIgnoreCase(code));
+    }
+
+    private String key(LocalDate date, Long periodId) {
+        return date.toString() + "#" + periodId;
+    }
+
+    private record SlotKey(LocalDate reservationDate, int weekday, Long periodId) { }
 }

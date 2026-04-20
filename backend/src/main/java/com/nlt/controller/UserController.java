@@ -26,14 +26,14 @@ public class UserController {
     private final TokenService tokenService;
 
     /**
-     * 查询用户信息列表
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @param username 参数
-     * @param realName 参数
-     * @param departmentId 部门ID
-     * @param status 状态值
-     * @return 响应结果
+     * 鏌ヨ鐢ㄦ埛淇℃伅鍒楄〃
+     * @param pageNum 椤电爜
+     * @param pageSize 姣忛〉鏉℃暟
+     * @param username 鍙傛暟
+     * @param realName 鍙傛暟
+     * @param departmentId 閮ㄩ棬ID
+     * @param status 鐘舵€佸€?
+     * @return 鍝嶅簲缁撴灉
      */
     @GetMapping
     public ApiResponse<PageData<UserVO>> page(@RequestParam(defaultValue = "1") int pageNum,
@@ -46,19 +46,19 @@ public class UserController {
     }
 
     /**
-     * 新增用户信息
-     * @param request 请求参数
-     * @return 响应结果
+     * 鏂板鐢ㄦ埛淇℃伅
+     * @param request 璇锋眰鍙傛暟
+     * @return 鍝嶅簲缁撴灉
      */
     @PostMapping
     public ApiResponse<UserVO> create(@Valid @RequestBody UserCreateRequest request) {
-        return ApiResponse.success(userService.create(request));
+        return ApiResponse.created(userService.create(request));
     }
 
     /**
-     * 处理用户信息
-     * @param status 状态值
-     * @return 响应结果
+     * 澶勭悊鐢ㄦ埛淇℃伅
+     * @param status 鐘舵€佸€?
+     * @return 鍝嶅簲缁撴灉
      */
     @GetMapping("/options")
     public ApiResponse<List<OptionItem>> options(@RequestParam(required = false) Integer status) {
@@ -66,9 +66,9 @@ public class UserController {
     }
 
     /**
-     * 处理用户信息
-     * @param request 请求参数
-     * @return 响应结果
+     * 澶勭悊鐢ㄦ埛淇℃伅
+     * @param request 璇锋眰鍙傛暟
+     * @return 鍝嶅簲缁撴灉
      */
     @GetMapping("/profile")
     public ApiResponse<UserVO> profile(HttpServletRequest request) {
@@ -76,10 +76,10 @@ public class UserController {
     }
 
     /**
-     * 更新用户信息
-     * @param request 请求参数
-     * @param req 参数
-     * @return 响应结果
+     * 鏇存柊鐢ㄦ埛淇℃伅
+     * @param request 璇锋眰鍙傛暟
+     * @param req 鍙傛暟
+     * @return 鍝嶅簲缁撴灉
      */
     @PutMapping("/profile")
     public ApiResponse<UserVO> updateProfile(HttpServletRequest request,
@@ -88,10 +88,10 @@ public class UserController {
     }
 
     /**
-     * 更新用户信息
-     * @param request 请求参数
-     * @param req 参数
-     * @return 响应结果
+     * 鏇存柊鐢ㄦ埛淇℃伅
+     * @param request 璇锋眰鍙傛暟
+     * @param req 鍙傛暟
+     * @return 鍝嶅簲缁撴灉
      */
     @PatchMapping("/password")
     public ApiResponse<Void> updatePassword(HttpServletRequest request,
@@ -101,9 +101,9 @@ public class UserController {
     }
 
     /**
-     * 查询用户信息
-     * @param id 主键ID
-     * @return 响应结果
+     * 鏌ヨ鐢ㄦ埛淇℃伅
+     * @param id 涓婚敭ID
+     * @return 鍝嶅簲缁撴灉
      */
     @GetMapping("/{id}")
     public ApiResponse<UserVO> getById(@PathVariable Long id) {
@@ -111,10 +111,10 @@ public class UserController {
     }
 
     /**
-     * 更新用户信息
-     * @param id 主键ID
-     * @param request 请求参数
-     * @return 响应结果
+     * 鏇存柊鐢ㄦ埛淇℃伅
+     * @param id 涓婚敭ID
+     * @param request 璇锋眰鍙傛暟
+     * @return 鍝嶅簲缁撴灉
      */
     @PutMapping("/{id}")
     public ApiResponse<UserVO> update(@PathVariable Long id,
@@ -123,9 +123,9 @@ public class UserController {
     }
 
     /**
-     * 删除用户信息
-     * @param id 主键ID
-     * @return 响应结果
+     * 鍒犻櫎鐢ㄦ埛淇℃伅
+     * @param id 涓婚敭ID
+     * @return 鍝嶅簲缁撴灉
      */
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
@@ -134,10 +134,10 @@ public class UserController {
     }
 
     /**
-     * 重置用户信息
-     * @param id 主键ID
-     * @param request 请求参数
-     * @return 响应结果
+     * 閲嶇疆鐢ㄦ埛淇℃伅
+     * @param id 涓婚敭ID
+     * @param request 璇锋眰鍙傛暟
+     * @return 鍝嶅簲缁撴灉
      */
     @PatchMapping("/{id}/reset-password")
     public ApiResponse<Void> resetPassword(@PathVariable Long id,
@@ -147,10 +147,10 @@ public class UserController {
     }
 
     /**
-     * 更新用户信息
-     * @param id 主键ID
-     * @param request 请求参数
-     * @return 响应结果
+     * 鏇存柊鐢ㄦ埛淇℃伅
+     * @param id 涓婚敭ID
+     * @param request 璇锋眰鍙傛暟
+     * @return 鍝嶅簲缁撴灉
      */
     @PatchMapping("/{id}/status")
     public ApiResponse<Void> updateStatus(@PathVariable Long id,
@@ -160,11 +160,11 @@ public class UserController {
     }
 
     /**
-     * 处理用户信息
-     * @param id 主键ID
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @return 响应结果
+     * 澶勭悊鐢ㄦ埛淇℃伅
+     * @param id 涓婚敭ID
+     * @param pageNum 椤电爜
+     * @param pageSize 姣忛〉鏉℃暟
+     * @return 鍝嶅簲缁撴灉
      */
     @GetMapping("/{id}/violations")
     public ApiResponse<PageData<ViolationRecordEntity>> violations(@PathVariable Long id,

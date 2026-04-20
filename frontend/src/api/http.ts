@@ -1,6 +1,6 @@
 ﻿import type { ApiResponse } from '../types';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8080/api';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8080';
 
 export class ApiError extends Error {
   code: number;
@@ -72,3 +72,15 @@ export function patch<T>(path: string, payload?: unknown, token?: string): Promi
     token,
   );
 }
+
+export function put<T>(path: string, payload?: unknown, token?: string): Promise<T> {
+  return request<T>(
+    path,
+    {
+      method: 'PUT',
+      body: payload ? JSON.stringify(payload) : undefined,
+    },
+    token,
+  );
+}
+

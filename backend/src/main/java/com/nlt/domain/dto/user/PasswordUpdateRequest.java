@@ -12,4 +12,7 @@ public class PasswordUpdateRequest {
     @NotBlank
     private String newPassword;
 
+    @NotBlank
+    private String confirmPassword;
+
 }

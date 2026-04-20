@@ -28,6 +28,8 @@ public class AuthController {
      */
     @PostMapping("/login")
     public ApiResponse<LoginResponseData> login(@Valid @RequestBody LoginRequest request) {
+        LoginResponseData login = authService.login(request);
+        System.out.println(login.getUsername());
         return ApiResponse.success(authService.login(request));
     }
 

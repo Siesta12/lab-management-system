@@ -2,52 +2,62 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.nlt.mapper.ReservationMapper">
     <select id="selectPage" resultType="com.nlt.domain.entity.ReservationEntity">
-        select *
-        from lab_reservation
+        select r.*
+        from lab_reservation r
         where 1 = 1
         <if test="reservationNo != null and reservationNo != ''">
-            and reservation_no like concat('%', #{reservationNo}, '%')
+            and r.reservation_no like concat('%', #{reservationNo}, '%')
         </if>
         <if test="labId != null">
-            and lab_id = #{labId}
+            and r.lab_id = #{labId}
         </if>
         <if test="applicantUserId != null">
-            and applicant_user_id = #{applicantUserId}
+            and r.applicant_user_id = #{applicantUserId}
         </if>
         <if test="approverUserId != null">
-            and approver_user_id = #{approverUserId}
+            and r.approver_user_id = #{approverUserId}
         </if>
         <if test="status != null">
-            and status = #{status}
+            and r.status = #{status}
         </if>
         <if test="reservationDate != null">
-            and reservation_date = #{reservationDate}
+            and exists (
+                select 1
+                from lab_reservation_slot s
+                where s.reservation_id = r.id
+                  and s.reservation_date = #{reservationDate}
+            )
         </if>
-        order by id desc
+        order by r.id desc
         limit #{offset}, #{pageSize}
     </select>
 
     <select id="countPage" resultType="long">
         select count(*)
-        from lab_reservation
+        from lab_reservation r
         where 1 = 1
         <if test="reservationNo != null and reservationNo != ''">
-            and reservation_no like concat('%', #{reservationNo}, '%')
+            and r.reservation_no like concat('%', #{reservationNo}, '%')
         </if>
         <if test="labId != null">
-            and lab_id = #{labId}
+            and r.lab_id = #{labId}
         </if>
         <if test="applicantUserId != null">
-            and applicant_user_id = #{applicantUserId}
+            and r.applicant_user_id = #{applicantUserId}
         </if>
         <if test="approverUserId != null">
-            and approver_user_id = #{approverUserId}
+            and r.approver_user_id = #{approverUserId}
         </if>
         <if test="status != null">
-            and status = #{status}
+            and r.status = #{status}
         </if>
         <if test="reservationDate != null">
-            and reservation_date = #{reservationDate}
+            and exists (
+                select 1
+                from lab_reservation_slot s
+                where s.reservation_id = r.id
+                  and s.reservation_date = #{reservationDate}
+            )
         </if>
     </select>
 
@@ -86,9 +96,9 @@
     </select>
 
     <insert id="insert"
-                    parameterType="com.nlt.domain.entity.ReservationEntity"
-                    useGeneratedKeys="true"
-                    keyProperty="id">
+            parameterType="com.nlt.domain.entity.ReservationEntity"
+            useGeneratedKeys="true"
+            keyProperty="id">
         insert into lab_reservation(
             reservation_no,
             lab_id,
@@ -96,9 +106,6 @@
             approver_user_id,
             reservation_type,
             priority_level,
-            reservation_date,
-            start_time,
-            end_time,
             usage_purpose,
             course_or_project_name,
             participant_count,
@@ -115,9 +122,6 @@
             #{approverUserId},
             #{reservationType},
             #{priorityLevel},
-            #{reservationDate},
-            #{startTime},
-            #{endTime},
             #{usagePurpose},
             #{courseOrProjectName},
             #{participantCount},
@@ -132,8 +136,8 @@
     <update id="updateAuditResult" parameterType="com.nlt.domain.entity.ReservationEntity">
         update lab_reservation
         set approver_user_id = #{approverUserId},
-                status = #{status},
-                reject_reason = #{rejectReason}
+            status = #{status},
+            reject_reason = #{rejectReason}
         where id = #{id}
     </update>
 
@@ -152,64 +156,50 @@
     <update id="checkOut">
         update lab_reservation
         set check_out_time = now(),
-                status = 5
+            status = 5
         where id = #{id}
     </update>
 
-    <select id="countConflict" resultType="int">
-        select count(*)
-        from lab_reservation
-        where lab_id = #{labId}
-            and status in (1, 2, 5)
-            and start_time &lt; #{endTime}
-            and end_time &gt; #{startTime}
-    </select>
-
-    <select id="selectByLabAndDate" resultType="com.nlt.domain.entity.ReservationEntity">
-        select *
-        from lab_reservation
-        where lab_id = #{labId}
-            and status in (1, 2, 5)
-            and reservation_date = #{reservationDate}
-        order by start_time asc
-    </select>
-
+    <!-- Statistics: all date-range filters use slot.reservation_date -->
     <select id="countByReservationType" resultType="map">
-        select reservation_type as name, count(*) as count
-        from lab_reservation
+        select r.reservation_type as name, count(distinct r.id) as count
+        from lab_reservation r
+        join lab_reservation_slot s on s.reservation_id = r.id
         where 1 = 1
         <if test="startDate != null">
-            and reservation_date <![CDATA[ >= ]]> #{startDate}
+            and s.reservation_date <![CDATA[ >= ]]> #{startDate}
         </if>
         <if test="endDate != null">
-            and reservation_date <![CDATA[ <= ]]> #{endDate}
+            and s.reservation_date <![CDATA[ <= ]]> #{endDate}
         </if>
         <if test="labId != null">
-            and lab_id = #{labId}
+            and r.lab_id = #{labId}
         </if>
-        group by reservation_type
+        group by r.reservation_type
     </select>
 
     <select id="countByStatus" resultType="map">
-        select status as name, count(*) as count
-        from lab_reservation
+        select r.status as name, count(distinct r.id) as count
+        from lab_reservation r
+        join lab_reservation_slot s on s.reservation_id = r.id
         where 1 = 1
         <if test="startDate != null">
-            and reservation_date <![CDATA[ >= ]]> #{startDate}
+            and s.reservation_date <![CDATA[ >= ]]> #{startDate}
         </if>
         <if test="endDate != null">
-            and reservation_date <![CDATA[ <= ]]> #{endDate}
+            and s.reservation_date <![CDATA[ <= ]]> #{endDate}
         </if>
         <if test="labId != null">
-            and lab_id = #{labId}
+            and r.lab_id = #{labId}
         </if>
-        group by status
+        group by r.status
     </select>
 
     <select id="countByLabUsage" resultType="map">
-        select l.lab_name as name, count(r.id) as count
+        select l.lab_name as name, count(distinct r.id) as count
         from lab l
         left join lab_reservation r on l.id = r.lab_id
+        left join lab_reservation_slot s on s.reservation_id = r.id
         where l.deleted = 0
         <if test="departmentId != null">
             and l.department_id = #{departmentId}
@@ -218,43 +208,48 @@
             and l.id = #{labId}
         </if>
         <if test="startDate != null">
-            and (r.id is null or r.reservation_date <![CDATA[ >= ]]> #{startDate})
+            and (r.id is null or s.reservation_date <![CDATA[ >= ]]> #{startDate})
         </if>
         <if test="endDate != null">
-            and (r.id is null or r.reservation_date <![CDATA[ <= ]]> #{endDate})
+            and (r.id is null or s.reservation_date <![CDATA[ <= ]]> #{endDate})
         </if>
         group by l.id, l.lab_name
         order by count desc, l.id asc
     </select>
 
+    <!-- "Time distribution" becomes "period distribution" -->
     <select id="countByTimeDistribution" resultType="map">
-        select date_format(start_time, '%H:00') as name, count(*) as count
-        from lab_reservation
+        select p.period_name as name, count(*) as count
+        from lab_reservation_slot s
+        join lab_reservation r on r.id = s.reservation_id
+        join class_period p on p.id = s.period_id
         where 1 = 1
         <if test="startDate != null">
-            and reservation_date <![CDATA[ >= ]]> #{startDate}
+            and s.reservation_date <![CDATA[ >= ]]> #{startDate}
         </if>
         <if test="endDate != null">
-            and reservation_date <![CDATA[ <= ]]> #{endDate}
+            and s.reservation_date <![CDATA[ <= ]]> #{endDate}
         </if>
         <if test="labId != null">
-            and lab_id = #{labId}
+            and r.lab_id = #{labId}
         </if>
-        group by date_format(start_time, '%H:00')
-        order by name asc
+        group by p.id, p.period_name
+        order by p.sort_order asc, p.period_no asc
     </select>
 
     <select id="reservationTrend" resultType="map">
-        select date_format(reservation_date, '%Y-%m-%d') as name, count(*) as count
-        from lab_reservation
+        select date_format(s.reservation_date, '%Y-%m-%d') as name, count(distinct r.id) as count
+        from lab_reservation_slot s
+        join lab_reservation r on r.id = s.reservation_id
         where 1 = 1
         <if test="startDate != null">
-            and reservation_date <![CDATA[ >= ]]> #{startDate}
+            and s.reservation_date <![CDATA[ >= ]]> #{startDate}
         </if>
         <if test="endDate != null">
-            and reservation_date <![CDATA[ <= ]]> #{endDate}
+            and s.reservation_date <![CDATA[ <= ]]> #{endDate}
         </if>
-        group by reservation_date
-        order by reservation_date asc
+        group by s.reservation_date
+        order by s.reservation_date asc
     </select>
 </mapper>
+

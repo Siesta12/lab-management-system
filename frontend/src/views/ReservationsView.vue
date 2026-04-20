@@ -1,224 +1,218 @@
-﻿<template>
-  <section class="content-grid sidebar-layout">
-    <BasePanel tag="预约申请" title="冲突检测与推荐" panel-class="form-panel">
-      <form class="stack-form" @submit.prevent="handleSubmit">
-        <label>
-          <span>实验室</span>
-          <select v-model.number="form.labId">
-            <option v-for="lab in labOptions" :key="lab.id" :value="lab.id">{{ lab.name }}</option>
-          </select>
-        </label>
-        <label><span>预约日期</span><input v-model="form.reservationDate" type="date" /></label>
-        <label><span>开始时间</span><input v-model="form.startClock" type="time" /></label>
-        <label><span>结束时间</span><input v-model="form.endClock" type="time" /></label>
-        <label>
-          <span>预约类型</span>
-          <select v-model.number="form.reservationType">
-            <option :value="1">教学预约</option>
-            <option :value="2">科研预约</option>
-            <option :value="3">个人预约</option>
-          </select>
-        </label>
-        <label><span>用途说明</span><input v-model="form.usagePurpose" /></label>
-        <label><span>课程 / 项目名称</span><input v-model="form.courseOrProjectName" /></label>
-        <label><span>参与人数</span><input v-model.number="form.participantCount" type="number" min="1" /></label>
-        <label><span>联系电话</span><input v-model="form.contactPhone" /></label>
-        <div class="button-row">
-          <button type="button" class="ghost-btn wide" @click="handleCheck">冲突检测</button>
-          <button type="submit" class="primary-btn wide">提交申请</button>
-        </div>
-      </form>
-
-      <p v-if="formMessage" class="info-text">{{ formMessage }}</p>
-
-      <div class="recommendation-box">
-        <h4>推荐时间段</h4>
-        <div v-for="item in timeItems" :key="item.range" class="mini-card">
-          <strong>{{ item.range }}</strong>
-          <span>{{ item.note }}</span>
-        </div>
-        <h4>推荐实验室</h4>
-        <div v-for="item in labItems" :key="item.name" class="mini-card">
-          <strong>{{ item.name }}</strong>
-          <span>{{ item.location }} · {{ item.reason }}</span>
-        </div>
-      </div>
-    </BasePanel>
-
-    <BasePanel tag="预约列表" title="预约申请与审核状态" :note="`共 ${reservationState.total} 条`">
+<template>
+  <section class="content-grid split-grid">
+    <BasePanel tag="预约管理" title="预约单列表" :note="`共 ${state.total} 条`">
       <div class="toolbar">
-        <button type="button" class="ghost-btn" @click="loadReservations">刷新列表</button>
+        <select v-model="statusFilter">
+          <option value="">全部状态</option>
+          <option value="1">待审批</option>
+          <option value="2">已通过</option>
+          <option value="3">已驳回</option>
+          <option value="4">已取消</option>
+          <option value="5">已完成</option>
+        </select>
+        <button type="button" class="ghost-btn" @click="loadPage">刷新</button>
       </div>
-      <p v-if="tableMessage" class="info-text">{{ tableMessage }}</p>
-      <BaseTable :headers="['申请人', '实验室', '日期', '时间段', '类型', '优先级', '状态']">
-        <tr v-for="item in displayReservations" :key="item.id">
-          <td>{{ item.applicant }}</td>
-          <td>{{ item.labName }}</td>
-          <td>{{ item.date }}</td>
-          <td>{{ item.timeRange }}</td>
-          <td>{{ item.type }}</td>
-          <td>{{ item.priority }}</td>
-          <td><span :class="getBadgeClass(item.status)">{{ item.status }}</span></td>
+
+      <p v-if="message" class="info-text">{{ message }}</p>
+
+      <BaseTable :headers="['预约编号', '实验室', '申请人', '节次明细', '状态']">
+        <tr v-for="item in filteredList" :key="item.id" class="clickable-row" @click="select(item.id)">
+          <td>{{ item.reservationNo }}</td>
+          <td>{{ labName(item.labId) }}</td>
+          <td>#{{ item.applicantUserId }}</td>
+          <td>{{ slotSummary(item) }}</td>
+          <td><span :class="getBadgeClass(statusText(item.status))">{{ statusText(item.status) }}</span></td>
         </tr>
       </BaseTable>
+    </BasePanel>
+
+    <BasePanel tag="审批" title="预约详情与审批操作" panel-class="detail-panel">
+      <div v-if="selected" class="detail-stack">
+        <div class="detail-card">
+          <h4>{{ labName(selected.labId) }}</h4>
+          <p>{{ selected.reservationNo }}</p>
+        </div>
+
+        <div class="detail-list">
+          <div><strong>状态</strong><span>{{ statusText(selected.status) }}</span></div>
+          <div><strong>类型</strong><span>{{ typeText(selected.reservationType) }}</span></div>
+          <div><strong>优先级</strong><span>{{ priorityText(selected.priorityLevel) }}</span></div>
+          <div><strong>用途</strong><span>{{ selected.usagePurpose }}</span></div>
+          <div><strong>课程/项目</strong><span>{{ selected.courseOrProjectName || '未填写' }}</span></div>
+          <div><strong>参与人数</strong><span>{{ selected.participantCount }} 人</span></div>
+          <div><strong>联系电话</strong><span>{{ selected.contactPhone || '未填写' }}</span></div>
+          <div><strong>驳回原因</strong><span>{{ selected.rejectReason || '无' }}</span></div>
+        </div>
+
+        <div class="detail-section">
+          <h5>节次明细</h5>
+          <ul class="bullet-list compact-list">
+            <li v-for="slot in selected.slots" :key="slot.id">
+              {{ slot.reservationDate }} · {{ slot.periodName }} · {{ slot.slotStatus === 1 ? '占用' : '已取消' }}
+            </li>
+          </ul>
+        </div>
+
+        <div class="detail-section">
+          <h5>审批操作</h5>
+          <div class="stack-form">
+            <label class="wide">
+              <span>备注（可选）</span>
+              <input v-model="auditComment" placeholder="例如：请注意设备使用规范" />
+            </label>
+            <label class="wide">
+              <span>驳回原因（驳回时必填）</span>
+              <input v-model="rejectReason" placeholder="例如：节次不开放/人数超限/维护中" />
+            </label>
+            <div class="button-row">
+              <button type="button" class="primary-btn wide" :disabled="selected.status !== 1" @click="handleApprove">通过</button>
+              <button type="button" class="ghost-btn wide" :disabled="selected.status !== 1" @click="handleReject">驳回</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <h5>审核日志</h5>
+          <ul class="bullet-list compact-list">
+            <li v-for="log in logs" :key="log.id">
+              {{ log.createdAt }} · {{ auditActionText(log.auditAction) }} · {{ log.auditComment || '无备注' }}
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <p v-else class="info-text">请选择一条预约单进行审批。</p>
     </BasePanel>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
-import {
-  checkReservationConflict,
-  createReservation,
-  fetchMyReservations,
-  fetchReservations,
-  recommendLabs,
-  recommendTimes,
-} from '../api/reservations';
+import { computed, onMounted, ref } from 'vue';
 import BasePanel from '../components/BasePanel.vue';
 import BaseTable from '../components/BaseTable.vue';
-import { labRecommendations as fallbackLabRecommendations, labs, reservations as fallbackReservations, timeRecommendations as fallbackTimeRecommendations } from '../data/mock';
+import { fetchReservationAuditLogs } from '../api/reservationAuditLogs';
+import { approveReservation, fetchReservationById, fetchReservations, rejectReservation } from '../api/reservations';
+import { fetchLabs } from '../api/labs';
 import { useAuthStore } from '../stores/auth';
-import type { LabRecommendation, ReservationCreatePayload, ReservationDto, ReservationItem, TimeRecommendation } from '../types';
+import type { LabDto, ReservationAuditLogDto, ReservationDto } from '../types';
 import { getBadgeClass } from '../utils/format';
 
 const auth = useAuthStore();
+const message = ref('');
+const statusFilter = ref('');
+const state = ref<{ list: ReservationDto[]; total: number }>({ list: [], total: 0 });
+const selected = ref<ReservationDto | null>(null);
+const logs = ref<ReservationAuditLogDto[]>([]);
+const labs = ref<LabDto[]>([]);
+const auditComment = ref('');
+const rejectReason = ref('');
 
-const labOptions = computed(() => labs);
-const form = reactive({
-  labId: labs[0]?.id ?? 1,
-  reservationDate: '2026-04-20',
-  startClock: '08:00',
-  endClock: '10:00',
-  reservationType: 1,
-  usagePurpose: '课程实验',
-  courseOrProjectName: '软件工程实验',
-  participantCount: 32,
-  contactPhone: '13800000000',
+const filteredList = computed(() => {
+  if (!statusFilter.value) return state.value.list;
+  return state.value.list.filter((r) => String(r.status) === statusFilter.value);
 });
 
-const reservationState = ref<{ list: ReservationItem[]; total: number }>({
-  list: fallbackReservations,
-  total: fallbackReservations.length,
-});
-const timeItems = ref<TimeRecommendation[]>(fallbackTimeRecommendations);
-const labItems = ref<LabRecommendation[]>(fallbackLabRecommendations);
-const formMessage = ref('');
-const tableMessage = ref('');
+function labName(id: number): string {
+  return labs.value.find((l) => l.id === id)?.labName ?? `实验室#${id}`;
+}
 
-const displayReservations = computed(() => reservationState.value.list);
+function slotSummary(item: ReservationDto): string {
+  const parts = item.slots?.map((s) => `${s.reservationDate} ${s.periodName}`) ?? [];
+  if (parts.length <= 2) return parts.join('；') || '--';
+  return `${parts.slice(0, 2).join('；')}…（共${parts.length}条）`;
+}
 
-function typeText(value: number): ReservationItem['type'] {
-  if (value === 1) return '教学预约';
-  if (value === 2) return '科研预约';
+function statusText(status: number): '待审批' | '已通过' | '已驳回' | '已取消' | '已完成' {
+  if (status === 2) return '已通过';
+  if (status === 3) return '已驳回';
+  if (status === 4) return '已取消';
+  if (status === 5) return '已完成';
+  return '待审批';
+}
+
+function typeText(type: number): string {
+  if (type === 1) return '课程预约';
+  if (type === 2) return '科研预约';
   return '个人预约';
 }
 
-function priorityText(value: number): ReservationItem['priority'] {
+function priorityText(value: number): string {
   if (value === 1) return '高';
   if (value === 2) return '中';
   return '低';
 }
 
-function statusText(value: number): ReservationItem['status'] {
-  if (value === 2) return '已通过';
-  if (value === 3) return '已驳回';
-  if (value === 4) return '已取消';
-  return '待审核';
+function auditActionText(action: number): string {
+  if (action === 1) return '提交申请';
+  if (action === 2) return '审批通过';
+  if (action === 3) return '审批驳回';
+  if (action === 4) return '取消预约';
+  if (action === 5) return '完成/签退';
+  return '状态变更';
 }
 
-function buildDateTime(date: string, time: string): string {
-  return `${date} ${time}:00`;
-}
-
-function buildPayload(): ReservationCreatePayload {
-  return {
-    labId: form.labId,
-    reservationType: form.reservationType,
-    reservationDate: form.reservationDate,
-    startTime: buildDateTime(form.reservationDate, form.startClock),
-    endTime: buildDateTime(form.reservationDate, form.endClock),
-    usagePurpose: form.usagePurpose,
-    courseOrProjectName: form.courseOrProjectName,
-    participantCount: form.participantCount,
-    contactPhone: form.contactPhone,
-  };
-}
-
-function mapReservation(dto: ReservationDto): ReservationItem {
-  const matchedLab = labs.find((item) => item.id === dto.labId);
-  return {
-    id: dto.id,
-    applicant: `用户 #${dto.applicantUserId}`,
-    labName: matchedLab?.name ?? `实验室 #${dto.labId}`,
-    date: dto.reservationDate,
-    timeRange: `${dto.startTime.slice(11, 16)} - ${dto.endTime.slice(11, 16)}`,
-    type: typeText(dto.reservationType),
-    priority: priorityText(dto.priorityLevel),
-    status: statusText(dto.status),
-  };
-}
-
-async function loadReservations(): Promise<void> {
+async function loadPage(): Promise<void> {
   try {
-    const data = auth.token.value
-      ? await fetchMyReservations({ pageNum: 1, pageSize: 10 }, auth.token.value)
-      : await fetchReservations({ pageNum: 1, pageSize: 10 });
-
-    reservationState.value = {
-      list: data.list.map(mapReservation),
-      total: data.total,
-    };
-    tableMessage.value = auth.token.value ? '已加载当前登录用户的预约记录。' : '未登录时展示公共预约列表。';
+    const [page, labData] = await Promise.all([
+      fetchReservations({ pageNum: 1, pageSize: 30 }, auth.token.value),
+      fetchLabs({ pageNum: 1, pageSize: 200 }, auth.token.value),
+    ]);
+    state.value = page;
+    labs.value = labData.list;
+    message.value = '已加载预约单列表。';
+    if (page.list.length && !selected.value) {
+      await select(page.list[0].id);
+    }
   } catch (error) {
-    reservationState.value = {
-      list: fallbackReservations,
-      total: fallbackReservations.length,
-    };
-    tableMessage.value = error instanceof Error ? `后端请求失败，当前显示演示数据：${error.message}` : '后端请求失败，当前显示演示数据。';
+    message.value = error instanceof Error ? error.message : '加载失败。';
   }
 }
 
-async function handleCheck(): Promise<void> {
-  const payload = buildPayload();
+async function select(id: number): Promise<void> {
   try {
-    const conflict = await checkReservationConflict(payload, auth.token.value || undefined);
-    const times = await recommendTimes(payload, auth.token.value || undefined);
-    const labsData = await recommendLabs(payload, auth.token.value || undefined);
-
-    timeItems.value = times.map((item) => ({
-      range: `${item.startTime} - ${item.endTime}`,
-      note: item.reason,
-    }));
-    labItems.value = labsData.map((item) => ({
-      name: item.labName,
-      location: [item.buildingName, item.roomNo].filter(Boolean).join(' / ') || '位置待补充',
-      reason: item.reason,
-    }));
-    formMessage.value = conflict.message;
+    const [detail, auditLogs] = await Promise.all([
+      fetchReservationById(id, auth.token.value),
+      fetchReservationAuditLogs(id, auth.token.value),
+    ]);
+    selected.value = detail;
+    logs.value = auditLogs;
+    auditComment.value = '';
+    rejectReason.value = '';
   } catch (error) {
-    timeItems.value = fallbackTimeRecommendations;
-    labItems.value = fallbackLabRecommendations;
-    formMessage.value = error instanceof Error ? `冲突检测失败，已回退为演示数据：${error.message}` : '冲突检测失败，已回退为演示数据。';
+    message.value = error instanceof Error ? error.message : '加载预约详情失败。';
   }
 }
 
-async function handleSubmit(): Promise<void> {
-  if (!auth.token.value) {
-    formMessage.value = '请先登录后再提交预约。';
+async function handleApprove(): Promise<void> {
+  if (!selected.value) return;
+  try {
+    await approveReservation(selected.value.id, auth.token.value, auditComment.value || undefined);
+    message.value = '已审批通过。';
+    selected.value = null;
+    await loadPage();
+  } catch (error) {
+    message.value = error instanceof Error ? error.message : '审批失败。';
+  }
+}
+
+async function handleReject(): Promise<void> {
+  if (!selected.value) return;
+  if (!rejectReason.value.trim()) {
+    message.value = '驳回原因必填。';
     return;
   }
-
   try {
-    await createReservation(buildPayload(), auth.token.value);
-    formMessage.value = '预约提交成功，已刷新列表。';
-    await loadReservations();
+    await rejectReservation(selected.value.id, auth.token.value, rejectReason.value.trim(), auditComment.value || undefined);
+    message.value = '已驳回。';
+    selected.value = null;
+    await loadPage();
   } catch (error) {
-    formMessage.value = error instanceof Error ? error.message : '预约提交失败，请稍后重试。';
+    message.value = error instanceof Error ? error.message : '驳回失败。';
   }
 }
 
 onMounted(() => {
-  void loadReservations();
+  void loadPage();
 });
 </script>
+

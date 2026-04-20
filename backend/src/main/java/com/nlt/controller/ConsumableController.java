@@ -21,13 +21,13 @@ public class ConsumableController {
     private final TokenService tokenService;
 
     /**
-     * 查询耗材信息列表
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @param labId 实验室ID
-     * @param consumableName 参数
-     * @param consumableCode 参数
-     * @return 响应结果
+     * 鏌ヨ鑰楁潗淇℃伅鍒楄〃
+     * @param pageNum 椤电爜
+     * @param pageSize 姣忛〉鏉℃暟
+     * @param labId 瀹為獙瀹D
+     * @param consumableName 鍙傛暟
+     * @param consumableCode 鍙傛暟
+     * @return 鍝嶅簲缁撴灉
      */
     @GetMapping
     public ApiResponse<PageData<ConsumableEntity>> page(@RequestParam(defaultValue = "1") int pageNum,
@@ -39,20 +39,20 @@ public class ConsumableController {
     }
 
     /**
-     * 新增耗材信息
-     * @param request 请求参数
-     * @return 响应结果
+     * 鏂板鑰楁潗淇℃伅
+     * @param request 璇锋眰鍙傛暟
+     * @return 鍝嶅簲缁撴灉
      */
     @PostMapping
     public ApiResponse<ConsumableEntity> create(@Valid @RequestBody ConsumableSaveRequest request) {
-        return ApiResponse.success(consumableService.create(request));
+        return ApiResponse.created(consumableService.create(request));
     }
 
     /**
-     * 处理耗材信息
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @return 响应结果
+     * 澶勭悊鑰楁潗淇℃伅
+     * @param pageNum 椤电爜
+     * @param pageSize 姣忛〉鏉℃暟
+     * @return 鍝嶅簲缁撴灉
      */
     @GetMapping("/low-stock")
     public ApiResponse<PageData<ConsumableEntity>> lowStock(@RequestParam(defaultValue = "1") int pageNum,
@@ -61,10 +61,10 @@ public class ConsumableController {
     }
 
     /**
-     * 处理耗材信息
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @return 响应结果
+     * 澶勭悊鑰楁潗淇℃伅
+     * @param pageNum 椤电爜
+     * @param pageSize 姣忛〉鏉℃暟
+     * @return 鍝嶅簲缁撴灉
      */
     @GetMapping("/warning-list")
     public ApiResponse<PageData<ConsumableEntity>> warningList(@RequestParam(defaultValue = "1") int pageNum,
@@ -73,9 +73,9 @@ public class ConsumableController {
     }
 
     /**
-     * 查询耗材信息
-     * @param id 主键ID
-     * @return 响应结果
+     * 鏌ヨ鑰楁潗淇℃伅
+     * @param id 涓婚敭ID
+     * @return 鍝嶅簲缁撴灉
      */
     @GetMapping("/{id}")
     public ApiResponse<ConsumableEntity> getById(@PathVariable Long id) {
@@ -83,10 +83,10 @@ public class ConsumableController {
     }
 
     /**
-     * 更新耗材信息
-     * @param id 主键ID
-     * @param request 请求参数
-     * @return 响应结果
+     * 鏇存柊鑰楁潗淇℃伅
+     * @param id 涓婚敭ID
+     * @param request 璇锋眰鍙傛暟
+     * @return 鍝嶅簲缁撴灉
      */
     @PutMapping("/{id}")
     public ApiResponse<ConsumableEntity> update(@PathVariable Long id,
@@ -95,9 +95,9 @@ public class ConsumableController {
     }
 
     /**
-     * 删除耗材信息
-     * @param id 主键ID
-     * @return 响应结果
+     * 鍒犻櫎鑰楁潗淇℃伅
+     * @param id 涓婚敭ID
+     * @return 鍝嶅簲缁撴灉
      */
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
@@ -106,11 +106,11 @@ public class ConsumableController {
     }
 
     /**
-     * 更新耗材信息
-     * @param id 主键ID
-     * @param request 请求参数
-     * @param servletRequest HTTP请求对象
-     * @return 响应结果
+     * 鏇存柊鑰楁潗淇℃伅
+     * @param id 涓婚敭ID
+     * @param request 璇锋眰鍙傛暟
+     * @param servletRequest HTTP璇锋眰瀵硅薄
+     * @return 鍝嶅簲缁撴灉
      */
     @PatchMapping("/{id}/stock")
     public ApiResponse<ConsumableEntity> updateStock(@PathVariable Long id,

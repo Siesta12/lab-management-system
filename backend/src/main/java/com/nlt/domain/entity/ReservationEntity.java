@@ -1,6 +1,5 @@
 package com.nlt.domain.entity;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -20,12 +19,6 @@ public class ReservationEntity {
     private Integer reservationType;
 
     private Integer priorityLevel;
-
-    private LocalDate reservationDate;
-
-    private LocalDateTime startTime;
-
-    private LocalDateTime endTime;
 
     private String usagePurpose;
 

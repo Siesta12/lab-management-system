@@ -19,13 +19,13 @@ public class DepartmentController {
     private final DepartmentService departmentService;
 
     /**
-     * 查询部门信息列表
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @param departmentName 参数
-     * @param departmentCode 参数
-     * @param status 状态值
-     * @return 响应结果
+     * 鏌ヨ閮ㄩ棬淇℃伅鍒楄〃
+     * @param pageNum 椤电爜
+     * @param pageSize 姣忛〉鏉℃暟
+     * @param departmentName 鍙傛暟
+     * @param departmentCode 鍙傛暟
+     * @param status 鐘舵€佸€?
+     * @return 鍝嶅簲缁撴灉
      */
     @GetMapping
     public ApiResponse<PageData<DepartmentEntity>> page(@RequestParam(defaultValue = "1") int pageNum,
@@ -37,18 +37,18 @@ public class DepartmentController {
     }
 
     /**
-     * 新增部门信息
-     * @param request 请求参数
-     * @return 响应结果
+     * 鏂板閮ㄩ棬淇℃伅
+     * @param request 璇锋眰鍙傛暟
+     * @return 鍝嶅簲缁撴灉
      */
     @PostMapping
     public ApiResponse<DepartmentEntity> create(@Valid @RequestBody DepartmentSaveRequest request) {
-        return ApiResponse.success(departmentService.create(request));
+        return ApiResponse.created(departmentService.create(request));
     }
 
     /**
-     * 处理部门信息
-     * @return 响应结果
+     * 澶勭悊閮ㄩ棬淇℃伅
+     * @return 鍝嶅簲缁撴灉
      */
     @GetMapping("/options")
     public ApiResponse<List<OptionItem>> options() {
@@ -56,9 +56,9 @@ public class DepartmentController {
     }
 
     /**
-     * 查询部门信息
-     * @param id 主键ID
-     * @return 响应结果
+     * 鏌ヨ閮ㄩ棬淇℃伅
+     * @param id 涓婚敭ID
+     * @return 鍝嶅簲缁撴灉
      */
     @GetMapping("/{id}")
     public ApiResponse<DepartmentEntity> getById(@PathVariable Long id) {
@@ -66,10 +66,10 @@ public class DepartmentController {
     }
 
     /**
-     * 更新部门信息
-     * @param id 主键ID
-     * @param request 请求参数
-     * @return 响应结果
+     * 鏇存柊閮ㄩ棬淇℃伅
+     * @param id 涓婚敭ID
+     * @param request 璇锋眰鍙傛暟
+     * @return 鍝嶅簲缁撴灉
      */
     @PutMapping("/{id}")
     public ApiResponse<DepartmentEntity> update(@PathVariable Long id,
@@ -78,9 +78,9 @@ public class DepartmentController {
     }
 
     /**
-     * 删除部门信息
-     * @param id 主键ID
-     * @return 响应结果
+     * 鍒犻櫎閮ㄩ棬淇℃伅
+     * @param id 涓婚敭ID
+     * @return 鍝嶅簲缁撴灉
      */
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {

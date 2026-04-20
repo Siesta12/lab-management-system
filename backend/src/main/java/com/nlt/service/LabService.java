@@ -20,8 +20,8 @@ public interface LabService {
      * @param labStatus 参数
      * @return 分页数据
      */
-    public PageData<LabEntity> page(int pageNum, int pageSize, String labName, String labCode, String labType,
-    Long departmentId, Integer openStatus, Integer labStatus);
+    PageData<LabEntity> page(int pageNum, int pageSize, String labName, String labCode, String labType,
+        Long departmentId, Integer openStatus, Integer labStatus, Long currentUserId, List<String> currentRoleCodes);
 
     /**
      * 新增实验室信息
@@ -35,7 +35,7 @@ public interface LabService {
      * @param id 主键ID
      * @return 处理结果
      */
-    LabEntity getById(Long id);
+    LabEntity getById(Long id, Long currentUserId, List<String> currentRoleCodes);
 
     /**
      * 更新实验室信息
@@ -70,6 +70,6 @@ public interface LabService {
      * @param openStatus 参数
      * @return 数据列表
      */
-    List<OptionItem> options(Integer openStatus);
+    List<OptionItem> options(Integer openStatus, Long currentUserId, List<String> currentRoleCodes);
 
 }

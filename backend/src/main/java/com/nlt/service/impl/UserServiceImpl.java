@@ -28,29 +28,16 @@ public class UserServiceImpl implements UserService {
 
     private final UserRoleMapper userRoleMapper;
 
-    /**
-     * 查询用户信息列表
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @param username 参数
-     * @param realName 参数
-     * @param departmentId 部门ID
-     * @param status 状态值
-     * @return 分页数据
-     */
     @Override
     public PageData<UserVO> page(int pageNum, int pageSize, String username, String realName, Long departmentId, Integer status) {
         int offset = (pageNum - 1) * pageSize;
         List<UserVO> list = userMapper.selectPage(offset, pageSize, username, realName, departmentId, status)
-        .stream().map(this::toVo).toList();
+            .stream()
+            .map(this::toVo)
+            .toList();
         return new PageData<>(list, userMapper.countPage(username, realName, departmentId, status), pageNum, pageSize);
     }
 
-    /**
-     * 新增用户信息
-     * @param request 请求参数
-     * @return 处理结果
-     */
     @Transactional
     @Override
     public UserVO create(UserCreateRequest request) {
@@ -66,11 +53,6 @@ public class UserServiceImpl implements UserService {
         return getById(entity.getId());
     }
 
-    /**
-     * 查询用户信息
-     * @param id 主键ID
-     * @return 处理结果
-     */
     @Override
     public UserVO getById(Long id) {
         UserEntity entity = userMapper.selectById(id);
@@ -80,12 +62,6 @@ public class UserServiceImpl implements UserService {
         return toVo(entity);
     }
 
-    /**
-     * 更新用户信息
-     * @param id 主键ID
-     * @param request 请求参数
-     * @return 处理结果
-     */
     @Transactional
     @Override
     public UserVO update(Long id, UserUpdateRequest request) {
@@ -99,66 +75,36 @@ public class UserServiceImpl implements UserService {
         return getById(id);
     }
 
-    /**
-     * 处理用户信息
-     * @param status 状态值
-     * @return 数据列表
-     */
     @Override
     public List<OptionItem> options(Integer status) {
         return userMapper.selectOptions(status).stream()
-        .map(item -> new OptionItem(item.getRealName(), item.getId()))
-        .toList();
+            .map(item -> new OptionItem(item.getRealName(), item.getId()))
+            .toList();
     }
 
-    /**
-     * 删除用户信息
-     * @param id 主键ID
-     */
     @Override
     public void delete(Long id) {
         getById(id);
         userMapper.softDelete(id);
     }
 
-    /**
-     * 重置用户信息
-     * @param id 主键ID
-     * @param request 请求参数
-     */
     @Override
     public void resetPassword(Long id, PasswordResetRequest request) {
         getById(id);
         userMapper.updatePassword(id, request.getNewPassword());
     }
 
-    /**
-     * 更新用户信息
-     * @param id 主键ID
-     * @param status 状态值
-     */
     @Override
     public void updateStatus(Long id, Integer status) {
         getById(id);
         userMapper.updateStatus(id, status);
     }
 
-    /**
-     * 获取当前登录用户信息
-     * @param userId 用户ID
-     * @return 处理结果
-     */
     @Override
     public UserVO currentUser(Long userId) {
         return getById(userId);
     }
 
-    /**
-     * 更新用户信息
-     * @param userId 用户ID
-     * @param request 请求参数
-     * @return 处理结果
-     */
     @Override
     public UserVO updateProfile(Long userId, UserProfileUpdateRequest request) {
         UserEntity entity = userMapper.selectById(userId);
@@ -170,11 +116,6 @@ public class UserServiceImpl implements UserService {
         return getById(userId);
     }
 
-    /**
-     * 更新用户信息
-     * @param userId 用户ID
-     * @param request 请求参数
-     */
     @Override
     public void updatePassword(Long userId, PasswordUpdateRequest request) {
         UserEntity entity = userMapper.selectById(userId);
@@ -184,14 +125,15 @@ public class UserServiceImpl implements UserService {
         if (!entity.getPassword().equals(request.getOldPassword())) {
             throw new BusinessException(400, "原密码错误");
         }
+        if (request.getNewPassword().equals(request.getOldPassword())) {
+            throw new BusinessException(400, "新密码不能与原密码相同");
+        }
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new BusinessException(400, "两次输入的新密码不一致");
+        }
         userMapper.updatePassword(userId, request.getNewPassword());
     }
 
-    /**
-     * 转换用户信息
-     * @param entity 参数
-     * @return 处理结果
-     */
     private UserVO toVo(UserEntity entity) {
         UserVO vo = new UserVO();
         BeanUtils.copyProperties(entity, vo);
@@ -199,11 +141,6 @@ public class UserServiceImpl implements UserService {
         return vo;
     }
 
-    /**
-     * 处理用户信息
-     * @param userId 用户ID
-     * @param roleIds 角色ID列表
-     */
     private void rebuildUserRoles(Long userId, List<Long> roleIds) {
         userRoleMapper.deleteByUserId(userId);
         if (roleIds == null) {
@@ -213,5 +150,4 @@ public class UserServiceImpl implements UserService {
             userRoleMapper.insert(userId, roleId);
         }
     }
-
 }
