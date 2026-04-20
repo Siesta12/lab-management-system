@@ -76,7 +76,10 @@
                s.period_id as periodId,
                s.reservation_id as reservationId,
                r.reservation_no as reservationNo,
-               r.status as reservationStatus
+               r.status as reservationStatus,
+               r.applicant_user_id as applicantUserId,
+               r.reservation_type as reservationType,
+               r.priority_level as priorityLevel
         from lab_reservation_slot s
         join lab_reservation r on r.id = s.reservation_id
         where s.lab_id = #{labId}
@@ -91,7 +94,10 @@
                s.period_id as periodId,
                s.reservation_id as reservationId,
                r.reservation_no as reservationNo,
-               r.status as reservationStatus
+               r.status as reservationStatus,
+               r.applicant_user_id as applicantUserId,
+               r.reservation_type as reservationType,
+               r.priority_level as priorityLevel
         from lab_reservation_slot s
         join lab_reservation r on r.id = s.reservation_id
         where s.slot_status = 1

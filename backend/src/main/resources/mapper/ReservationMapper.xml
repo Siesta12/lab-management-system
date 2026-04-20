@@ -82,10 +82,18 @@
     </select>
 
     <select id="selectPendingAudit" resultType="com.nlt.domain.entity.ReservationEntity">
-        select *
-        from lab_reservation
-        where status = 1
-        order by id desc
+        select r.*
+        from lab_reservation r
+        left join sys_user u on u.id = r.applicant_user_id
+        where r.status = 1
+        order by case r.reservation_type
+            when 1 then 1
+            when 2 then 2
+            else 3
+        end asc,
+        u.credit_score desc,
+        r.created_at asc,
+        r.id asc
         limit #{offset}, #{pageSize}
     </select>
 
@@ -252,4 +260,3 @@
         order by s.reservation_date asc
     </select>
 </mapper>
-

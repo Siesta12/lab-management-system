@@ -7,7 +7,9 @@ import com.nlt.domain.dto.reservation.ReservationApproveRequest;
 import com.nlt.domain.dto.reservation.ReservationCreateRequest;
 import com.nlt.domain.dto.reservation.ReservationRecommendationRequest;
 import com.nlt.domain.dto.reservation.ReservationRejectRequest;
+import com.nlt.domain.vo.reservation.ReservationApplyResponse;
 import com.nlt.domain.vo.reservation.ReservationDetailVo;
+import com.nlt.domain.vo.reservation.SlotStatusResponse;
 import com.nlt.domain.vo.reservation.SlotRecommendationItem;
 import com.nlt.service.ReservationService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -41,6 +43,19 @@ public class ReservationController {
     public ApiResponse<ReservationDetailVo> create(@Valid @RequestBody ReservationCreateRequest request,
         HttpServletRequest servletRequest) {
         return ApiResponse.created(reservationService.create(request, tokenService.getCurrentUserId(servletRequest)));
+    }
+
+    @PostMapping("/apply")
+    public ApiResponse<ReservationApplyResponse> apply(@Valid @RequestBody ReservationCreateRequest request,
+        HttpServletRequest servletRequest) {
+        return ApiResponse.success(reservationService.apply(request, tokenService.getCurrentUserId(servletRequest)));
+    }
+
+    @GetMapping("/slot-status")
+    public ApiResponse<SlotStatusResponse> slotStatus(@RequestParam Long labId,
+        @RequestParam String date,
+        HttpServletRequest servletRequest) {
+        return ApiResponse.success(reservationService.slotStatus(labId, date, tokenService.getCurrentUserId(servletRequest)));
     }
 
     @PostMapping("/recommendations")

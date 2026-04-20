@@ -23,7 +23,7 @@
           <td><span :class="getBadgeClass(statusText(item.status))">{{ statusText(item.status) }}</span></td>
           <td>
             <button v-if="canCancel(item)" type="button" class="ghost-btn small-btn" @click.stop="handleCancel(item.id)">
-              鍙栨秷棰勭害
+              取消预约
             </button>
           </td>
         </tr>

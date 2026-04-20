@@ -15,6 +15,11 @@ public class ReservedSlotRow {
     private String reservationNo;
 
     private Integer reservationStatus;
-}
 
+    private Long applicantUserId;
+
+    private Integer reservationType;
+
+    private Integer priorityLevel;
+}
 

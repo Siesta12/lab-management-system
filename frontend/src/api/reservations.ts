@@ -1,4 +1,10 @@
-﻿import type { PageData, ReservationCreatePayload, ReservationDto, SlotRecommendationItem } from '../types';
+﻿import type {
+  PageData,
+  ReservationApplyResponse,
+  ReservationCreatePayload,
+  ReservationDto,
+  SlotRecommendationItem,
+} from '../types';
 import { get, post, put } from './http';
 
 export interface ReservationQuery {
@@ -24,6 +30,10 @@ export function createReservation(payload: ReservationCreatePayload, token: stri
   return post<ReservationDto>('/reservations', payload, token);
 }
 
+export function applyReservation(payload: ReservationCreatePayload, token: string): Promise<ReservationApplyResponse> {
+  return post<ReservationApplyResponse>('/reservations/apply', payload, token);
+}
+
 export function fetchReservationById(id: number, token: string): Promise<ReservationDto> {
   return get<ReservationDto>(`/reservations/${id}`, token);
 }
@@ -46,5 +56,3 @@ export function recommendSlots(
 ): Promise<SlotRecommendationItem[]> {
   return post<SlotRecommendationItem[]>('/reservations/recommendations', payload, token);
 }
-
-

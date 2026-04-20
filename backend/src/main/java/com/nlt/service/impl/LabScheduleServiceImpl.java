@@ -107,25 +107,36 @@ public class LabScheduleServiceImpl implements LabScheduleService {
                 LabOpenSlotEntity openSlot = openMap.get(key(weekday, period.getId()));
                 boolean openAllowed = isOpenAllowed(openSlot, isStudent, isTeacher);
                 if (!openAllowed) {
-                    cells.add(new ScheduleCellItem(period.getId(), "CLOSED", null, null, null, null, null));
+                    cells.add(new ScheduleCellItem(period.getId(), "CLOSED", null, null, null, null, null, "当前节次不开放"));
                     continue;
                 }
 
                 LabMaintenanceEntity maintenance = maintenanceMap.get(key(date, period.getId()));
                 if (maintenance != null) {
-                    cells.add(new ScheduleCellItem(period.getId(), "MAINTENANCE", null, null, null, maintenance.getId(), maintenance.getReason()));
+                    cells.add(new ScheduleCellItem(period.getId(), "MAINTENANCE", null, null, null, maintenance.getId(), maintenance.getReason(), maintenance.getReason()));
                     continue;
                 }
 
                 ReservedSlotRow reserved = reservedMap.get(key(date, period.getId()));
                 if (reserved != null) {
-                    String status = Objects.equals(reserved.getReservationStatus(), 1) ? "PENDING" : "RESERVED";
+                    String status;
+                    String note;
+                    if (Objects.equals(reserved.getReservationStatus(), 1) && Objects.equals(reserved.getApplicantUserId(), currentUserId)) {
+                        status = "PENDING_SELF";
+                        note = "你已申请该时段";
+                    } else if (Objects.equals(reserved.getReservationStatus(), 1)) {
+                        status = "PENDING_OTHERS";
+                        note = "已有他人待审核，仍可提交申请";
+                    } else {
+                        status = "RESERVED";
+                        note = "该时段已有通过预约";
+                    }
                     cells.add(new ScheduleCellItem(period.getId(), status, reserved.getReservationId(), reserved.getReservationNo(),
-                        reserved.getReservationStatus(), null, null));
+                        reserved.getReservationStatus(), null, null, note));
                     continue;
                 }
 
-                cells.add(new ScheduleCellItem(period.getId(), "FREE", null, null, null, null, null));
+                cells.add(new ScheduleCellItem(period.getId(), "FREE", null, null, null, null, null, "当前节次可预约"));
             }
 
             days.add(new ScheduleDayItem(date.format(DATE_FORMATTER), weekday, cells));
@@ -169,13 +180,13 @@ public class LabScheduleServiceImpl implements LabScheduleService {
                 LabOpenSlotEntity openSlot = openMap.get(key(lab.getId(), period.getId()));
                 boolean isOpen = openSlot != null && openSlot.getStatus() != null && openSlot.getStatus() == 1;
                 if (!isOpen) {
-                    cells.add(new ScheduleCellItem(period.getId(), "CLOSED", null, null, null, null, null));
+                    cells.add(new ScheduleCellItem(period.getId(), "CLOSED", null, null, null, null, null, "当前节次不开放"));
                     continue;
                 }
 
                 LabMaintenanceEntity maintenance = maintenanceMap.get(key(lab.getId(), period.getId()));
                 if (maintenance != null) {
-                    cells.add(new ScheduleCellItem(period.getId(), "MAINTENANCE", null, null, null, maintenance.getId(), maintenance.getReason()));
+                    cells.add(new ScheduleCellItem(period.getId(), "MAINTENANCE", null, null, null, maintenance.getId(), maintenance.getReason(), maintenance.getReason()));
                     continue;
                 }
 
@@ -183,11 +194,11 @@ public class LabScheduleServiceImpl implements LabScheduleService {
                 if (reserved != null) {
                     String status = Objects.equals(reserved.getReservationStatus(), 1) ? "PENDING" : "RESERVED";
                     cells.add(new ScheduleCellItem(period.getId(), status, reserved.getReservationId(), reserved.getReservationNo(),
-                        reserved.getReservationStatus(), null, null));
+                        reserved.getReservationStatus(), null, null, Objects.equals(reserved.getReservationStatus(), 1) ? "当前时段存在待审核预约" : "当前时段已占用"));
                     continue;
                 }
 
-                cells.add(new ScheduleCellItem(period.getId(), "FREE", null, null, null, null, null));
+                cells.add(new ScheduleCellItem(period.getId(), "FREE", null, null, null, null, null, "当前节次可预约"));
             }
             labItems.add(new DailyScheduleLabItem(lab.getId(), lab.getLabName(), cells));
         }
@@ -343,5 +354,4 @@ public class LabScheduleServiceImpl implements LabScheduleService {
         return labId + "#" + periodId;
     }
 }
-
 

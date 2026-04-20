@@ -212,7 +212,14 @@ export interface ClassPeriodDto {
   endTime: string;
 }
 
-export type ScheduleStatus = 'FREE' | 'RESERVED' | 'PENDING' | 'MAINTENANCE' | 'CLOSED';
+export type ScheduleStatus =
+  | 'FREE'
+  | 'RESERVED'
+  | 'PENDING'
+  | 'PENDING_SELF'
+  | 'PENDING_OTHERS'
+  | 'MAINTENANCE'
+  | 'CLOSED';
 
 export interface ScheduleCellDto {
   periodId: number;
@@ -222,6 +229,7 @@ export interface ScheduleCellDto {
   reservationStatus?: number;
   maintenanceId?: number;
   maintenanceReason?: string;
+  note?: string;
 }
 
 export interface ScheduleDayDto {
@@ -381,3 +389,11 @@ export interface SlotRecommendationItem {
   recommendationReason: string;
 }
 
+export interface ReservationApplyResponse {
+  submitted: boolean;
+  currentStatus: string;
+  conflict: boolean;
+  conflictNote?: string;
+  reservation?: ReservationDto;
+  recommendations: SlotRecommendationItem[];
+}

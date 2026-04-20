@@ -9,7 +9,7 @@ public class ScheduleCellItem {
 
     private Long periodId;
 
-    private String status; // FREE / RESERVED / PENDING / MAINTENANCE / CLOSED
+    private String status; // FREE / RESERVED / PENDING / PENDING_SELF / PENDING_OTHERS / MAINTENANCE / CLOSED
 
     private Long reservationId;
 
@@ -20,6 +20,7 @@ public class ScheduleCellItem {
     private Long maintenanceId;
 
     private String maintenanceReason;
-}
 
+    private String note;
+}
 

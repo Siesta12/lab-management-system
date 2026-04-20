@@ -5,7 +5,9 @@ import com.nlt.domain.dto.reservation.ReservationApproveRequest;
 import com.nlt.domain.dto.reservation.ReservationCreateRequest;
 import com.nlt.domain.dto.reservation.ReservationRecommendationRequest;
 import com.nlt.domain.dto.reservation.ReservationRejectRequest;
+import com.nlt.domain.vo.reservation.ReservationApplyResponse;
 import com.nlt.domain.vo.reservation.ReservationDetailVo;
+import com.nlt.domain.vo.reservation.SlotStatusResponse;
 import com.nlt.domain.vo.reservation.SlotRecommendationItem;
 import java.util.List;
 
@@ -20,7 +22,11 @@ public interface ReservationService {
 
     ReservationDetailVo getById(Long id);
 
+    ReservationApplyResponse apply(ReservationCreateRequest request, Long currentUserId);
+
     ReservationDetailVo create(ReservationCreateRequest request, Long currentUserId);
+
+    SlotStatusResponse slotStatus(Long labId, String date, Long currentUserId);
 
     ReservationDetailVo approve(Long id, ReservationApproveRequest request, Long currentUserId);
 
@@ -34,4 +40,3 @@ public interface ReservationService {
 
     List<SlotRecommendationItem> recommend(ReservationRecommendationRequest request, Long currentUserId);
 }
-

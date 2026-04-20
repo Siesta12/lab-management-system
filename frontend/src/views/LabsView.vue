@@ -94,17 +94,23 @@
               <div class="legend">
                 <span class="legend-item free">空闲</span>
                 <span class="legend-item reserved">已预约</span>
-                <span class="legend-item pending">待审批</span>
+                <span class="legend-item pending">待审核（本人）</span>
+                <span class="legend-item pendingOther">可申请（他人待审核）</span>
                 <span class="legend-item maintenance">维护中</span>
                 <span class="legend-item closed">不开放</span>
                 <span v-if="selectedKeys.length" class="legend-selected">已选 {{ selectedKeys.length }} 个</span>
               </div>
 
-              <div v-if="selectedKeys.length" class="selection-strip">
+              <div v-if="selectedKeys.length || recommendationRequestKeys.length" class="selection-strip">
                 <div class="selection-left">
-                  <span class="selection-label">已选</span>
+                  <span class="selection-label">{{ selectedKeys.length ? '已选' : '推荐依据' }}</span>
                   <div class="selection-items">
-                    <span v-for="k in selectedKeys" :key="`${k.date}-${k.periodId}`" class="selection-pill">
+                    <span
+                      v-for="k in (selectedKeys.length ? selectedKeys : recommendationRequestKeys)"
+                      :key="`${k.date}-${k.periodId}`"
+                      class="selection-pill"
+                      :class="{ blocked: !selectedKeys.length }"
+                    >
                       {{ k.date.slice(5) }} · {{ periodLabel(k.periodId) }}
                     </span>
                   </div>
@@ -142,6 +148,7 @@
                           <span class="cell-status">{{ cellStatusText(day, period.id) }}</span>
                           <span v-if="cell(day, period.id)?.reservationNo" class="cell-sub">#{{ cell(day, period.id)?.reservationNo }}</span>
                           <span v-if="cell(day, period.id)?.maintenanceReason" class="cell-sub">{{ cell(day, period.id)?.maintenanceReason }}</span>
+                          <span v-else-if="cell(day, period.id)?.note" class="cell-sub">{{ cell(day, period.id)?.note }}</span>
                         </div>
                       </td>
                     </tr>
@@ -157,7 +164,7 @@
                   </div>
 
                   <p v-if="!selectedKeys.length" class="info-text compact-tip">
-                    先在课表中选择空闲节次，再填写并提交。
+                    先在课表中选择空闲节次提交预约，或点击不可预约格子获取推荐。
                   </p>
 
                   <div v-else class="beauty-form">
@@ -205,10 +212,10 @@
                      <button
                          type="button"
                          class="ghost-btn recommend-btn"
-                         :disabled="!selectedKeys.length || submittingReservation"
+                         :disabled="!recommendationRequestKeys.length || submittingReservation"
                          @click="handleRecommend"
                      >
-                       刷新推荐
+                       {{ selectedKeys.length ? '为当前选择推荐' : '查看推荐时段' }}
                      </button>
                   </div>
 
@@ -222,13 +229,28 @@
                    </button>
                  </div>
 
+                <div v-if="conflictPanel.visible" class="form-card conflict-card" :class="conflictPanel.type">
+                  <div class="conflict-card-head">
+                    <h6>{{ conflictPanel.title }}</h6>
+                    <span class="conflict-chip">{{ conflictPanel.type === 'warning' ? '冲突判定' : '提交提示' }}</span>
+                  </div>
+                  <p>{{ conflictPanel.detail }}</p>
+                </div>
+
                 <div v-if="recommendations.length" class="form-card">
                   <h6>推荐结果</h6>
-                  <ul class="bullet-list compact-list">
-                    <li v-for="(item, idx) in recommendations" :key="idx">
-                      {{ item.labName }} · {{ item.reservationDate }} · {{ item.periodName || `节次#${item.periodId}` }} · {{ item.recommendationReason }}
-                    </li>
-                  </ul>
+                  <div class="recommendation-list">
+                    <div v-for="(item, idx) in recommendations" :key="idx" class="recommendation-card">
+                      <div class="recommendation-main">
+                        <strong>{{ item.labName }}</strong>
+                        <span>{{ item.reservationDate }} · {{ item.periodName || `节次#${item.periodId}` }}</span>
+                        <small>{{ item.recommendationReason }}</small>
+                      </div>
+                      <button type="button" class="ghost-btn small-btn" @click="applyRecommendation(item)">
+                        选用
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -277,8 +299,17 @@
       </div>
     </div>
 
-    <div v-if="toast.visible" class="toast" :class="toast.type" role="status" aria-live="polite">
-      {{ toast.text }}
+    <div v-if="feedback.visible && feedback.mode === 'toast'" class="toast" :class="feedback.type" role="status" aria-live="polite">
+      {{ feedback.text }}
+    </div>
+
+    <div v-if="successDialogVisible" class="success-dialog-mask">
+      <div class="success-dialog" role="dialog" aria-modal="true" aria-labelledby="success-dialog-title">
+        <div class="success-dialog-badge">预约创建成功</div>
+        <h4 id="success-dialog-title">提交成功</h4>
+        <p>{{ successDialogText }}</p>
+        <button type="button" class="success-dialog-btn" @click="handleSuccessConfirm">确定</button>
+      </div>
     </div>
   </teleport>
 </template>
@@ -289,11 +320,22 @@ import { fetchConsumables } from '../api/consumables';
 import { fetchDepartmentOptions } from '../api/departments';
 import { fetchDevices } from '../api/devices';
 import { fetchLabById, fetchLabs, fetchLabSchedule } from '../api/labs';
-import { createReservation, recommendSlots } from '../api/reservations';
+import { applyReservation, recommendSlots } from '../api/reservations';
 import BasePanel from '../components/BasePanel.vue';
 import BaseTable from '../components/BaseTable.vue';
 import { useAuthStore } from '../stores/auth';
-import type { ConsumableDto, DeviceDto, LabDto, LabScheduleDto, OptionItem, PageData, ScheduleDayDto, ScheduleCellDto, SlotRecommendationItem } from '../types';
+import type {
+  ConsumableDto,
+  DeviceDto,
+  LabDto,
+  LabScheduleDto,
+  OptionItem,
+  PageData,
+  ReservationApplyResponse,
+  ScheduleDayDto,
+  ScheduleCellDto,
+  SlotRecommendationItem,
+} from '../types';
 import { getBadgeClass } from '../utils/format';
 
 const auth = useAuthStore();
@@ -316,14 +358,29 @@ const schedule = ref<LabScheduleDto | null>(null);
 const scheduleMessage = ref('');
 
 const selectedKeys = ref<Array<{ date: string; periodId: number }>>([]);
+const blockedKeys = ref<Array<{ date: string; periodId: number }>>([]);
 const recommendations = ref<SlotRecommendationItem[]>([]);
+const conflictPanel = reactive<{
+  visible: boolean;
+  type: 'warning' | 'info';
+  title: string;
+  detail: string;
+}>({
+  visible: false,
+  type: 'info',
+  title: '',
+  detail: '',
+});
 
 const submittingReservation = ref(false);
-const toast = reactive<{ visible: boolean; type: 'success' | 'error'; text: string; timer?: number }>({
+const feedback = reactive<{ visible: boolean; mode: 'toast' | 'dialog'; type: 'success' | 'error'; text: string; timer?: number }>({
   visible: false,
+  mode: 'toast',
   type: 'success',
   text: '',
 });
+const successDialogVisible = ref(false);
+const successDialogText = ref('');
 
 const reservationForm = reactive({
   reservationType: 3,
@@ -353,6 +410,10 @@ const canSubmitReservation = computed(() => {
     reservationForm.usagePurpose.trim().length > 0 &&
     reservationForm.contactPhone.trim().length > 0
   );
+});
+
+const recommendationRequestKeys = computed(() => {
+  return selectedKeys.value.length ? selectedKeys.value : blockedKeys.value;
 });
 
 
@@ -421,17 +482,35 @@ function closeDetailModal(): void {
 }
 
 function showToast(type: 'success' | 'error', text: string, durationMs = 1800): void {
-  if (toast.timer) {
-    window.clearTimeout(toast.timer);
+  if (feedback.timer) {
+    window.clearTimeout(feedback.timer);
   }
-  toast.visible = true;
-  toast.type = type;
-  toast.text = text;
-  toast.timer = window.setTimeout(() => {
-    toast.visible = false;
-    toast.text = '';
-    toast.timer = undefined;
+  feedback.visible = true;
+  feedback.mode = 'toast';
+  feedback.type = type;
+  feedback.text = text;
+  feedback.timer = window.setTimeout(() => {
+    feedback.visible = false;
+    feedback.text = '';
+    feedback.timer = undefined;
   }, durationMs);
+}
+
+function showSuccessDialog(text: string): void {
+  if (feedback.timer) {
+    window.clearTimeout(feedback.timer);
+    feedback.timer = undefined;
+  }
+  feedback.visible = false;
+  feedback.text = '';
+  successDialogText.value = text;
+  successDialogVisible.value = true;
+}
+
+function handleSuccessConfirm(): void {
+  successDialogVisible.value = false;
+  successDialogText.value = '';
+  closeDetailModal();
 }
 
 async function openLabDetail(id: number): Promise<void> {
@@ -465,6 +544,8 @@ function cellStatusText(day: ScheduleDayDto, periodId: number): string {
   const c = cell(day, periodId);
   if (!c) return '--';
   if (c.status === 'FREE') return '空闲';
+  if (c.status === 'PENDING_SELF') return '待审核（本人）';
+  if (c.status === 'PENDING_OTHERS') return '可申请';
   if (c.status === 'RESERVED') return '已预约';
   if (c.status === 'PENDING') return '待审核';
   if (c.status === 'MAINTENANCE') return '维护';
@@ -481,11 +562,12 @@ function cellClass(day: ScheduleDayDto, periodId: number): Record<string, boolea
   return {
     free: status === 'FREE',
     reserved: status === 'RESERVED',
-    pending: status === 'PENDING',
+    pending: status === 'PENDING' || status === 'PENDING_SELF',
+    pendingOther: status === 'PENDING_OTHERS',
     maintenance: status === 'MAINTENANCE',
     closed: status === 'CLOSED',
     selected: isSelected(day.date, periodId),
-    clickable: status === 'FREE',
+    clickable: status === 'FREE' || status === 'PENDING_OTHERS',
   };
 }
 
@@ -517,6 +599,11 @@ async function reloadSchedule(): Promise<void> {
 
 function clearSelection(): void {
   selectedKeys.value = [];
+  blockedKeys.value = [];
+  recommendations.value = [];
+  conflictPanel.visible = false;
+  conflictPanel.title = '';
+  conflictPanel.detail = '';
   scheduleMessage.value = '预约已加载，请点击空白格选择时段。';
 }
 
@@ -525,6 +612,9 @@ async function handleCellClick(day: ScheduleDayDto, periodId: number): Promise<v
   if (!c) return;
 
   if (c.status === 'FREE') {
+    blockedKeys.value = [];
+    recommendations.value = [];
+    conflictPanel.visible = false;
     toggleSelection(day.date, periodId);
 
     if (selectedKeys.value.length) {
@@ -535,7 +625,38 @@ async function handleCellClick(day: ScheduleDayDto, periodId: number): Promise<v
     return;
   }
 
-  scheduleMessage.value = '该时段不可预约，可点击箭头查看可选时段。';
+  if (c.status === 'PENDING_OTHERS') {
+    blockedKeys.value = [];
+    recommendations.value = [];
+    conflictPanel.visible = true;
+    conflictPanel.type = 'warning';
+    conflictPanel.title = '该时段已有他人待审核';
+    conflictPanel.detail = c.note || '你仍然可以提交申请，系统会在提交时进入冲突判定，并为你推荐其他可选方案。';
+    toggleSelection(day.date, periodId);
+    scheduleMessage.value = '该时段已有他人待审核，你可以继续填写表单并提交申请。';
+    return;
+  }
+
+  if (c.status === 'PENDING_SELF') {
+    selectedKeys.value = [];
+    blockedKeys.value = [{ date: day.date, periodId }];
+    conflictPanel.visible = true;
+    conflictPanel.type = 'warning';
+    conflictPanel.title = '你已申请该时段';
+    conflictPanel.detail = c.note || '该节次已由你提交待审核申请，不能重复申请。';
+    scheduleMessage.value = '你已申请该时段，不能重复提交。';
+    showToast('error', '你已申请该时段，当前状态为待审核。');
+    return;
+  }
+
+  selectedKeys.value = [];
+  blockedKeys.value = [{ date: day.date, periodId }];
+  recommendations.value = [];
+  conflictPanel.visible = true;
+  conflictPanel.type = 'info';
+  conflictPanel.title = '该时段当前不可直接预约';
+  conflictPanel.detail = c.note || '该时段不可预约，已为你锁定推荐依据，点击“查看推荐时段”即可。';
+  scheduleMessage.value = '该时段不可预约，已为你锁定推荐依据，点击“查看推荐时段”即可。';
 }
 
 async function handleCreateReservation(): Promise<void> {
@@ -547,7 +668,7 @@ async function handleCreateReservation(): Promise<void> {
   if (submittingReservation.value) return;
   submittingReservation.value = true;
   try {
-    await createReservation(
+    const response = await applyReservation(
       {
         labId: selectedLab.value.id,
         reservationType: reservationForm.reservationType,
@@ -560,11 +681,7 @@ async function handleCreateReservation(): Promise<void> {
       },
       auth.token.value,
     );
-    // Use unicode escapes to avoid any potential charset issues in built JS delivery.
-    showToast('success', '\u9884\u7ea6\u63d0\u4ea4\u6210\u529f\uff0c\u5df2\u4e3a\u4f60\u81ea\u52a8\u5173\u95ed\u9884\u7ea6\u7a97\u53e3\u3002', 2600);
-    // Close immediately (the toast stays visible outside the modal).
-    detailVisible.value = false;
-    window.setTimeout(() => closeDetailModal(), 0);
+    applyReservationResult(response);
   } catch (error) {
     const text = error instanceof Error ? error.message : '\u9884\u7ea6\u63d0\u4ea4\u5931\u8d25\u3002';
     scheduleMessage.value = text;
@@ -578,7 +695,7 @@ async function handleCreateReservation(): Promise<void> {
 
 async function handleRecommend(): Promise<void> {
   if (!selectedLab.value || !auth.token.value) return;
-  if (!selectedKeys.value.length) {
+  if (!recommendationRequestKeys.value.length) {
     scheduleMessage.value = '请先选择您要预约的时段（或选择一个不可预约的时段，再查看推荐）。';
     return;
   }
@@ -587,13 +704,55 @@ async function handleRecommend(): Promise<void> {
       {
         labId: selectedLab.value.id,
         participantCount: reservationForm.participantCount,
-        slots: selectedKeys.value.map((k) => ({ reservationDate: k.date, periodId: k.periodId })),
+        slots: recommendationRequestKeys.value.map((k) => ({ reservationDate: k.date, periodId: k.periodId })),
       },
       auth.token.value,
     );
     scheduleMessage.value = recommendations.value.length ? '已生成推荐结果。' : '暂无可推荐的时段/实验室。';
   } catch (error) {
     scheduleMessage.value = error instanceof Error ? error.message : '推荐查询失败。';
+  }
+}
+
+async function applyRecommendation(item: SlotRecommendationItem): Promise<void> {
+  if (!auth.token.value) return;
+  if (selectedLab.value?.id !== item.labId) {
+    await openLabDetail(item.labId);
+  }
+  selectedKeys.value = [{ date: item.reservationDate, periodId: item.periodId }];
+  blockedKeys.value = [];
+  recommendations.value = [];
+  conflictPanel.visible = false;
+  detailTab.value = 'schedule';
+  scheduleMessage.value = `已选中推荐节次：${item.reservationDate} ${item.periodName || `节次#${item.periodId}`}，可直接提交预约。`;
+}
+
+function applyReservationResult(response: ReservationApplyResponse): void {
+  recommendations.value = response.recommendations || [];
+
+  if (response.submitted) {
+    conflictPanel.visible = Boolean(response.conflict);
+    conflictPanel.type = response.conflict ? 'warning' : 'info';
+    conflictPanel.title = response.conflict ? '申请已提交，系统已判定存在竞争' : '申请已提交';
+    conflictPanel.detail = response.conflictNote || '预约申请已经提交成功。';
+
+    if (response.currentStatus === 'PENDING_PRIORITY') {
+      showSuccessDialog('预约申请提交成功。当前时段已有低优先级申请，你的申请已进入优先审核队列。点击确定返回。');
+    } else {
+      showSuccessDialog('预约申请已经提交成功，请点击确定返回实验室列表。');
+    }
+    return;
+  }
+
+  conflictPanel.visible = true;
+  conflictPanel.type = 'warning';
+  conflictPanel.title = response.currentStatus === 'PENDING_SELF' ? '你已申请该时段' : '该时段已被占用';
+  conflictPanel.detail = response.conflictNote || '当前所选时段无法提交，请改选推荐方案。';
+  scheduleMessage.value = response.conflictNote || '当前所选时段无法提交。';
+  if (response.currentStatus === 'PENDING_SELF') {
+    showToast('error', '你已申请该时段，当前状态为待审核。');
+  } else {
+    showToast('error', '当前所选时段无法提交，已为你推荐其他方案。');
   }
 }
 
@@ -679,6 +838,67 @@ onMounted(async () => {
   background: #ffffff;
   padding: 16px;
   box-shadow: 0 28px 48px rgba(15, 23, 42, 0.3);
+}
+
+.success-dialog-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1350;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, 0.34);
+  backdrop-filter: blur(4px);
+}
+
+.success-dialog {
+  width: min(420px, 92vw);
+  border-radius: 24px;
+  padding: 28px 24px 24px;
+  background: linear-gradient(180deg, #16a34a 0%, #15803d 100%);
+  color: #ffffff;
+  box-shadow: 0 28px 64px rgba(21, 128, 61, 0.36);
+  text-align: center;
+}
+
+.success-dialog-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.success-dialog h4 {
+  margin: 18px 0 8px;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.success-dialog p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.success-dialog-btn {
+  margin-top: 22px;
+  width: 100%;
+  height: 48px;
+  border: 0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #166534;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 12px 24px rgba(255, 255, 255, 0.16);
 }
 
 .toast {
@@ -888,6 +1108,12 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
+.selection-pill.blocked {
+  border-color: rgba(59, 130, 246, 0.25);
+  background: rgba(59, 130, 246, 0.08);
+  color: #1d4ed8;
+}
+
 .compact-tip {
   margin-top: 6px;
   margin-bottom: 0;
@@ -1076,6 +1302,9 @@ onMounted(async () => {
 .schedule-cell.pending {
   background: rgba(245, 158, 11, 0.12);
 }
+.schedule-cell.pendingOther {
+  background: rgba(59, 130, 246, 0.1);
+}
 .schedule-cell.maintenance {
   background: rgba(14, 165, 233, 0.12);
 }
@@ -1188,6 +1417,49 @@ onMounted(async () => {
   color: #334155;
 }
 
+.conflict-card {
+  display: grid;
+  gap: 12px;
+}
+
+.conflict-card.warning {
+  border-color: rgba(245, 158, 11, 0.25);
+  background: rgba(255, 251, 235, 0.9);
+}
+
+.conflict-card.info {
+  border-color: rgba(59, 130, 246, 0.18);
+  background: rgba(239, 246, 255, 0.9);
+}
+
+.conflict-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.conflict-card-head h6 {
+  margin: 0;
+  font-size: 18px;
+  color: #1f2937;
+}
+
+.conflict-card p {
+  margin: 0;
+  line-height: 1.7;
+  color: #475569;
+}
+
+.conflict-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(15, 23, 42, 0.08);
+  color: #334155;
+}
+
 .recommend-btn {
   min-width: 120px;
 }
@@ -1225,11 +1497,48 @@ onMounted(async () => {
 .legend-item.pending {
   background: rgba(245, 158, 11, 0.12);
 }
+.legend-item.pendingOther {
+  background: rgba(59, 130, 246, 0.1);
+}
 .legend-item.maintenance {
   background: rgba(14, 165, 233, 0.12);
 }
 .legend-item.closed {
   background: rgba(148, 163, 184, 0.16);
+}
+
+.recommendation-list {
+  display: grid;
+  gap: 12px;
+}
+
+.recommendation-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(248, 250, 252, 0.88);
+}
+
+.recommendation-main {
+  display: grid;
+  gap: 4px;
+}
+
+.recommendation-main strong {
+  color: #1e293b;
+}
+
+.recommendation-main span {
+  color: #334155;
+  font-size: 14px;
+}
+
+.recommendation-main small {
+  color: #64748b;
 }
 
 @media (max-width: 980px) {
@@ -1253,4 +1562,3 @@ onMounted(async () => {
   }
 }
 </style>
-
