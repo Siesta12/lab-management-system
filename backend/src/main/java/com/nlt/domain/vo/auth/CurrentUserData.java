@@ -14,5 +14,7 @@ public class CurrentUserData {
 
     private List<String> roleCodes;
 
+    private Long departmentId;
+
 }
 

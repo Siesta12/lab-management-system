@@ -2,7 +2,6 @@
 import { getFirstAccessiblePath, hasRouteAccess, type AppRole } from '../access';
 import AdminLayout from '../layouts/AdminLayout.vue';
 import ConsumablesView from '../views/ConsumablesView.vue';
-import DailyScheduleView from '../views/DailyScheduleView.vue';
 import DevicesView from '../views/DevicesView.vue';
 import LabsView from '../views/LabsView.vue';
 import LoginView from '../views/LoginView.vue';
@@ -42,15 +41,6 @@ const router = createRouter({
           component: OverviewView,
           meta: {
             title: '系统总览',
-            roles: ['ADMIN'] satisfies AppRole[],
-          },
-        },
-        {
-          path: 'daily-schedule',
-          name: 'daily-schedule',
-          component: DailyScheduleView,
-          meta: {
-            title: '每日课表总览',
             roles: ['ADMIN'] satisfies AppRole[],
           },
         },
@@ -193,4 +183,3 @@ router.beforeEach(async (to) => {
 });
 
 export default router;
-

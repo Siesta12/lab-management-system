@@ -8,6 +8,7 @@ import com.nlt.domain.dto.reservation.ReservationCreateRequest;
 import com.nlt.domain.dto.reservation.ReservationRecommendationRequest;
 import com.nlt.domain.dto.reservation.ReservationRejectRequest;
 import com.nlt.domain.vo.reservation.ReservationApplyResponse;
+import com.nlt.domain.vo.reservation.ReservationConflictSlotVo;
 import com.nlt.domain.vo.reservation.ReservationDetailVo;
 import com.nlt.domain.vo.reservation.SlotStatusResponse;
 import com.nlt.domain.vo.reservation.SlotRecommendationItem;
@@ -34,9 +35,10 @@ public class ReservationController {
         @RequestParam(required = false) Long applicantUserId,
         @RequestParam(required = false) Long approverUserId,
         @RequestParam(required = false) Integer status,
-        @RequestParam(required = false) String reservationDate) {
+        @RequestParam(required = false) String reservationDate,
+        @RequestParam(required = false) Boolean conflictOnly) {
         return ApiResponse.success(reservationService.page(pageNum, pageSize, reservationNo, labId, applicantUserId,
-            approverUserId, status, reservationDate));
+            approverUserId, status, reservationDate, conflictOnly));
     }
 
     @PostMapping
@@ -75,6 +77,12 @@ public class ReservationController {
     public ApiResponse<PageData<ReservationDetailVo>> pendingAudit(@RequestParam(defaultValue = "1") int pageNum,
         @RequestParam(defaultValue = "10") int pageSize) {
         return ApiResponse.success(reservationService.pendingAudit(pageNum, pageSize));
+    }
+
+    @GetMapping("/conflicts")
+    public ApiResponse<PageData<ReservationConflictSlotVo>> conflicts(@RequestParam(defaultValue = "1") int pageNum,
+        @RequestParam(defaultValue = "10") int pageSize) {
+        return ApiResponse.success(reservationService.conflictPage(pageNum, pageSize));
     }
 
     @GetMapping("/{id}")

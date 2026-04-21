@@ -46,6 +46,7 @@ public class AuthServiceImpl implements AuthService {
         data.setRealName(user.getRealName());
         data.setToken(tokenService.generateToken(user.getId(), user.getUsername(), roleCodes));
         data.setRoleCodes(roleCodes);
+        data.setDepartmentId(user.getDepartmentId());
         return data;
     }
 
@@ -67,6 +68,7 @@ public class AuthServiceImpl implements AuthService {
         data.setRealName(user.getRealName());
         List<String> roleCodes = userRoleMapper.selectRoleCodesByUserId(userId);
         data.setRoleCodes(roleCodes);
+        data.setDepartmentId(user.getDepartmentId());
         return data;
     }
 

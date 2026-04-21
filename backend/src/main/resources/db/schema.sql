@@ -40,7 +40,7 @@ CREATE TABLE `department` (
 
 CREATE TABLE `sys_user` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-    `department_id` BIGINT DEFAULT NULL COMMENT 'Department id, nullable for platform admin',
+    `department_id` BIGINT DEFAULT NULL COMMENT 'Department id',
     `username` VARCHAR(50) NOT NULL COMMENT 'Login username',
     `password` VARCHAR(255) NOT NULL COMMENT 'Login password',
     `real_name` VARCHAR(50) NOT NULL COMMENT 'Real name',
@@ -96,14 +96,14 @@ CREATE TABLE `sys_user_role` (
 
 CREATE TABLE `lab` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-    `department_id` BIGINT DEFAULT NULL COMMENT 'Department id, nullable before assignment',
+    `department_id` BIGINT DEFAULT NULL COMMENT 'Department id',
     `lab_code` VARCHAR(50) NOT NULL COMMENT 'Lab code',
     `lab_name` VARCHAR(100) NOT NULL COMMENT 'Lab name',
     `lab_type` VARCHAR(50) NOT NULL COMMENT 'Lab type',
     `building_name` VARCHAR(100) NOT NULL COMMENT 'Building name',
     `room_no` VARCHAR(50) NOT NULL COMMENT 'Room number',
     `capacity` INT NOT NULL DEFAULT 0 COMMENT 'Capacity',
-    `manager_user_id` BIGINT DEFAULT NULL COMMENT 'Manager user id, nullable before assignment',
+    `manager_user_id` BIGINT DEFAULT NULL COMMENT 'Manager user id',
     `open_status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 open, 0 closed',
     `lab_status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 normal, 2 maintenance, 0 disabled',
     `description` VARCHAR(500) DEFAULT NULL COMMENT 'Description',
@@ -208,7 +208,7 @@ CREATE TABLE `consumable_stock_log` (
     `change_amount` INT NOT NULL COMMENT 'Changed amount',
     `before_stock` INT NOT NULL COMMENT 'Stock before change',
     `after_stock` INT NOT NULL COMMENT 'Stock after change',
-    `operator_user_id` BIGINT DEFAULT NULL COMMENT 'Operator user id, nullable for system job',
+    `operator_user_id` BIGINT DEFAULT NULL COMMENT 'Operator user id',
     `remark` VARCHAR(255) DEFAULT NULL COMMENT 'Remark',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
     PRIMARY KEY (`id`),
@@ -226,7 +226,7 @@ CREATE TABLE `lab_reservation` (
     `reservation_no` VARCHAR(50) NOT NULL COMMENT 'Reservation number',
     `lab_id` BIGINT NOT NULL COMMENT 'Lab id',
     `applicant_user_id` BIGINT NOT NULL COMMENT 'Applicant user id',
-    `approver_user_id` BIGINT DEFAULT NULL COMMENT 'Approver user id, nullable before audit',
+    `approver_user_id` BIGINT DEFAULT NULL COMMENT 'Approver user id',
     `reservation_type` TINYINT NOT NULL DEFAULT 3 COMMENT '1 course, 2 research, 3 personal',
     `priority_level` TINYINT NOT NULL DEFAULT 3 COMMENT '1 high, 2 medium, 3 low',
     `usage_purpose` VARCHAR(255) NOT NULL COMMENT 'Usage purpose',
@@ -303,7 +303,7 @@ CREATE TABLE `reservation_audit_log` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
     `reservation_id` BIGINT NOT NULL COMMENT 'Reservation id',
     `audit_user_id` BIGINT NOT NULL COMMENT 'Audit user id',
-    `audit_action` TINYINT NOT NULL COMMENT '1 submit, 2 approve, 3 reject, 4 cancel, 5 complete',
+    `audit_action` TINYINT NOT NULL COMMENT '1 submit, 2 approve, 3 reject, 4 cancel, 5 check in, 6 check out',
     `audit_comment` VARCHAR(255) DEFAULT NULL COMMENT 'Audit comment',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
     PRIMARY KEY (`id`),
@@ -318,7 +318,7 @@ CREATE TABLE `reservation_audit_log` (
 CREATE TABLE `user_violation_record` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
     `user_id` BIGINT NOT NULL COMMENT 'User id',
-    `reservation_id` BIGINT DEFAULT NULL COMMENT 'Reservation id, nullable for non-order-specific violation',
+    `reservation_id` BIGINT DEFAULT NULL COMMENT 'Reservation id',
     `violation_type` TINYINT NOT NULL COMMENT '1 no show, 2 late, 3 misuse, 4 other',
     `score_change` INT NOT NULL DEFAULT 0 COMMENT 'Score change',
     `remark` VARCHAR(255) DEFAULT NULL COMMENT 'Remark',
@@ -331,19 +331,5 @@ CREATE TABLE `user_violation_record` (
     CONSTRAINT `fk_user_violation_record_reservation`
         FOREIGN KEY (`reservation_id`) REFERENCES `lab_reservation` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='User violation record table';
-
-INSERT INTO `sys_role` (`id`, `role_name`, `role_code`, `description`, `status`, `deleted`)
-VALUES
-    (1, 'System Admin', 'ADMIN', 'Manage labs, devices, consumables, users, and audit flows', 1, 0),
-    (2, 'Teacher', 'TEACHER', 'Reserve labs and participate in audit flows', 1, 0),
-    (3, 'Student', 'STUDENT', 'Reserve labs and view own records', 1, 0);
-
-INSERT INTO `class_period` (`id`, `period_no`, `period_name`, `start_time`, `end_time`, `sort_order`, `status`)
-VALUES
-    (1, 1, '第1-2节', '08:00:00', '09:35:00', 1, 1),
-    (2, 2, '第3-4节', '10:00:00', '11:35:00', 2, 1),
-    (3, 3, '第5-6节', '14:00:00', '15:35:00', 3, 1),
-    (4, 4, '第7-8节', '16:00:00', '17:35:00', 4, 1),
-    (5, 5, '第9-10节', '19:00:00', '20:35:00', 5, 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

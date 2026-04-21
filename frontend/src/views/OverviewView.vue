@@ -1,146 +1,553 @@
-﻿<template>
+<template>
   <section class="card-grid metrics-grid">
-    <article v-for="card in visibleCards" :key="card.label" class="metric-card" :class="card.tone">
+    <article v-for="card in cardsToShow" :key="card.label" class="metric-card" :class="card.tone">
       <span>{{ card.label }}</span>
       <strong>{{ card.value }}</strong>
       <small>{{ card.trend }}</small>
     </article>
   </section>
 
-  <section class="content-grid two-columns">
-    <BasePanel :tag="trendTag" :title="trendTitle" note="单位：次" panel-class="chart-panel">
-      <div class="sparkline" v-html="bars"></div>
-      <div class="sparkline-axis">
-        <span>周一</span>
-        <span>周二</span>
-        <span>周三</span>
-        <span>周四</span>
-        <span>周五</span>
-        <span>周六</span>
-        <span>周日</span>
-      </div>
+  <section class="content-grid overview-stack">
+    <BasePanel tag="今日业务" title="每日预约概览" note="只保留核心预约指标">
+      <template v-if="dashboard">
+        <div class="overview-summary-grid">
+          <button type="button" class="overview-summary-card overview-summary-card-total" @click="openTimelineDialog">
+            <span class="summary-label">今日预约总数</span>
+            <strong>{{ dashboard.todayOverview.total }}</strong>
+            <small>点击查看今日预约时间轴</small>
+          </button>
+
+          <div class="overview-summary-card overview-summary-card-duo">
+            <button type="button" class="summary-half" @click="goToReservations('pending')">
+              <span class="summary-label">待审核数量</span>
+              <strong>{{ dashboard.todayOverview.pending }}</strong>
+              <small>跳转预约管理</small>
+            </button>
+            <span class="summary-divider" />
+            <button type="button" class="summary-half" @click="goToReservations('conflict')">
+              <span class="summary-label">冲突数量</span>
+              <strong>{{ dashboard.todayOverview.conflict }}</strong>
+              <small>跳转冲突处理</small>
+            </button>
+          </div>
+        </div>
+      </template>
+      <div v-else class="empty-state">正在加载每日预约概览...</div>
     </BasePanel>
 
-    <BasePanel :tag="alertTag" :title="alertTitle">
-      <div class="alert-list">
-        <div v-for="item in visibleAlerts" :key="item.title" class="alert-item">
-          <span class="alert-tag">{{ item.tag }}</span>
-          <h4>{{ item.title }}</h4>
-          <p>{{ item.detail }}</p>
+    <BasePanel tag="占用情况" title="各类型实验室今日占用情况" note="按实验室类型汇总今日开放节次">
+      <template v-if="occupancyItems.length">
+        <div class="occupancy-type-list">
+          <article v-for="group in occupancyItems" :key="group.labType" class="occupancy-type-card">
+            <div class="occupancy-type-head">
+              <div>
+                <strong>{{ group.labType }}</strong>
+                <p>今日已占用 {{ group.occupiedSlots }} / {{ group.totalOpenSlots }} 节次</p>
+              </div>
+              <span>{{ formatPercent(occupancyPercent(group.occupancyRate)) }}</span>
+            </div>
+            <div class="occupancy-bar">
+              <i
+                v-if="occupancyPercent(group.occupancyRate) > 0"
+                :style="{ width: `${occupancyPercent(group.occupancyRate)}%` }"
+              />
+            </div>
+            <small>共 {{ group.labCount }} 间实验室</small>
+          </article>
         </div>
-      </div>
+      </template>
+      <div v-else class="empty-state">正在加载实验室类型占用情况...</div>
     </BasePanel>
   </section>
 
-  <section class="content-grid two-columns">
-    <BasePanel :tag="heatmapTag" :title="heatmapTitle">
-      <div class="heat-list">
-        <div v-for="item in dashboardData.heatmap" :key="item.label" class="heat-row">
-          <span>{{ item.label }}</span>
-          <div class="heat-bar"><i :style="{ width: `${item.value}%` }"></i></div>
-          <strong>{{ formatPercent(item.value) }}</strong>
+  <div v-if="timelineDialogVisible" class="timeline-dialog-mask" @click.self="closeTimelineDialog">
+    <div class="timeline-dialog" role="dialog" aria-modal="true" aria-labelledby="timeline-dialog-title">
+      <div class="timeline-dialog-head">
+        <div>
+          <span class="dialog-tag">今日预约时间轴</span>
+          <h3 id="timeline-dialog-title">今日预约时间轴</h3>
+        </div>
+        <button type="button" class="dialog-close" @click="closeTimelineDialog">关闭</button>
+      </div>
+
+      <div class="timeline-dialog-body">
+        <article v-for="item in pagedTimelineItems" :key="`${item.reservationId}-${item.labId}-${item.periodId}`" class="timeline-item">
+          <div class="timeline-time">{{ item.timeRange || '--' }}</div>
+          <div class="timeline-body">
+            <div class="timeline-title-row">
+              <strong>{{ item.labName }}</strong>
+              <span class="timeline-type" :class="typeClass(item.typeLabel)">{{ item.typeLabel }}</span>
+            </div>
+            <p>{{ item.applicantName }} · {{ item.note }}</p>
+          </div>
+          <span class="timeline-status" :class="statusClass(item.statusLabel)">{{ item.statusLabel }}</span>
+        </article>
+        <div v-if="!timelineItems.length" class="empty-state">今日暂无预约时间轴数据。</div>
+      </div>
+
+      <div v-if="timelineItems.length" class="timeline-dialog-footer">
+        <div class="timeline-dialog-count">共 {{ timelineItems.length }} 条，当前第 {{ timelinePage }} / {{ timelinePageCount }} 页</div>
+        <div class="timeline-dialog-pager">
+          <button type="button" class="pager-btn" :disabled="timelinePage === 1" @click="timelinePage--">上一页</button>
+          <button type="button" class="pager-btn" :disabled="timelinePage === timelinePageCount" @click="timelinePage++">下一页</button>
         </div>
       </div>
-    </BasePanel>
-
-    <BasePanel :tag="focusTag" :title="focusTitle" panel-class="emphasis-panel">
-      <ul class="bullet-list">
-        <li v-for="item in focusItems" :key="item">{{ item }}</li>
-      </ul>
-    </BasePanel>
-  </section>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { getPrimaryRole } from '../access';
+import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { fetchAdminDashboard } from '../api/dashboard';
 import BasePanel from '../components/BasePanel.vue';
-import { dashboardData } from '../data/mock';
+import type { AdminDashboardDto, DashboardCardDto } from '../types';
 import { useAuthStore } from '../stores/auth';
-import { chartBars, formatPercent } from '../utils/format';
+import { formatPercent } from '../utils/format';
 
 const auth = useAuthStore();
-const primaryRole = computed(() => getPrimaryRole(auth.currentUser.value?.roleCodes));
-const bars = computed(() => chartBars(dashboardData.reservationTrend));
+const router = useRouter();
 
-const visibleCards = computed(() => {
-  if (primaryRole.value === 'STUDENT') {
-    return [
-      dashboardData.cards[0],
-      dashboardData.cards[2],
-      { label: '我的预订', value: '3', trend: '其中 1 项待审核', tone: 'accent' as const },
-      { label: '信用状态', value: '优秀', trend: '近30天无违纪记录', tone: 'success' as const },
-    ];
-  }
+const dashboard = ref<AdminDashboardDto | null>(null);
+const timelineDialogVisible = ref(false);
+const timelinePage = ref(1);
+const timelinePageSize = 5;
 
-  if (primaryRole.value === 'TEACHER') {
-    return [
-      dashboardData.cards[0],
-      dashboardData.cards[1],
-      { label: '我的教学预约', value: '6', trend: '本学期已使用2项', tone: 'brand' as const },
-      { label: '设备配套', value: '8', trend: '可连接实验室设备8台', tone: 'warning' as const },
-    ];
-  }
+const fallbackCards: DashboardCardDto[] = [
+  { label: '开放实验室', value: '--', trend: '当前可预约实验室', tone: 'success' },
+  { label: '待审核申请', value: '--', trend: '待管理员审核', tone: 'warning' },
+  { label: '低库存耗材', value: '--', trend: '需要补货提醒', tone: 'accent' },
+  { label: '设备维护中', value: '--', trend: '需要关注设备状态', tone: 'brand' },
+];
 
-  return dashboardData.cards;
+const cardsToShow = computed(() => dashboard.value?.cards?.length ? dashboard.value.cards : fallbackCards);
+const timelineItems = computed(() => dashboard.value?.todayTimeline ?? []);
+const occupancyItems = computed(() => dashboard.value?.occupancyRates ?? []);
+const timelinePageCount = computed(() => Math.max(1, Math.ceil(timelineItems.value.length / timelinePageSize)));
+
+const pagedTimelineItems = computed(() => {
+  const start = (timelinePage.value - 1) * timelinePageSize;
+  return timelineItems.value.slice(start, start + timelinePageSize);
 });
 
-const visibleAlerts = computed(() => {
-  if (primaryRole.value === 'STUDENT') {
-    return [
-      { title: '请按时签到', detail: '已通过预订需在开始前 15 分钟内签到，超时可能影响信用分。', tag: '学生提醒' },
-      { title: '本学期开放时间更新', detail: '实验室开放时间段有所延长，可在预约页面查看新的固定时间段。', tag: '规则提醒' },
-    ];
+function openTimelineDialog(): void {
+  timelinePage.value = 1;
+  timelineDialogVisible.value = true;
+}
+
+function closeTimelineDialog(): void {
+  timelineDialogVisible.value = false;
+}
+
+function goToReservations(view: 'pending' | 'conflict'): void {
+  void router.push({ name: 'reservations', query: { view } });
+}
+
+function typeClass(typeLabel?: string): string {
+  if (typeLabel === '课程实验') {
+    return 'type-teach';
   }
-
-  if (primaryRole.value === 'TEACHER') {
-    return [
-      { title: '教学预约优先审核', detail: '本学期实验室预约较多，建议提前申请并填写教学信息。', tag: '教师提醒' },
-      { title: '设备维护期间提示', detail: 'A102 房间设备今日维护，请预约前先确认设备状态。', tag: '设备提示' },
-    ];
+  if (typeLabel === '科研训练') {
+    return 'type-research';
   }
-
-  return dashboardData.alerts;
-});
-
-const trendTag = computed(() => (primaryRole.value === 'STUDENT' ? '我的预订' : primaryRole.value === 'TEACHER' ? '教学预订' : '预订概览'));
-const trendTitle = computed(() => (primaryRole.value === 'STUDENT' ? '最近7天我的预约情况' : primaryRole.value === 'TEACHER' ? '最近7天教师与管理员预约活动' : '最近7天预约活动'));
-const alertTag = computed(() => (primaryRole.value === 'ADMIN' ? '运行提醒' : '我的提醒'));
-const alertTitle = computed(() => (primaryRole.value === 'STUDENT' ? '学生使用提醒' : primaryRole.value === 'TEACHER' ? '教师工作提醒' : '今日重点事项'));
-const heatmapTag = computed(() => (primaryRole.value === 'STUDENT' ? '预约时段' : '热力时段'));
-const heatmapTitle = computed(() => (primaryRole.value === 'STUDENT' ? '当前最容易预约的时间段' : '实验室使用热力图'));
-const focusTag = computed(() => (primaryRole.value === 'ADMIN' ? '关键设计要点' : '使用建议'));
-const focusTitle = computed(() => {
-  if (primaryRole.value === 'STUDENT') return '学生进入系统后最常用的功能';
-  if (primaryRole.value === 'TEACHER') return '教师进入系统后建议优先处理的事项';
-  return '当前首页已预设的快捷显示点';
-});
-
-const focusItems = computed(() => {
-  if (primaryRole.value === 'STUDENT') {
-    return [
-      '查看实验室开放时间段，提前安排预约审核',
-      '遇到时间冲突时直接使用推荐时间段',
-      '按时到达与结束签到，保持良好的信用分',
-      '优先在"我的预约"里查看这个审核状态',
-    ];
+  if (typeLabel === '维护') {
+    return 'type-maintenance';
   }
+  return 'type-personal';
+}
 
-  if (primaryRole.value === 'TEACHER') {
-    return [
-      '优先提交教学预约，系统会按级别优先审核',
-      '预约前先确认实验室设备与开放时间',
-      '重点填写项目名称与参与人数等完整信息',
-      '通过统计页面查看高峰时段，避免拥挤时间',
-    ];
+function occupancyPercent(rate: number): number {
+  return Math.max(0, Math.round(rate * 100));
+}
+
+function statusClass(statusLabel?: string): string {
+  if (statusLabel === '已通过' || statusLabel === '已完成') {
+    return 'status-running';
   }
+  if (statusLabel === '即将开始') {
+    return 'status-upcoming';
+  }
+  if (statusLabel === '冲突待处理') {
+    return 'status-warning';
+  }
+  return 'status-pending';
+}
 
-  return [
-    '预约期间学习与推荐相关',
-    '实验室运行状态一览视图',
-    '热力时间段与使用可视化',
-    '耗材库存与设备维护提醒',
-  ];
+async function loadDashboard(): Promise<void> {
+  try {
+    dashboard.value = await fetchAdminDashboard(auth.token.value || '');
+  } catch {
+    dashboard.value = null;
+  }
+}
+
+onMounted(() => {
+  void loadDashboard();
 });
 </script>
 
+<style scoped>
+.overview-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.overview-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.overview-summary-card {
+  border: 0;
+  border-radius: 18px;
+  padding: 18px 20px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.94), rgba(241, 245, 249, 0.88));
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.04);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.overview-summary-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(37, 99, 235, 0.22);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+}
+
+.overview-summary-card strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 34px;
+  line-height: 1;
+  color: #0f172a;
+}
+
+.summary-label {
+  font-size: 13px;
+  color: #475569;
+  font-weight: 650;
+}
+
+.overview-summary-card small {
+  display: block;
+  margin-top: 10px;
+  color: #64748b;
+}
+
+.overview-summary-card-total {
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.04));
+}
+
+.overview-summary-card-duo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  padding: 0;
+  overflow: hidden;
+}
+
+.summary-half {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 18px 20px;
+  cursor: pointer;
+}
+
+.summary-half strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 34px;
+  line-height: 1;
+  color: #0f172a;
+}
+
+.summary-half:hover {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.summary-divider {
+  width: 1px;
+  background: rgba(148, 163, 184, 0.28);
+}
+
+.occupancy-type-list {
+  display: grid;
+  gap: 12px;
+}
+
+.occupancy-type-card {
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(248, 250, 252, 0.88);
+}
+
+.occupancy-type-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.occupancy-type-head strong {
+  font-size: 16px;
+  color: #0f172a;
+}
+
+.occupancy-type-head p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.occupancy-type-head span {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.occupancy-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+  overflow: hidden;
+}
+
+.occupancy-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #60a5fa 0%, #22c55e 100%);
+}
+
+.occupancy-type-card small {
+  display: block;
+  margin-top: 10px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.timeline-dialog-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(10px);
+}
+
+.timeline-dialog {
+  width: min(1200px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  display: grid;
+  gap: 18px;
+  padding: 24px 24px 20px;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.24);
+}
+
+.timeline-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dialog-tag {
+  display: inline-flex;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.1);
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.timeline-dialog-head h3 {
+  margin: 10px 0 0;
+  font-size: 22px;
+  color: #0f172a;
+}
+
+.dialog-close {
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: #fff;
+  color: #334155;
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.timeline-dialog-body {
+  display: grid;
+  gap: 14px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.timeline-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 4px;
+}
+
+.timeline-dialog-count {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.timeline-dialog-pager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pager-btn {
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: #fff;
+  color: #334155;
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.pager-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.timeline-item {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 18px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(248, 250, 252, 0.86);
+}
+
+.timeline-time {
+  font-weight: 700;
+  font-size: 16px;
+  color: #0f172a;
+}
+
+.timeline-body {
+  display: grid;
+  gap: 4px;
+}
+
+.timeline-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.timeline-title-row strong {
+  color: #1e293b;
+}
+
+.timeline-body p {
+  margin: 0;
+  color: #475569;
+  font-size: 14px;
+}
+
+.timeline-type,
+.timeline-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.timeline-type.type-teach {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+}
+
+.timeline-type.type-research {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+}
+
+.timeline-type.type-personal {
+  background: rgba(168, 85, 247, 0.12);
+  color: #7c3aed;
+}
+
+.timeline-type.type-maintenance {
+  background: rgba(148, 163, 184, 0.16);
+  color: #475569;
+}
+
+.timeline-status.status-running {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+}
+
+.timeline-status.status-upcoming {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+.timeline-status.status-warning {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.timeline-status.status-pending {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+}
+
+.empty-state {
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.82);
+  border: 1px dashed rgba(148, 163, 184, 0.4);
+  color: #64748b;
+  font-size: 13px;
+}
+
+@media (max-width: 1440px) {
+  .overview-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1120px) {
+  .timeline-item {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+  }
+
+  .overview-summary-card-duo {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-divider {
+    width: 100%;
+    height: 1px;
+  }
+
+  .timeline-dialog-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+</style>

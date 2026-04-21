@@ -2,12 +2,15 @@ package com.nlt.service.impl;
 
 import com.nlt.common.api.PageData;
 import com.nlt.common.exception.BusinessException;
+import com.nlt.common.security.CurrentUserScopeService;
 import com.nlt.domain.dto.consumable.ConsumableSaveRequest;
 import com.nlt.domain.dto.consumable.ConsumableStockUpdateRequest;
 import com.nlt.domain.entity.ConsumableEntity;
 import com.nlt.domain.entity.ConsumableStockLogEntity;
+import com.nlt.domain.entity.LabEntity;
 import com.nlt.mapper.ConsumableMapper;
 import com.nlt.mapper.ConsumableStockLogMapper;
+import com.nlt.mapper.LabMapper;
 import com.nlt.service.ConsumableService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
@@ -19,36 +22,25 @@ import org.springframework.transaction.annotation.Transactional;
 public class ConsumableServiceImpl implements ConsumableService {
 
     private final ConsumableMapper consumableMapper;
-
     private final ConsumableStockLogMapper consumableStockLogMapper;
+    private final LabMapper labMapper;
+    private final CurrentUserScopeService currentUserScopeService;
 
-    /**
-     * 查询耗材信息列表
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @param labId 实验室ID
-     * @param consumableName 参数
-     * @param consumableCode 参数
-     * @return 分页数据
-     */
     @Override
     public PageData<ConsumableEntity> page(int pageNum, int pageSize, Long labId, String consumableName, String consumableCode) {
         int offset = (pageNum - 1) * pageSize;
+        Long departmentId = currentUserScopeService.resolveAdminDepartmentId();
         return new PageData<>(
-        consumableMapper.selectPage(offset, pageSize, labId, consumableName, consumableCode),
-        consumableMapper.countPage(labId, consumableName, consumableCode),
-        pageNum,
-        pageSize
+            consumableMapper.selectPage(offset, pageSize, labId, consumableName, consumableCode, departmentId),
+            consumableMapper.countPage(labId, consumableName, consumableCode, departmentId),
+            pageNum,
+            pageSize
         );
     }
 
-    /**
-     * 新增耗材信息
-     * @param request 请求参数
-     * @return 处理结果
-     */
     @Override
     public ConsumableEntity create(ConsumableSaveRequest request) {
+        ensureLabAccessible(request.getLabId());
         ConsumableEntity entity = new ConsumableEntity();
         BeanUtils.copyProperties(request, entity);
         if (entity.getStockQuantity() == null) {
@@ -61,65 +53,40 @@ public class ConsumableServiceImpl implements ConsumableService {
         return getById(entity.getId());
     }
 
-    /**
-     * 查询耗材信息
-     * @param id 主键ID
-     * @return 处理结果
-     */
     @Override
     public ConsumableEntity getById(Long id) {
         ConsumableEntity entity = consumableMapper.selectById(id);
         if (entity == null) {
             throw new BusinessException(404, "耗材不存在");
         }
+        ensureLabAccessible(entity.getLabId());
         return entity;
     }
 
-    /**
-     * 更新耗材信息
-     * @param id 主键ID
-     * @param request 请求参数
-     * @return 处理结果
-     */
     @Override
     public ConsumableEntity update(Long id, ConsumableSaveRequest request) {
         ConsumableEntity entity = getById(id);
+        ensureLabAccessible(request.getLabId());
         BeanUtils.copyProperties(request, entity);
         consumableMapper.update(entity);
         return getById(id);
     }
 
-    /**
-     * 删除耗材信息
-     * @param id 主键ID
-     */
     @Override
     public void delete(Long id) {
         getById(id);
         consumableMapper.softDelete(id);
     }
 
-    /**
-     * 处理耗材信息
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @return 分页数据
-     */
     @Override
     public PageData<ConsumableEntity> warningList(int pageNum, int pageSize) {
-        var list = consumableMapper.selectWarningList();
+        Long departmentId = currentUserScopeService.resolveAdminDepartmentId();
+        var list = consumableMapper.selectWarningList(departmentId);
         int fromIndex = Math.min((pageNum - 1) * pageSize, list.size());
         int toIndex = Math.min(fromIndex + pageSize, list.size());
         return new PageData<>(list.subList(fromIndex, toIndex), list.size(), pageNum, pageSize);
     }
 
-    /**
-     * 更新耗材库存
-     * @param id 主键ID
-     * @param request 请求参数
-     * @param operatorUserId 操作人用户ID
-     * @return 处理结果
-     */
     @Transactional
     @Override
     public ConsumableEntity updateStock(Long id, ConsumableStockUpdateRequest request, Long operatorUserId) {
@@ -142,5 +109,14 @@ public class ConsumableServiceImpl implements ConsumableService {
         return getById(id);
     }
 
+    private void ensureLabAccessible(Long labId) {
+        if (labId == null) {
+            throw new BusinessException(400, "实验室不能为空");
+        }
+        LabEntity lab = labMapper.selectById(labId);
+        if (lab == null || (lab.getDeleted() != null && lab.getDeleted() == 1)) {
+            throw new BusinessException(404, "实验室不存在");
+        }
+        currentUserScopeService.ensureDepartmentAccessible(lab.getDepartmentId(), "实验室不存在");
+    }
 }
-

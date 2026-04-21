@@ -2,6 +2,7 @@ package com.nlt.service.impl;
 
 import com.nlt.common.api.PageData;
 import com.nlt.common.exception.BusinessException;
+import com.nlt.common.security.CurrentUserScopeService;
 import com.nlt.domain.dto.reservation.ReservationApproveRequest;
 import com.nlt.domain.dto.reservation.ReservationCreateRequest;
 import com.nlt.domain.dto.reservation.ReservationRecommendationRequest;
@@ -14,11 +15,14 @@ import com.nlt.domain.entity.LabReservationSlotEntity;
 import com.nlt.domain.entity.ReservationAuditLogEntity;
 import com.nlt.domain.entity.ReservationEntity;
 import com.nlt.domain.vo.reservation.ReservationApplyResponse;
+import com.nlt.domain.vo.reservation.ReservationConflictReservationVo;
+import com.nlt.domain.vo.reservation.ReservationConflictRowVo;
+import com.nlt.domain.vo.reservation.ReservationConflictSlotVo;
 import com.nlt.domain.vo.reservation.ReservationDetailVo;
 import com.nlt.domain.vo.reservation.ReservationSlotVo;
+import com.nlt.domain.vo.reservation.SlotRecommendationItem;
 import com.nlt.domain.vo.reservation.SlotStatusItem;
 import com.nlt.domain.vo.reservation.SlotStatusResponse;
-import com.nlt.domain.vo.reservation.SlotRecommendationItem;
 import com.nlt.domain.vo.schedule.ReservedSlotRow;
 import com.nlt.mapper.ClassPeriodMapper;
 import com.nlt.mapper.LabMaintenanceMapper;
@@ -36,6 +40,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -63,15 +68,18 @@ public class ReservationServiceImpl implements ReservationService {
     private final ReservationConflictService reservationConflictService;
     private final ReservationRecommendationService reservationRecommendationService;
     private final ClassPeriodMapper classPeriodMapper;
+    private final CurrentUserScopeService currentUserScopeService;
 
     @Override
     public PageData<ReservationDetailVo> page(int pageNum, int pageSize, String reservationNo, Long labId,
-        Long applicantUserId, Long approverUserId, Integer status, String reservationDate) {
+        Long applicantUserId, Long approverUserId, Integer status, String reservationDate, Boolean conflictOnly) {
         int offset = (pageNum - 1) * pageSize;
         LocalDate date = reservationDate == null || reservationDate.isBlank() ? null : LocalDate.parse(reservationDate, DATE_FORMATTER);
+        Long departmentId = currentUserScopeService.resolveAdminDepartmentId();
         List<ReservationEntity> list = reservationMapper.selectPage(offset, pageSize, reservationNo, labId,
-            applicantUserId, approverUserId, status, date);
-        long total = reservationMapper.countPage(reservationNo, labId, applicantUserId, approverUserId, status, date);
+            applicantUserId, approverUserId, status, date, departmentId, Boolean.TRUE.equals(conflictOnly));
+        long total = reservationMapper.countPage(reservationNo, labId, applicantUserId, approverUserId, status, date, departmentId,
+            Boolean.TRUE.equals(conflictOnly));
         return new PageData<>(attachSlots(list), total, pageNum, pageSize);
     }
 
@@ -86,9 +94,39 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     public PageData<ReservationDetailVo> pendingAudit(int pageNum, int pageSize) {
         int offset = (pageNum - 1) * pageSize;
-        List<ReservationEntity> list = reservationMapper.selectPendingAudit(offset, pageSize);
-        long total = reservationMapper.countPendingAudit();
+        Long departmentId = currentUserScopeService.resolveAdminDepartmentId();
+        List<ReservationEntity> list = reservationMapper.selectPendingAudit(offset, pageSize, departmentId);
+        long total = reservationMapper.countPendingAudit(departmentId);
         return new PageData<>(attachSlots(list), total, pageNum, pageSize);
+    }
+
+    @Override
+    public PageData<ReservationConflictSlotVo> conflictPage(int pageNum, int pageSize) {
+        Long departmentId = currentUserScopeService.resolveAdminDepartmentId();
+        List<ReservationConflictRowVo> rows = labReservationSlotMapper.selectConflictRowsByDepartment(departmentId);
+        Map<Long, Integer> periodOrderMap = classPeriodMapper.selectActiveList().stream()
+            .collect(Collectors.toMap(ClassPeriodEntity::getId, ClassPeriodEntity::getPeriodNo, (left, right) -> left));
+        Map<String, List<ReservationConflictRowVo>> grouped = rows.stream()
+            .collect(Collectors.groupingBy(row -> conflictKey(row.getLabId(), row.getReservationDate(), row.getPeriodId()),
+                LinkedHashMap::new, Collectors.toList()));
+
+        List<ReservationConflictSlotVo> all = grouped.values().stream()
+            .filter(list -> list.size() > 1)
+            .map(this::toConflictSlotVo)
+            .sorted((left, right) -> {
+                int dateCompare = left.getReservationDate().compareTo(right.getReservationDate());
+                if (dateCompare != 0) return dateCompare;
+                int periodCompare = Integer.compare(periodOrderMap.getOrDefault(left.getPeriodId(), Integer.MAX_VALUE),
+                    periodOrderMap.getOrDefault(right.getPeriodId(), Integer.MAX_VALUE));
+                if (periodCompare != 0) return periodCompare;
+                return left.getLabName().compareTo(right.getLabName());
+            })
+            .toList();
+
+        int fromIndex = Math.max(0, (pageNum - 1) * pageSize);
+        int toIndex = Math.min(all.size(), fromIndex + pageSize);
+        List<ReservationConflictSlotVo> pageList = fromIndex >= toIndex ? List.of() : all.subList(fromIndex, toIndex);
+        return new PageData<>(pageList, all.size(), pageNum, pageSize);
     }
 
     @Override
@@ -101,10 +139,9 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional
     @Override
     public ReservationApplyResponse apply(ReservationCreateRequest request, Long currentUserId) {
-        if (currentUserId == null) {
-            throw new BusinessException(401, "用户未登录");
-        }
+        requireLogin(currentUserId);
         loadAndValidateLab(request.getLabId());
+        validateStudentReservationType(currentUserId, request.getReservationType());
 
         List<SlotKey> requestedSlots = normalizeRequestedSlots(request);
         validateWithinNext21Days(requestedSlots);
@@ -143,26 +180,23 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional
     @Override
     public ReservationDetailVo create(ReservationCreateRequest request, Long currentUserId) {
-        if (currentUserId == null) {
-            throw new BusinessException(401, "用户未登录");
-        }
+        requireLogin(currentUserId);
         loadAndValidateLab(request.getLabId());
+        validateStudentReservationType(currentUserId, request.getReservationType());
 
         List<SlotKey> requestedSlots = normalizeRequestedSlots(request);
         validateWithinNext21Days(requestedSlots);
         Map<SlotKey, LabOpenSlotEntity> openSlotMap = loadOpenSlots(request.getLabId(), requestedSlots);
         validateRoleAllowed(openSlotMap, requestedSlots, currentUserId);
         validateNoMaintenance(request.getLabId(), requestedSlots);
-        validateNoReservationConflict(request.getLabId(), requestedSlots);
+        validateNoReservationConflict(request.getLabId(), requestedSlots, currentUserId);
 
         return persistReservation(request, currentUserId, requestedSlots);
     }
 
     @Override
     public SlotStatusResponse slotStatus(Long labId, String date, Long currentUserId) {
-        if (currentUserId == null) {
-            throw new BusinessException(401, "用户未登录");
-        }
+        requireLogin(currentUserId);
         loadAndValidateLab(labId);
 
         LocalDate targetDate = date == null || date.isBlank() ? LocalDate.now() : LocalDate.parse(date, DATE_FORMATTER);
@@ -186,7 +220,7 @@ public class ReservationServiceImpl implements ReservationService {
             .collect(Collectors.toMap(
                 item -> key(item.getReservationDate(), item.getPeriodId()),
                 item -> item,
-                (a, b) -> choosePreferredRow(a, b)
+                (left, right) -> choosePreferredRow(left, right, currentUserId)
             ));
 
         List<SlotStatusItem> items = new ArrayList<>();
@@ -214,11 +248,13 @@ public class ReservationServiceImpl implements ReservationService {
             }
 
             if (Objects.equals(reserved.getReservationStatus(), 2) || Objects.equals(reserved.getReservationStatus(), 5)) {
-                items.add(new SlotStatusItem(period.getId(), period.getPeriodName(), "APPROVED", "已占用", "预约单号：" + reserved.getReservationNo()));
+                items.add(new SlotStatusItem(period.getId(), period.getPeriodName(), "APPROVED", "已占用",
+                    "预约单号：" + reserved.getReservationNo()));
             } else if (Objects.equals(reserved.getApplicantUserId(), currentUserId)) {
-                items.add(new SlotStatusItem(period.getId(), period.getPeriodName(), "PENDING_SELF", "待审核（本人）", "你已申请该时段"));
+                items.add(new SlotStatusItem(period.getId(), period.getPeriodName(), "PENDING_SELF", "待审核（本人）", "你已申请过该时段"));
             } else {
-                items.add(new SlotStatusItem(period.getId(), period.getPeriodName(), "PENDING_OTHERS", "可申请", "已有他人待审核，提交后将进入冲突判定"));
+                items.add(new SlotStatusItem(period.getId(), period.getPeriodName(), "PENDING_OTHERS", "可申请",
+                    "已有他人待审核，提交后将进入冲突判定"));
             }
         }
 
@@ -261,9 +297,7 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional
     @Override
     public ReservationDetailVo cancel(Long id, Long currentUserId) {
-        if (currentUserId == null) {
-            throw new BusinessException(401, "用户未登录");
-        }
+        requireLogin(currentUserId);
         ReservationEntity entity = requireReservation(id);
         boolean isAdmin = isAdmin(currentUserId);
         if (!isAdmin && !Objects.equals(entity.getApplicantUserId(), currentUserId)) {
@@ -355,11 +389,26 @@ public class ReservationServiceImpl implements ReservationService {
         return 3;
     }
 
-    private ReservedSlotRow choosePreferredRow(ReservedSlotRow left, ReservedSlotRow right) {
+    private void validateStudentReservationType(Long currentUserId, Integer reservationType) {
+        List<String> roleCodes = userRoleMapper.selectRoleCodesByUserId(currentUserId);
+        if (hasRole(roleCodes, "STUDENT") && (reservationType == null || reservationType != 3)) {
+            throw new BusinessException(400, "学生仅支持个人预约");
+        }
+    }
+
+    private ReservedSlotRow choosePreferredRow(ReservedSlotRow left, ReservedSlotRow right, Long currentUserId) {
         if (isApprovedLike(left.getReservationStatus()) && !isApprovedLike(right.getReservationStatus())) {
             return left;
         }
         if (!isApprovedLike(left.getReservationStatus()) && isApprovedLike(right.getReservationStatus())) {
+            return right;
+        }
+        boolean leftSelf = currentUserId != null && currentUserId.equals(left.getApplicantUserId());
+        boolean rightSelf = currentUserId != null && currentUserId.equals(right.getApplicantUserId());
+        if (leftSelf && !rightSelf) {
+            return left;
+        }
+        if (rightSelf && !leftSelf) {
             return right;
         }
         if (Objects.equals(left.getApplicantUserId(), right.getApplicantUserId())) {
@@ -408,6 +457,40 @@ public class ReservationServiceImpl implements ReservationService {
         );
     }
 
+    private ReservationConflictSlotVo toConflictSlotVo(List<ReservationConflictRowVo> rows) {
+        ReservationConflictRowVo first = rows.get(0);
+        List<ReservationConflictReservationVo> reservations = rows.stream()
+            .map(row -> new ReservationConflictReservationVo(
+                row.getReservationId(),
+                row.getReservationNo(),
+                row.getApplicantUserId(),
+                row.getApplicantName(),
+                row.getReservationType(),
+                row.getPriorityLevel(),
+                row.getReservationStatus(),
+                row.getCreatedAt(),
+                row.getUsagePurpose(),
+                row.getCourseOrProjectName()
+            ))
+            .toList();
+        return new ReservationConflictSlotVo(
+            first.getLabId(),
+            first.getLabName(),
+            first.getReservationDate().format(DATE_FORMATTER),
+            first.getReservationDate().getDayOfWeek().getValue(),
+            first.getPeriodId(),
+            first.getPeriodName(),
+            first.getStartTime(),
+            first.getEndTime(),
+            reservations.size(),
+            reservations
+        );
+    }
+
+    private String conflictKey(Long labId, LocalDate reservationDate, Long periodId) {
+        return labId + "|" + reservationDate + "|" + periodId;
+    }
+
     private String formatDateTime(LocalDateTime value) {
         return value == null ? null : value.format(DATE_TIME_FORMATTER);
     }
@@ -417,6 +500,11 @@ public class ReservationServiceImpl implements ReservationService {
         if (entity == null) {
             throw new BusinessException(404, "预约不存在");
         }
+        LabEntity lab = labMapper.selectById(entity.getLabId());
+        if (lab == null || (lab.getDeleted() != null && lab.getDeleted() == 1)) {
+            throw new BusinessException(404, "预约不存在");
+        }
+        currentUserScopeService.ensureDepartmentAccessible(lab.getDepartmentId(), "预约不存在");
         return entity;
     }
 
@@ -428,6 +516,7 @@ public class ReservationServiceImpl implements ReservationService {
         if (lab == null) {
             throw new BusinessException(404, "实验室不存在");
         }
+        currentUserScopeService.ensureDepartmentAccessible(lab.getDepartmentId(), "实验室不存在");
         if (lab.getDeleted() != null && lab.getDeleted() == 1) {
             throw new BusinessException(400, "实验室已删除");
         }
@@ -524,14 +613,25 @@ public class ReservationServiceImpl implements ReservationService {
         }
     }
 
-    private void validateNoReservationConflict(Long labId, List<SlotKey> requestedSlots) {
+    private void validateNoReservationConflict(Long labId, List<SlotKey> requestedSlots, Long currentUserId) {
         LocalDate min = requestedSlots.stream().map(SlotKey::reservationDate).min(LocalDate::compareTo).orElseThrow();
         LocalDate max = requestedSlots.stream().map(SlotKey::reservationDate).max(LocalDate::compareTo).orElseThrow();
-        Map<String, Boolean> reservedMap = labReservationSlotMapper.selectReservedSlots(labId, min, max).stream()
-            .collect(Collectors.toMap(item -> key(item.getReservationDate(), item.getPeriodId()), item -> true, (a, b) -> a));
+        Map<String, ReservedSlotRow> reservedMap = labReservationSlotMapper.selectReservedSlots(labId, min, max).stream()
+            .collect(Collectors.toMap(
+                item -> key(item.getReservationDate(), item.getPeriodId()),
+                item -> item,
+                (left, right) -> choosePreferredRow(left, right, currentUserId)
+            ));
         for (SlotKey key : requestedSlots) {
-            if (reservedMap.containsKey(key(key.reservationDate(), key.periodId()))) {
+            ReservedSlotRow reserved = reservedMap.get(key(key.reservationDate(), key.periodId()));
+            if (reserved == null) {
+                continue;
+            }
+            if (Objects.equals(reserved.getReservationStatus(), 2) || Objects.equals(reserved.getReservationStatus(), 5)) {
                 throw new BusinessException(400, "该时间段已经被预约");
+            }
+            if (Objects.equals(reserved.getReservationStatus(), 1) && Objects.equals(reserved.getApplicantUserId(), currentUserId)) {
+                throw new BusinessException(400, "你已申请过该时段，当前状态为待审核");
             }
         }
     }
@@ -548,10 +648,14 @@ public class ReservationServiceImpl implements ReservationService {
         reservationAuditLogMapper.insert(entity);
     }
 
-    private void requireAdmin(Long currentUserId) {
+    private void requireLogin(Long currentUserId) {
         if (currentUserId == null) {
             throw new BusinessException(401, "用户未登录");
         }
+    }
+
+    private void requireAdmin(Long currentUserId) {
+        requireLogin(currentUserId);
         if (!isAdmin(currentUserId)) {
             throw new BusinessException(403, "需要管理员权限");
         }

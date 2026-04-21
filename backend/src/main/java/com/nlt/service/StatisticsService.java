@@ -5,6 +5,7 @@ import com.nlt.domain.dto.statistics.ReservationStatusStatisticsRequest;
 import com.nlt.domain.dto.statistics.ReservationTypeStatisticsRequest;
 import com.nlt.domain.dto.statistics.TimeDistributionStatisticsRequest;
 import com.nlt.domain.dto.statistics.ViolationStatisticsRequest;
+import com.nlt.domain.vo.dashboard.AdminDashboardVo;
 import com.nlt.domain.vo.statistics.StatisticsItem;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +17,12 @@ public interface StatisticsService {
      * @return 处理结果
      */
     Map<String, Long> overview();
+
+    /**
+     * 获取管理员首页动态面板数据
+     * @return 管理员首页数据
+     */
+    AdminDashboardVo adminOverview();
 
     /**
      * 实验室使用情况统计

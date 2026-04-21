@@ -6,6 +6,7 @@ import com.nlt.domain.dto.statistics.ReservationStatusStatisticsRequest;
 import com.nlt.domain.dto.statistics.ReservationTypeStatisticsRequest;
 import com.nlt.domain.dto.statistics.TimeDistributionStatisticsRequest;
 import com.nlt.domain.dto.statistics.ViolationStatisticsRequest;
+import com.nlt.domain.vo.dashboard.AdminDashboardVo;
 import com.nlt.domain.vo.statistics.StatisticsItem;
 import com.nlt.service.StatisticsService;
 import java.util.List;
@@ -26,6 +27,15 @@ public class DashboardController {
     @GetMapping("/dashboard/overview")
     public ApiResponse<Map<String, Long>> overview() {
         return ApiResponse.success(statisticsService.overview());
+    }
+
+    /**
+     * 获取管理员动态首页数据
+     * @return 处理结果
+     */
+    @GetMapping("/dashboard/admin-overview")
+    public ApiResponse<AdminDashboardVo> adminOverview() {
+        return ApiResponse.success(statisticsService.adminOverview());
     }
 
     /**

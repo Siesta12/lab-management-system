@@ -64,7 +64,7 @@ public class LabScheduleServiceImpl implements LabScheduleService {
         }
         LocalDate end = start.plusDays(20);
 
-        labService.getById(labId, currentUserId, currentRoleCodes);
+        labService.getById(labId);
 
         List<ClassPeriodEntity> periods = classPeriodMapper.selectActiveList();
         if (periods.isEmpty()) {
@@ -94,7 +94,11 @@ public class LabScheduleServiceImpl implements LabScheduleService {
 
         List<ReservedSlotRow> reservedRows = labReservationSlotMapper.selectReservedSlots(labId, start, end);
         Map<String, ReservedSlotRow> reservedMap = reservedRows.stream()
-            .collect(Collectors.toMap(r -> key(r.getReservationDate(), r.getPeriodId()), r -> r, (a, b) -> a));
+            .collect(Collectors.toMap(
+                r -> key(r.getReservationDate(), r.getPeriodId()),
+                r -> r,
+                (left, right) -> choosePreferredRow(left, right, currentUserId)
+            ));
 
         boolean isStudent = hasRole(currentRoleCodes, "STUDENT");
         boolean isTeacher = hasRole(currentRoleCodes, "TEACHER");
@@ -145,6 +149,31 @@ public class LabScheduleServiceImpl implements LabScheduleService {
         return new LabScheduleResponse(start.format(DATE_FORMATTER), end.format(DATE_FORMATTER), periodItems, days);
     }
 
+    private ReservedSlotRow choosePreferredRow(ReservedSlotRow left, ReservedSlotRow right, Long currentUserId) {
+        if (isApprovedLike(left.getReservationStatus()) && !isApprovedLike(right.getReservationStatus())) {
+            return left;
+        }
+        if (!isApprovedLike(left.getReservationStatus()) && isApprovedLike(right.getReservationStatus())) {
+            return right;
+        }
+        boolean leftSelf = currentUserId != null && currentUserId.equals(left.getApplicantUserId());
+        boolean rightSelf = currentUserId != null && currentUserId.equals(right.getApplicantUserId());
+        if (leftSelf && !rightSelf) {
+            return left;
+        }
+        if (rightSelf && !leftSelf) {
+            return right;
+        }
+        if (Objects.equals(left.getApplicantUserId(), right.getApplicantUserId())) {
+            return left;
+        }
+        return left;
+    }
+
+    private boolean isApprovedLike(Integer status) {
+        return Objects.equals(status, 2) || Objects.equals(status, 5);
+    }
+
     @Override
     public DailyScheduleResponse getDailySchedule(String date, Long currentUserId, List<String> currentRoleCodes) {
         requireAdmin(currentRoleCodes);
@@ -159,7 +188,7 @@ public class LabScheduleServiceImpl implements LabScheduleService {
         List<SchedulePeriodItem> periodItems = periods.stream().map(this::toPeriodItem).toList();
 
         int weekday = targetDate.getDayOfWeek().getValue();
-        List<LabEntity> labs = labMapper.selectPage(0, 500, null, null, null, null, null, null).stream()
+        List<LabEntity> labs = labMapper.selectPage(0, 500, null, null, null, null, null, null, null).stream()
             .filter(l -> l.getDeleted() == null || l.getDeleted() == 0)
             .toList();
         List<Long> labIds = labs.stream().map(LabEntity::getId).toList();
@@ -210,7 +239,7 @@ public class LabScheduleServiceImpl implements LabScheduleService {
     public List<LabMaintenanceItem> listLabMaintenance(Long labId, Long currentUserId, List<String> currentRoleCodes) {
         LocalDate today = LocalDate.now();
         LocalDate end = today.plusDays(20);
-        labService.getById(labId, currentUserId, currentRoleCodes);
+        labService.getById(labId);
 
         Map<Long, ClassPeriodEntity> periodMap = classPeriodMapper.selectActiveList().stream()
             .collect(Collectors.toMap(ClassPeriodEntity::getId, p -> p, (a, b) -> a));
@@ -238,7 +267,7 @@ public class LabScheduleServiceImpl implements LabScheduleService {
         if (operatorUserId == null) {
             throw new BusinessException(401, "用户未登录");
         }
-        labService.getById(labId, operatorUserId, currentRoleCodes);
+        labService.getById(labId);
 
         LocalDate maintenanceDate = LocalDate.parse(request.getMaintenanceDate(), DATE_FORMATTER);
         validateWithinNext21Days(maintenanceDate);
@@ -280,7 +309,7 @@ public class LabScheduleServiceImpl implements LabScheduleService {
         if (operatorUserId == null) {
             throw new BusinessException(401, "用户未登录");
         }
-        labService.getById(labId, operatorUserId, currentRoleCodes);
+        labService.getById(labId);
         LabMaintenanceEntity entity = labMaintenanceMapper.selectById(maintenanceId);
         if (entity == null || !Objects.equals(entity.getLabId(), labId)) {
             throw new BusinessException(404, "维护记录不存在或不属于当前实验室");
@@ -354,4 +383,3 @@ public class LabScheduleServiceImpl implements LabScheduleService {
         return labId + "#" + periodId;
     }
 }
-

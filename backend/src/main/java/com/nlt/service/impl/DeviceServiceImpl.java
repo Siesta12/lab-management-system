@@ -2,10 +2,13 @@ package com.nlt.service.impl;
 
 import com.nlt.common.api.PageData;
 import com.nlt.common.exception.BusinessException;
+import com.nlt.common.security.CurrentUserScopeService;
 import com.nlt.domain.dto.device.DeviceSaveRequest;
 import com.nlt.domain.entity.DeviceEntity;
+import com.nlt.domain.entity.LabEntity;
 import com.nlt.domain.vo.common.OptionItem;
 import com.nlt.mapper.DeviceMapper;
+import com.nlt.mapper.LabMapper;
 import com.nlt.service.DeviceService;
 import java.time.LocalDate;
 import java.util.List;
@@ -18,110 +21,69 @@ import org.springframework.stereotype.Service;
 public class DeviceServiceImpl implements DeviceService {
 
     private final DeviceMapper deviceMapper;
+    private final LabMapper labMapper;
+    private final CurrentUserScopeService currentUserScopeService;
 
-    /**
-     * 查询设备信息列表
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @param labId 实验室ID
-     * @param deviceName 设备名称
-     * @param deviceCode 设备编号
-     * @param status 状态值
-     * @return 分页数据
-     */
     @Override
     public PageData<DeviceEntity> page(int pageNum, int pageSize, Long labId, String deviceName, String deviceCode, Integer status) {
         int offset = (pageNum - 1) * pageSize;
+        Long departmentId = currentUserScopeService.resolveAdminDepartmentId();
         return new PageData<>(
-                deviceMapper.selectPage(offset, pageSize, labId, deviceName, deviceCode, status),
-                deviceMapper.countPage(labId, deviceName, deviceCode, status),
-                pageNum,
-                pageSize
+            deviceMapper.selectPage(offset, pageSize, labId, deviceName, deviceCode, status, departmentId),
+            deviceMapper.countPage(labId, deviceName, deviceCode, status, departmentId),
+            pageNum,
+            pageSize
         );
     }
 
-    /**
-     * 新增设备信息
-     * @param request 请求参数
-     * @return 处理结果
-     */
     @Override
     public DeviceEntity create(DeviceSaveRequest request) {
+        ensureLabAccessible(request.getLabId());
         DeviceEntity entity = toEntity(request);
         deviceMapper.insert(entity);
         return getById(entity.getId());
     }
 
-    /**
-     * 获取设备选项列表
-     * @param labId 实验室ID
-     * @return 数据列表
-     */
     @Override
     public List<OptionItem> options(Long labId) {
-        return deviceMapper.selectOptions(labId).stream()
-                .map(item -> new OptionItem(item.getDeviceName(), item.getId()))
-                .toList();
+        Long departmentId = currentUserScopeService.resolveAdminDepartmentId();
+        return deviceMapper.selectOptions(labId, departmentId).stream()
+            .map(item -> new OptionItem(item.getDeviceName(), item.getId()))
+            .toList();
     }
 
-    /**
-     * 查询设备信息
-     * @param id 主键ID
-     * @return 处理结果
-     */
     @Override
     public DeviceEntity getById(Long id) {
         DeviceEntity entity = deviceMapper.selectById(id);
         if (entity == null) {
             throw new BusinessException(404, "设备不存在");
         }
+        ensureLabAccessible(entity.getLabId());
         return entity;
     }
 
-    /**
-     * 更新设备信息
-     * @param id 主键ID
-     * @param request 请求参数
-     * @return 处理结果
-     */
     @Override
     public DeviceEntity update(Long id, DeviceSaveRequest request) {
-        // 验证设备是否存在
         getById(id);
+        ensureLabAccessible(request.getLabId());
         DeviceEntity entity = toEntity(request);
         entity.setId(id);
         deviceMapper.update(entity);
         return getById(id);
     }
 
-    /**
-     * 删除设备信息
-     * @param id 主键ID
-     */
     @Override
     public void delete(Long id) {
-        // 验证设备是否存在
         getById(id);
         deviceMapper.softDelete(id);
     }
 
-    /**
-     * 更新设备状态
-     * @param id 主键ID
-     * @param status 状态值
-     */
     @Override
     public void updateStatus(Long id, Integer status) {
-        // 验证设备是否存在
         getById(id);
         deviceMapper.updateStatus(id, status);
     }
 
-    /**
-     * 转换设备信息
-     * @param request 请求参数
-     * @return 实体对象
-     */
     private DeviceEntity toEntity(DeviceSaveRequest request) {
         DeviceEntity entity = new DeviceEntity();
         BeanUtils.copyProperties(request, entity);
@@ -140,5 +102,14 @@ public class DeviceServiceImpl implements DeviceService {
         return entity;
     }
 
+    private void ensureLabAccessible(Long labId) {
+        if (labId == null) {
+            throw new BusinessException(400, "实验室不能为空");
+        }
+        LabEntity lab = labMapper.selectById(labId);
+        if (lab == null || (lab.getDeleted() != null && lab.getDeleted() == 1)) {
+            throw new BusinessException(404, "实验室不存在");
+        }
+        currentUserScopeService.ensureDepartmentAccessible(lab.getDepartmentId(), "实验室不存在");
+    }
 }
-

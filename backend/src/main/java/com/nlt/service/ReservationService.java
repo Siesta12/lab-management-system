@@ -6,6 +6,7 @@ import com.nlt.domain.dto.reservation.ReservationCreateRequest;
 import com.nlt.domain.dto.reservation.ReservationRecommendationRequest;
 import com.nlt.domain.dto.reservation.ReservationRejectRequest;
 import com.nlt.domain.vo.reservation.ReservationApplyResponse;
+import com.nlt.domain.vo.reservation.ReservationConflictSlotVo;
 import com.nlt.domain.vo.reservation.ReservationDetailVo;
 import com.nlt.domain.vo.reservation.SlotStatusResponse;
 import com.nlt.domain.vo.reservation.SlotRecommendationItem;
@@ -14,11 +15,13 @@ import java.util.List;
 public interface ReservationService {
 
     PageData<ReservationDetailVo> page(int pageNum, int pageSize, String reservationNo, Long labId,
-        Long applicantUserId, Long approverUserId, Integer status, String reservationDate);
+        Long applicantUserId, Long approverUserId, Integer status, String reservationDate, Boolean conflictOnly);
 
     PageData<ReservationDetailVo> mine(Long userId, int pageNum, int pageSize);
 
     PageData<ReservationDetailVo> pendingAudit(int pageNum, int pageSize);
+
+    PageData<ReservationConflictSlotVo> conflictPage(int pageNum, int pageSize);
 
     ReservationDetailVo getById(Long id);
 

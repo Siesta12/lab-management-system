@@ -3,7 +3,6 @@
   | 'users'
   | 'labs'
   | 'my-reservations'
-  | 'daily-schedule'
   | 'devices'
   | 'consumables'
   | 'statistics'
@@ -105,11 +104,124 @@ export interface LabRecommendation {
   reason: string;
 }
 
+export interface DashboardCardDto {
+  label: string;
+  value: string;
+  trend: string;
+  tone: 'brand' | 'accent' | 'success' | 'warning';
+}
+
+export interface DashboardAlertDto {
+  title: string;
+  detail: string;
+  tag: string;
+}
+
+export interface DashboardSectionItemDto {
+  primary: string;
+  secondary: string;
+  meta: string;
+  statusLabel: string;
+  tone: string;
+}
+
+export interface DashboardSectionDto {
+  title: string;
+  tag: string;
+  items: DashboardSectionItemDto[];
+}
+
+export interface TodayReservationSummaryDto {
+  total: number;
+  morning: number;
+  afternoon: number;
+  evening: number;
+  pending: number;
+  conflict: number;
+  upcoming: number;
+}
+
+export interface DashboardReservationItemDto {
+  reservationId: number;
+  reservationNo: string;
+  labId: number;
+  labName: string;
+  applicantUserId: number;
+  applicantName: string;
+  applicantCreditScore: number;
+  reservationType: number;
+  priorityLevel: number;
+  status: number;
+  reservationDate: string;
+  periodId: number;
+  periodName: string;
+  startTime: string;
+  endTime: string;
+  createdAt: string;
+  timeRange?: string;
+  typeLabel?: string;
+  statusLabel?: string;
+  note?: string;
+}
+
+export interface DashboardHeatmapDto {
+  name: string;
+  count: number;
+  rate?: number | null;
+}
+
+export interface DashboardLabOccupancyDto {
+  labType: string;
+  occupiedSlots: number;
+  totalOpenSlots: number;
+  occupancyRate: number;
+  labCount: number;
+}
+
+export interface AdminDashboardDto {
+  cards: DashboardCardDto[];
+  todayOverview: TodayReservationSummaryDto;
+  todayTimeline: DashboardReservationItemDto[];
+  pendingSections: DashboardSectionDto[];
+  occupancyRates: DashboardLabOccupancyDto[];
+  pendingReservations: DashboardReservationItemDto[];
+}
+
+export interface TodayReservationSummary {
+  total: number;
+  morning: number;
+  afternoon: number;
+  evening: number;
+  pending: number;
+  conflict: number;
+  upcoming: number;
+}
+
+export interface TodayReservationItem {
+  timeRange: string;
+  labName: string;
+  applicant: string;
+  type: '教学预约' | '科研预约' | '个人预约' | '维护';
+  status: '待审核' | '已通过' | '冲突待处理' | '即将开始' | '进行中';
+  note?: string;
+}
+
+export interface PendingReservationItem {
+  labName: string;
+  applicant: string;
+  timeRange: string;
+  type: '教学预约' | '科研预约' | '个人预约';
+  status: '待审核' | '优先待审核';
+}
+
 export interface DashboardData {
   cards: SummaryCard[];
   alerts: ReservationAlert[];
   reservationTrend: number[];
   heatmap: StatisticItem[];
+  todayOverview: TodayReservationSummary;
+  todayTimeline: TodayReservationItem[];
+  pendingReservations: PendingReservationItem[];
 }
 
 export interface ApiResponse<T> {
@@ -135,6 +247,7 @@ export interface AuthUser {
   username: string;
   realName: string;
   roleCodes: string[];
+  departmentId?: number | null;
 }
 
 export interface LoginResponseData extends AuthUser {
@@ -334,6 +447,32 @@ export interface ReservationAuditLogDto {
   auditAction: number;
   auditComment?: string;
   createdAt: string;
+}
+
+export interface ReservationConflictReservationDto {
+  reservationId: number;
+  reservationNo: string;
+  applicantUserId: number;
+  applicantName: string;
+  reservationType: number;
+  priorityLevel: number;
+  status: number;
+  createdAt: string;
+  usagePurpose?: string;
+  courseOrProjectName?: string;
+}
+
+export interface ReservationConflictSlotDto {
+  labId: number;
+  labName: string;
+  reservationDate: string;
+  weekday: number;
+  periodId: number;
+  periodName: string;
+  startTime?: string;
+  endTime?: string;
+  conflictCount: number;
+  reservations: ReservationConflictReservationDto[];
 }
 
 export interface ViolationRecordDto {

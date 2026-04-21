@@ -104,4 +104,41 @@
             and r.status in (1, 2, 5)
             and s.reservation_date = #{reservationDate}
     </select>
+
+    <select id="selectConflictRowsByDepartment" resultType="com.nlt.domain.vo.reservation.ReservationConflictRowVo">
+        select l.id as labId,
+               l.lab_name as labName,
+               s.reservation_date as reservationDate,
+               s.period_id as periodId,
+               p.period_name as periodName,
+               date_format(p.start_time, '%H:%i') as startTime,
+               date_format(p.end_time, '%H:%i') as endTime,
+               r.id as reservationId,
+               r.reservation_no as reservationNo,
+               r.status as reservationStatus,
+               r.applicant_user_id as applicantUserId,
+               u.real_name as applicantName,
+               r.reservation_type as reservationType,
+               r.priority_level as priorityLevel,
+               date_format(r.created_at, '%Y-%m-%d %H:%i:%s') as createdAt,
+               r.usage_purpose as usagePurpose,
+               r.course_or_project_name as courseOrProjectName
+        from lab_reservation_slot s
+        join lab_reservation r on r.id = s.reservation_id
+        join lab l on l.id = r.lab_id
+        join class_period p on p.id = s.period_id
+        join sys_user u on u.id = r.applicant_user_id
+        where s.slot_status = 1
+          and r.status in (1, 2, 5)
+        <if test="departmentId != null">
+          and l.department_id = #{departmentId}
+        </if>
+        order by s.reservation_date asc,
+                 p.sort_order asc,
+                 l.lab_name asc,
+                 r.priority_level asc,
+                 u.credit_score desc,
+                 r.created_at asc,
+                 r.id asc
+    </select>
 </mapper>

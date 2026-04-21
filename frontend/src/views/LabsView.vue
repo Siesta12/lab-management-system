@@ -2,24 +2,42 @@
   <section class="content-grid">
     <BasePanel>
       <div class="toolbar">
-        <input v-model="keyword" placeholder="输入实验室名称或编号等" @keyup.enter="handleSearch" />
+        <div class="toolbar-title">{{ pagePanelTitle }}</div>
+        <input v-model="keyword" :placeholder="isAdmin ? '输入实验室名称或编号' : '输入实验室名称或编号等'" @keyup.enter="handleSearch" />
+        <select v-if="isAdmin" v-model="filters.departmentId" :disabled="isDepartmentScopedAdmin">
+          <option v-if="!isDepartmentScopedAdmin" :value="undefined">全部学院</option>
+          <option v-for="dept in visibleDepartments" :key="dept.value" :value="dept.value">{{ dept.label }}</option>
+        </select>
+        <select v-if="isAdmin" v-model="filters.labType">
+          <option value="">全部类型</option>
+          <option v-for="type in filteredLabTypeOptions" :key="type" :value="type">{{ type }}</option>
+        </select>
+        <select v-if="isAdmin" v-model="filters.labId" :disabled="!filteredAdminLabOptions.length">
+          <option :value="undefined">全部实验室</option>
+          <option v-for="lab in filteredAdminLabOptions" :key="lab.value" :value="lab.value">{{ lab.label }}</option>
+        </select>
         <button type="button" class="ghost-btn" @click="handleSearch">查询</button>
         <button type="button" class="ghost-btn" @click="handleReset">重置</button>
       </div>
 
-      <BaseTable :headers="['名称', '编号', '位置', '开放状态', '运行状态', '容量']">
+      <BaseTable :headers="isAdmin ? ['名称', '编号', '类型', '位置', '开放状态', '运行状态', '容量', '操作'] : ['名称', '编号', '位置', '开放状态', '运行状态', '容量']">
         <tr
           v-for="lab in displayLabs"
           :key="lab.id"
-          class="clickable-row"
-          @click="openLabDetail(lab.id)"
+          :class="rowClass(lab)"
+          :title="rowTitle(lab)"
+          @click="handleLabRowClick(lab.id)"
         >
           <td>{{ lab.labName }}</td>
           <td>{{ lab.labCode }}</td>
+          <td v-if="isAdmin">{{ lab.labType || '--' }}</td>
           <td>{{ buildLocation(lab) }}</td>
           <td><span :class="getBadgeClass(openStatusText(lab.openStatus))">{{ openStatusText(lab.openStatus) }}</span></td>
           <td><span :class="getBadgeClass(labStatusText(lab.labStatus))">{{ labStatusText(lab.labStatus) }}</span></td>
           <td>{{ lab.capacity }}</td>
+          <td v-if="isAdmin">
+            <button type="button" class="ghost-btn small-btn" @click.stop="openLabDetail(lab.id)">管理</button>
+          </td>
         </tr>
       </BaseTable>
 
@@ -46,8 +64,10 @@
       <div class="detail-modal">
         <div class="detail-modal-head">
           <div class="detail-modal-title">
-            <h3>选择节次预约</h3>
-            <p class="detail-modal-subtitle">未来三周课表 · 点击空闲格子选择节次</p>
+            <h3>{{ isAdmin ? '实验室管理' : '选择节次预约' }}</h3>
+            <p class="detail-modal-subtitle">
+              {{ isAdmin ? '更新基础信息、维护状态与课表安排' : '未来三周课表 · 点击空闲格子选择节次' }}
+            </p>
           </div>
           <button type="button" class="ghost-btn small-btn" @click="closeDetailModal">关闭</button>
         </div>
@@ -75,6 +95,9 @@
             <button type="button" class="tab-btn" :class="{ active: detailTab === 'detail' }" @click="detailTab = 'detail'">
               详情
             </button>
+            <button v-if="isAdmin" type="button" class="tab-btn" :class="{ active: detailTab === 'manage' }" @click="detailTab = 'manage'">
+              管理
+            </button>
           </div>
 
           <div v-show="detailTab === 'schedule'" class="detail-pane">
@@ -85,6 +108,7 @@
               </div>
               <div v-if="isAuthenticated" class="schedule-actions">
                 <button type="button" class="ghost-btn" @click="reloadSchedule">刷新</button>
+                <span v-if="isAdmin" class="section-hint">管理员可点击空闲/维护格设置维护</span>
               </div>
             </div>
 
@@ -92,12 +116,21 @@
 
             <div v-if="schedule" class="schedule-wrap">
               <div class="legend">
-                <span class="legend-item free">空闲</span>
-                <span class="legend-item reserved">已预约</span>
-                <span class="legend-item pending">待审核（本人）</span>
-                <span class="legend-item pendingOther">可申请（他人待审核）</span>
-                <span class="legend-item maintenance">维护中</span>
-                <span class="legend-item closed">不开放</span>
+                <template v-if="isAdmin">
+                  <span class="legend-item free">空闲</span>
+                  <span class="legend-item reserved">已预约</span>
+                  <span class="legend-item pending">待审核</span>
+                  <span class="legend-item maintenance">维护中</span>
+                  <span class="legend-item closed">不开放</span>
+                </template>
+                <template v-else>
+                  <span class="legend-item free">空闲</span>
+                  <span class="legend-item reserved">已预约</span>
+                  <span class="legend-item pending">待审核（本人）</span>
+                  <span class="legend-item pendingOther">可申请（他人待审核）</span>
+                  <span class="legend-item maintenance">维护中</span>
+                  <span class="legend-item closed">不开放</span>
+                </template>
                 <span v-if="selectedKeys.length" class="legend-selected">已选 {{ selectedKeys.length }} 个</span>
               </div>
 
@@ -158,24 +191,37 @@
 
               <div v-if="isAuthenticated" class="schedule-forms">
                 <div class="form-card reservation-form-card">
-                  <div class="form-card-header">
+                  <div class="form-card-header" v-if="!isAdmin">
                     <h6>预约信息</h6>
                     <p>请填写预约信息，选择可用时间段后提交预约申请。</p>
                   </div>
 
-                  <p v-if="!selectedKeys.length" class="info-text compact-tip">
+                  <div v-if="isAdmin" class="form-card-header">
+                    <h6>维护设置</h6>
+                    <p>选择未来三周内的空闲或维护节次，可批量设置维护或取消维护。</p>
+                  </div>
+
+                  <p v-if="!selectedKeys.length && !isAdmin" class="info-text compact-tip">
                     先在课表中选择空闲节次提交预约，或点击不可预约格子获取推荐。
                   </p>
 
-                  <div v-else class="beauty-form">
-                    <label class="field-card">
-                      <span class="field-label">预约类型</span>
-                      <select v-model.number="reservationForm.reservationType">
-                        <option :value="3">个人预约</option>
-                        <option :value="1">课程实验</option>
-                        <option :value="2">科研训练</option>
-                      </select>
-                    </label>
+                  <p v-if="!blockedKeys.length && isAdmin" class="info-text compact-tip">
+                    先在课表中点击需要维护的节次，维护中的格子也可再次点击查看并取消。
+                  </p>
+
+                  <div v-else-if="!isAdmin" class="beauty-form">
+                      <label v-if="isStudent" class="field-card">
+                        <span class="field-label">预约类型</span>
+                        <input :value="'个人预约'" disabled />
+                      </label>
+                      <label v-else class="field-card">
+                        <span class="field-label">预约类型</span>
+                        <select v-model.number="reservationForm.reservationType">
+                          <option :value="3">个人预约</option>
+                          <option :value="1">课程实验</option>
+                          <option :value="2">科研训练</option>
+                        </select>
+                      </label>
 
                     <label class="field-card">
                       <span class="field-label">参与人数</span>
@@ -207,7 +253,17 @@
                     </label>
                   </div>
 
-                  <div class="recommend-box">
+                  <div v-else class="beauty-form">
+                    <label class="field-card field-full">
+                      <span class="field-label">维护原因</span>
+                      <input
+                        v-model="maintenanceForm.reason"
+                        placeholder="例如：设备检修 / 网络维护 / 深度清洁"
+                      />
+                    </label>
+                  </div>
+
+                  <div v-if="!isAdmin" class="recommend-box">
                     <div class="recommend-title">推荐可选节次</div>
                      <button
                          type="button"
@@ -219,7 +275,18 @@
                      </button>
                   </div>
 
+                  <button
+                    v-if="isAdmin"
+                    type="button"
+                    class="primary-btn submit-reservation-btn"
+                    :disabled="!canSubmitMaintenance || savingMaintenance"
+                    @click="handleCreateMaintenance"
+                  >
+                    {{ savingMaintenance ? '正在保存维护...' : '设置为维护' }}
+                  </button>
+
                    <button
+                       v-if="!isAdmin"
                        type="button"
                        class="primary-btn submit-reservation-btn"
                        :disabled="!canSubmitReservation || submittingReservation"
@@ -293,6 +360,73 @@
               <p class="info-text">{{ selectedLab.description || '暂无简介说明。' }}</p>
             </details>
           </div>
+
+          <div v-if="isAdmin" v-show="detailTab === 'manage'" class="detail-pane">
+            <div class="form-card reservation-form-card">
+              <div class="form-card-header">
+                <h6>基础信息维护</h6>
+                <p>管理员可以在这里调整实验室名称、类型、位置、状态与说明。</p>
+              </div>
+
+              <div class="beauty-form">
+                <label class="field-card">
+                  <span class="field-label">实验室名称</span>
+                  <input v-model="labEditForm.labName" />
+                </label>
+                <label class="field-card">
+                  <span class="field-label">实验室编号</span>
+                  <input v-model="labEditForm.labCode" />
+                </label>
+                <label class="field-card">
+                  <span class="field-label">实验室类型</span>
+                  <input v-model="labEditForm.labType" />
+                </label>
+                <label class="field-card">
+                  <span class="field-label">容量</span>
+                  <input v-model.number="labEditForm.capacity" type="number" min="0" />
+                </label>
+                <label class="field-card">
+                  <span class="field-label">楼宇</span>
+                  <input v-model="labEditForm.buildingName" />
+                </label>
+                <label class="field-card">
+                  <span class="field-label">房间</span>
+                  <input v-model="labEditForm.roomNo" />
+                </label>
+                <label class="field-card">
+                  <span class="field-label">开放状态</span>
+                  <select v-model.number="labEditForm.openStatus" class="arrow-select">
+                    <option :value="1">开放</option>
+                    <option :value="0">关闭</option>
+                  </select>
+                </label>
+                <label class="field-card">
+                  <span class="field-label">运行状态</span>
+                  <select v-model.number="labEditForm.labStatus" class="arrow-select">
+                    <option :value="1">正常</option>
+                    <option :value="2">维护</option>
+                  </select>
+                </label>
+                <label class="field-card field-full">
+                  <span class="field-label">实验室简介</span>
+                  <input v-model="labEditForm.description" />
+                </label>
+                <label class="field-card field-full">
+                  <span class="field-label">使用规则</span>
+                  <input v-model="labEditForm.usageRule" />
+                </label>
+              </div>
+
+              <button
+                type="button"
+                class="primary-btn submit-reservation-btn"
+                :disabled="savingLab"
+                @click="handleSaveLab"
+              >
+                {{ savingLab ? '正在保存...' : '保存实验室信息' }}
+              </button>
+            </div>
+          </div>
         </div>
 
         <p v-else class="info-text">请选择实验室查看详情与课表。</p>
@@ -315,11 +449,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { fetchConsumables } from '../api/consumables';
 import { fetchDepartmentOptions } from '../api/departments';
 import { fetchDevices } from '../api/devices';
-import { fetchLabById, fetchLabs, fetchLabSchedule } from '../api/labs';
+import {
+  createLabMaintenance,
+  fetchLabById,
+  fetchLabMaintenance,
+  fetchLabs,
+  fetchLabSchedule,
+  updateLab,
+  updateLabOpenStatus,
+  updateLabStatus,
+} from '../api/labs';
 import { applyReservation, recommendSlots } from '../api/reservations';
 import BasePanel from '../components/BasePanel.vue';
 import BaseTable from '../components/BaseTable.vue';
@@ -328,6 +471,7 @@ import type {
   ConsumableDto,
   DeviceDto,
   LabDto,
+  LabMaintenanceDto,
   LabScheduleDto,
   OptionItem,
   PageData,
@@ -340,17 +484,24 @@ import { getBadgeClass } from '../utils/format';
 
 const auth = useAuthStore();
 const isAuthenticated = computed(() => Boolean(auth.token.value));
+const roleCodes = computed(() => auth.currentUser.value?.roleCodes ?? []);
+const isAdmin = computed(() => roleCodes.value.some((item) => item === 'ADMIN' || item === 'ROLE_ADMIN'));
+const isStudent = computed(() => roleCodes.value.some((item) => item === 'STUDENT' || item === 'ROLE_STUDENT'));
+const adminDepartmentId = computed(() => auth.currentUser.value?.departmentId ?? undefined);
+const isDepartmentScopedAdmin = computed(() => isAdmin.value && !!adminDepartmentId.value);
 
 const keyword = ref('');
 const message = ref('');
 const labsState = ref<PageData<LabDto>>({ list: [], total: 0, pageNum: 1, pageSize: 6 });
 const departments = ref<OptionItem[]>([]);
+const adminLabSource = ref<LabDto[]>([]);
 const selectedLab = ref<LabDto | null>(null);
 const selectedDevices = ref<DeviceDto[]>([]);
 const selectedConsumables = ref<ConsumableDto[]>([]);
+const maintenances = ref<LabMaintenanceDto[]>([]);
 const detailVisible = ref(false);
 const loadingDetail = ref(false);
-const detailTab = ref<'schedule' | 'detail'>('schedule');
+const detailTab = ref<'schedule' | 'detail' | 'manage'>('schedule');
 const currentPage = ref(1);
 const pageSize = ref(10);
 
@@ -381,6 +532,14 @@ const feedback = reactive<{ visible: boolean; mode: 'toast' | 'dialog'; type: 's
 });
 const successDialogVisible = ref(false);
 const successDialogText = ref('');
+const savingLab = ref(false);
+const savingMaintenance = ref(false);
+
+const filters = reactive({
+  departmentId: undefined as number | undefined,
+  labId: undefined as number | undefined,
+  labType: '',
+});
 
 const reservationForm = reactive({
   reservationType: 3,
@@ -391,7 +550,55 @@ const reservationForm = reactive({
   contactPhone: '',
 });
 
+watch(
+  () => isStudent.value,
+  (value) => {
+    if (value) {
+      reservationForm.reservationType = 3;
+      reservationForm.priorityLevel = 3;
+    }
+  },
+  { immediate: true },
+);
+
+const labEditForm = reactive({
+  labName: '',
+  labCode: '',
+  labType: '',
+  buildingName: '',
+  roomNo: '',
+  capacity: 0,
+  description: '',
+  usageRule: '',
+  openStatus: 1,
+  labStatus: 1,
+});
+
+const maintenanceForm = reactive({
+  reason: '',
+});
+
 const displayLabs = computed(() => labsState.value.list);
+const visibleDepartments = computed(() => {
+  if (!isDepartmentScopedAdmin.value) {
+    return departments.value;
+  }
+  return departments.value.filter((item) => item.value === adminDepartmentId.value);
+});
+const departmentScopedLabs = computed(() => {
+  if (!isAdmin.value) {
+    return [] as LabDto[];
+  }
+  return adminLabSource.value.filter((item) => !filters.departmentId || item.departmentId === filters.departmentId);
+});
+const filteredLabTypeOptions = computed(() => {
+  return Array.from(new Set(departmentScopedLabs.value.map((item) => item.labType).filter(Boolean) as string[]));
+});
+const filteredAdminLabOptions = computed(() => {
+  return departmentScopedLabs.value
+    .filter((item) => !filters.labType || item.labType === filters.labType)
+    .map((item) => ({ label: item.labName, value: item.id }));
+});
 const totalPages = computed(() => {
   const pages = Math.ceil((labsState.value.total || 0) / pageSize.value);
   return Math.max(pages, 1);
@@ -415,6 +622,8 @@ const canSubmitReservation = computed(() => {
 const recommendationRequestKeys = computed(() => {
   return selectedKeys.value.length ? selectedKeys.value : blockedKeys.value;
 });
+const pagePanelTitle = computed(() => (isAdmin.value ? '实验室管理' : '实验室查询'));
+const canSubmitMaintenance = computed(() => isAdmin.value && blockedKeys.value.length > 0 && maintenanceForm.reason.trim().length > 0);
 
 
 
@@ -443,8 +652,16 @@ function periodLabel(periodId: number): string {
 async function loadLabs(pageNum = currentPage.value): Promise<void> {
   currentPage.value = Math.max(pageNum, 1);
   try {
+    const scopedDepartmentId = isAdmin.value ? filters.departmentId : (auth.currentUser.value?.departmentId ?? undefined);
     const data = await fetchLabs(
-      { pageNum: currentPage.value, pageSize: pageSize.value, labName: keyword.value.trim() || undefined },
+      {
+        pageNum: currentPage.value,
+        pageSize: pageSize.value,
+        labId: isAdmin.value ? filters.labId : undefined,
+        labName: keyword.value.trim() || undefined,
+        departmentId: scopedDepartmentId,
+        labType: isAdmin.value ? filters.labType || undefined : undefined,
+      },
       auth.token.value || undefined,
     );
     labsState.value = data;
@@ -462,11 +679,40 @@ function handleSearch(): void {
 
 function handleReset(): void {
   keyword.value = '';
+  filters.departmentId = adminDepartmentId.value;
+  filters.labId = undefined;
+  filters.labType = '';
   void loadLabs(1);
 }
 
 function changePage(pageNum: number): void {
   void loadLabs(pageNum);
+}
+
+function handleLabRowClick(id: number): void {
+  if (!isAdmin.value) {
+    const lab = displayLabs.value.find((item) => item.id === id);
+    if (lab && (lab.openStatus !== 1 || lab.labStatus !== 1)) {
+      showToast('error', '当前不可预约此实验室');
+      return;
+    }
+  }
+  void openLabDetail(id);
+}
+
+function rowClass(lab: LabDto): Record<string, boolean> {
+  const unavailable = !isAdmin.value && (lab.openStatus !== 1 || lab.labStatus !== 1);
+  return {
+    'clickable-row': !unavailable,
+    'inactive-row': unavailable,
+  };
+}
+
+function rowTitle(lab: LabDto): string | undefined {
+  if (!isAdmin.value && (lab.openStatus !== 1 || lab.labStatus !== 1)) {
+    return '当前不可预约';
+  }
+  return undefined;
 }
 
 function closeDetailModal(): void {
@@ -475,6 +721,7 @@ function closeDetailModal(): void {
   selectedLab.value = null;
   selectedDevices.value = [];
   selectedConsumables.value = [];
+  maintenances.value = [];
   schedule.value = null;
   scheduleMessage.value = '';
   recommendations.value = [];
@@ -497,14 +744,10 @@ function showToast(type: 'success' | 'error', text: string, durationMs = 1800): 
 }
 
 function showSuccessDialog(text: string): void {
-  if (feedback.timer) {
-    window.clearTimeout(feedback.timer);
-    feedback.timer = undefined;
-  }
-  feedback.visible = false;
-  feedback.text = '';
-  successDialogText.value = text;
-  successDialogVisible.value = true;
+  closeDetailModal();
+  window.setTimeout(() => {
+    showToast('success', text, 2400);
+  }, 60);
 }
 
 function handleSuccessConfirm(): void {
@@ -517,15 +760,21 @@ async function openLabDetail(id: number): Promise<void> {
   detailVisible.value = true;
   loadingDetail.value = true;
   try {
-    const [lab, devices, consumables] = await Promise.all([
+    const requests: Promise<unknown>[] = [
       fetchLabById(id, auth.token.value || undefined),
       fetchDevices({ labId: id, pageNum: 1, pageSize: 30 }, auth.token.value || undefined),
       fetchConsumables({ labId: id, pageNum: 1, pageSize: 30 }, auth.token.value || undefined),
-    ]);
+    ];
+    if (auth.token.value && isAdmin.value) {
+      requests.push(fetchLabMaintenance(id, auth.token.value));
+    }
+    const [lab, devices, consumables, maintenanceList] = await Promise.all(requests) as [LabDto, PageData<DeviceDto>, PageData<ConsumableDto>, LabMaintenanceDto[] | undefined];
     selectedLab.value = lab;
     selectedDevices.value = devices.list;
     selectedConsumables.value = consumables.list;
-    detailTab.value = 'schedule';
+    maintenances.value = maintenanceList ?? [];
+    fillLabEditForm(lab);
+      detailTab.value = 'schedule';
     clearSelection();
     recommendations.value = [];
     await reloadSchedule();
@@ -544,6 +793,9 @@ function cellStatusText(day: ScheduleDayDto, periodId: number): string {
   const c = cell(day, periodId);
   if (!c) return '--';
   if (c.status === 'FREE') return '空闲';
+  if (isAdmin.value && (c.status === 'PENDING_SELF' || c.status === 'PENDING_OTHERS' || c.status === 'PENDING')) {
+    return '待审核';
+  }
   if (c.status === 'PENDING_SELF') return '待审核（本人）';
   if (c.status === 'PENDING_OTHERS') return '可申请';
   if (c.status === 'RESERVED') return '已预约';
@@ -559,16 +811,21 @@ function isSelected(date: string, periodId: number): boolean {
 function cellClass(day: ScheduleDayDto, periodId: number): Record<string, boolean> {
   const c = cell(day, periodId);
   const status = c?.status ?? 'CLOSED';
+  const pendingStatus = isAdmin.value ? (status === 'PENDING' || status === 'PENDING_SELF' || status === 'PENDING_OTHERS') : (status === 'PENDING' || status === 'PENDING_SELF');
   return {
     free: status === 'FREE',
     reserved: status === 'RESERVED',
-    pending: status === 'PENDING' || status === 'PENDING_SELF',
-    pendingOther: status === 'PENDING_OTHERS',
+    pending: pendingStatus,
+    pendingOther: !isAdmin.value && status === 'PENDING_OTHERS',
     maintenance: status === 'MAINTENANCE',
     closed: status === 'CLOSED',
-    selected: isSelected(day.date, periodId),
-    clickable: status === 'FREE' || status === 'PENDING_OTHERS',
+    selected: isSelected(day.date, periodId) || (isAdmin.value && isBlocked(day.date, periodId)),
+    clickable: status === 'FREE' || (!isAdmin.value && status === 'PENDING_OTHERS'),
   };
+}
+
+function isBlocked(date: string, periodId: number): boolean {
+  return blockedKeys.value.some((k) => k.date === date && k.periodId === periodId);
 }
 
 function toggleSelection(date: string, periodId: number): void {
@@ -591,7 +848,7 @@ async function reloadSchedule(): Promise<void> {
   }
   try {
     schedule.value = await fetchLabSchedule(selectedLab.value.id, auth.token.value);
-    scheduleMessage.value = '预约已加载，请点击空白格选择时段。';
+    scheduleMessage.value = isAdmin.value ? '课表已加载，可点击格子设置维护。' : '预约已加载，请点击空白格选择时段。';
   } catch (error) {
     scheduleMessage.value = error instanceof Error ? `预约加载失败：${error.message}` : '预约加载失败。';
   }
@@ -604,12 +861,25 @@ function clearSelection(): void {
   conflictPanel.visible = false;
   conflictPanel.title = '';
   conflictPanel.detail = '';
-  scheduleMessage.value = '预约已加载，请点击空白格选择时段。';
+  scheduleMessage.value = isAdmin.value ? '课表已加载，可点击格子设置维护。' : '预约已加载，请点击空白格选择时段。';
 }
 
 async function handleCellClick(day: ScheduleDayDto, periodId: number): Promise<void> {
   const c = cell(day, periodId);
   if (!c) return;
+
+  if (isAdmin.value) {
+    if (c.status === 'FREE' || c.status === 'MAINTENANCE') {
+      blockedKeys.value = [{ date: day.date, periodId }];
+      selectedKeys.value = [];
+      recommendations.value = [];
+      conflictPanel.visible = false;
+      scheduleMessage.value = c.status === 'MAINTENANCE'
+        ? '已选中维护中的节次，可在下方取消维护。'
+        : '已选中节次，可填写维护原因后保存。';
+    }
+    return;
+  }
 
   if (c.status === 'FREE') {
     blockedKeys.value = [];
@@ -681,7 +951,7 @@ async function handleCreateReservation(): Promise<void> {
       },
       auth.token.value,
     );
-    applyReservationResult(response);
+    await applyReservationResult(response);
   } catch (error) {
     const text = error instanceof Error ? error.message : '\u9884\u7ea6\u63d0\u4ea4\u5931\u8d25\u3002';
     scheduleMessage.value = text;
@@ -727,19 +997,131 @@ async function applyRecommendation(item: SlotRecommendationItem): Promise<void> 
   scheduleMessage.value = `已选中推荐节次：${item.reservationDate} ${item.periodName || `节次#${item.periodId}`}，可直接提交预约。`;
 }
 
-function applyReservationResult(response: ReservationApplyResponse): void {
+function fillLabEditForm(lab: LabDto): void {
+  labEditForm.labName = lab.labName || '';
+  labEditForm.labCode = lab.labCode || '';
+  labEditForm.labType = lab.labType || '';
+  labEditForm.buildingName = lab.buildingName || '';
+  labEditForm.roomNo = lab.roomNo || '';
+  labEditForm.capacity = lab.capacity || 0;
+  labEditForm.description = lab.description || '';
+  labEditForm.usageRule = lab.usageRule || '';
+  labEditForm.openStatus = lab.openStatus ?? 1;
+  labEditForm.labStatus = lab.labStatus ?? 1;
+}
+
+async function handleSaveLab(): Promise<void> {
+  if (!selectedLab.value || !auth.token.value || !isAdmin.value) return;
+  savingLab.value = true;
+  try {
+    const updated = await updateLab(
+      selectedLab.value.id,
+      {
+        ...selectedLab.value,
+        labName: labEditForm.labName,
+        labCode: labEditForm.labCode,
+        labType: labEditForm.labType,
+        buildingName: labEditForm.buildingName,
+        roomNo: labEditForm.roomNo,
+        capacity: labEditForm.capacity,
+        description: labEditForm.description,
+        usageRule: labEditForm.usageRule,
+        openStatus: labEditForm.openStatus,
+        labStatus: labEditForm.labStatus,
+      },
+      auth.token.value,
+    );
+    if (selectedLab.value.openStatus !== labEditForm.openStatus) {
+      await updateLabOpenStatus(selectedLab.value.id, labEditForm.openStatus, auth.token.value);
+    }
+    if (selectedLab.value.labStatus !== labEditForm.labStatus) {
+      await updateLabStatus(selectedLab.value.id, labEditForm.labStatus, auth.token.value);
+    }
+    selectedLab.value = updated;
+    fillLabEditForm(updated);
+    await loadLabs(currentPage.value);
+    showToast('success', '实验室信息已更新');
+  } catch (error) {
+    showToast('error', error instanceof Error ? error.message : '实验室信息保存失败');
+  } finally {
+    savingLab.value = false;
+  }
+}
+
+async function handleCreateMaintenance(): Promise<void> {
+  if (!selectedLab.value || !auth.token.value || !blockedKeys.value.length || !maintenanceForm.reason.trim()) return;
+  savingMaintenance.value = true;
+  try {
+    const groupedByDate = blockedKeys.value.reduce<Record<string, number[]>>((acc, item) => {
+      acc[item.date] = acc[item.date] || [];
+      acc[item.date].push(item.periodId);
+      return acc;
+    }, {});
+    for (const [maintenanceDate, periodIds] of Object.entries(groupedByDate)) {
+      await createLabMaintenance(
+        selectedLab.value.id,
+        { maintenanceDate, periodIds, reason: maintenanceForm.reason.trim() },
+        auth.token.value,
+      );
+    }
+    maintenances.value = await fetchLabMaintenance(selectedLab.value.id, auth.token.value);
+    maintenanceForm.reason = '';
+    blockedKeys.value = [];
+    await reloadSchedule();
+    showToast('success', '维护设置成功');
+  } catch (error) {
+    showToast('error', error instanceof Error ? error.message : '维护设置失败');
+  } finally {
+    savingMaintenance.value = false;
+  }
+}
+
+watch(
+  () => filters.departmentId,
+  async () => {
+    filters.labType = '';
+    filters.labId = undefined;
+    if (isAdmin.value) {
+      await loadLabs(1);
+    }
+  },
+);
+
+watch(
+  () => filters.labType,
+  async () => {
+    filters.labId = undefined;
+    if (isAdmin.value) {
+      await loadLabs(1);
+    }
+  },
+);
+
+watch(
+  () => filters.labId,
+  async (value, oldValue) => {
+    if (!isAdmin.value || value === oldValue) {
+      return;
+    }
+    await loadLabs(1);
+  },
+);
+
+async function applyReservationResult(response: ReservationApplyResponse): Promise<void> {
   recommendations.value = response.recommendations || [];
 
   if (response.submitted) {
+    await reloadSchedule();
+    clearSelection();
     conflictPanel.visible = Boolean(response.conflict);
     conflictPanel.type = response.conflict ? 'warning' : 'info';
     conflictPanel.title = response.conflict ? '申请已提交，系统已判定存在竞争' : '申请已提交';
     conflictPanel.detail = response.conflictNote || '预约申请已经提交成功。';
 
     if (response.currentStatus === 'PENDING_PRIORITY') {
-      showSuccessDialog('预约申请提交成功。当前时段已有低优先级申请，你的申请已进入优先审核队列。点击确定返回。');
+      showSuccessDialog('预约申请提交成功，当前时段已有低优先级申请，你的申请已进入优先审核队列。');
     } else {
-      showSuccessDialog('预约申请已经提交成功，请点击确定返回实验室列表。');
+      showSuccessDialog('预约申请已经提交成功。');
     }
     return;
   }
@@ -757,10 +1139,19 @@ function applyReservationResult(response: ReservationApplyResponse): void {
 }
 
 onMounted(async () => {
+  if (isDepartmentScopedAdmin.value) {
+    filters.departmentId = adminDepartmentId.value;
+  }
   try {
     departments.value = await fetchDepartmentOptions(auth.token.value || undefined);
   } catch {
     departments.value = [];
+  }
+  try {
+    const allLabs = await fetchLabs({ pageNum: 1, pageSize: 500 }, auth.token.value || undefined);
+    adminLabSource.value = allLabs.list;
+  } catch {
+    adminLabSource.value = [];
   }
   await loadLabs();
 });
@@ -922,9 +1313,14 @@ onMounted(async () => {
 }
 
 .toast.success {
-  background: rgba(16, 185, 129, 0.92);
-  border-color: rgba(16, 185, 129, 0.55);
+  padding: 14px 28px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #2fd18a 0%, #18b977 100%);
+  border-color: rgba(16, 185, 129, 0.28);
   color: #ffffff;
+  box-shadow: 0 18px 34px rgba(16, 185, 129, 0.28);
+  font-size: 16px;
+  letter-spacing: 0.02em;
 }
 
 .toast.error {
@@ -1236,6 +1632,35 @@ onMounted(async () => {
   text-align: left;
 }
 
+.schedule-table tr.clickable-row {
+  transition:
+    background-color 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.schedule-table tr.clickable-row td {
+  cursor: pointer;
+}
+
+.schedule-table tr.clickable-row:hover td {
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.schedule-table tr.inactive-row {
+  opacity: 0.68;
+}
+
+.schedule-table tr.inactive-row td {
+  color: #64748b;
+  cursor: not-allowed;
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.schedule-table tr.inactive-row:hover td {
+  background: rgba(148, 163, 184, 0.12);
+}
+
 .period-col {
   padding: 10px 12px;
 }
@@ -1313,8 +1738,12 @@ onMounted(async () => {
 }
 
 .schedule-cell.selected {
-  outline: 2px solid rgba(15, 23, 42, 0.55);
-  outline-offset: -2px;
+  background: rgba(219, 234, 254, 0.92);
+  box-shadow: inset 0 0 0 3px rgba(37, 99, 235, 0.95);
+}
+
+.schedule-cell.selected .cell-status {
+  color: #1d4ed8;
 }
 
 .schedule-forms {
@@ -1388,7 +1817,7 @@ onMounted(async () => {
   padding: 0 14px;
   font-size: 15px;
   color: #1f2937;
-  background: #fff;
+  background-color: #fff;
   outline: none;
   transition: all 0.2s ease;
   box-sizing: border-box;
@@ -1398,6 +1827,27 @@ onMounted(async () => {
 .beauty-form select:focus {
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  background-color: #fff;
+}
+
+.arrow-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #64748b 50%),
+    linear-gradient(135deg, #64748b 50%, transparent 50%),
+    linear-gradient(180deg, #ffffff, #ffffff);
+  background-position:
+    calc(100% - 18px) calc(50% - 3px),
+    calc(100% - 12px) calc(50% - 3px),
+    0 0;
+  background-size:
+    6px 6px,
+    6px 6px,
+    100% 100%;
+  background-repeat: no-repeat;
+  padding-right: 42px;
 }
 
 .recommend-box {

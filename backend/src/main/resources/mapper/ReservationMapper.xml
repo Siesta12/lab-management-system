@@ -4,7 +4,9 @@
     <select id="selectPage" resultType="com.nlt.domain.entity.ReservationEntity">
         select r.*
         from lab_reservation r
+        join lab l on l.id = r.lab_id
         where 1 = 1
+          and l.deleted = 0
         <if test="reservationNo != null and reservationNo != ''">
             and r.reservation_no like concat('%', #{reservationNo}, '%')
         </if>
@@ -28,6 +30,28 @@
                   and s.reservation_date = #{reservationDate}
             )
         </if>
+        <if test="departmentId != null">
+            and l.department_id = #{departmentId}
+        </if>
+        <if test="conflictOnly">
+            and exists (
+                select 1
+                from lab_reservation_slot s
+                where s.reservation_id = r.id
+                  and s.slot_status = 1
+                  and exists (
+                      select 1
+                      from lab_reservation_slot s2
+                      join lab_reservation r2 on r2.id = s2.reservation_id
+                      where s2.slot_status = 1
+                        and s2.lab_id = s.lab_id
+                        and s2.reservation_date = s.reservation_date
+                        and s2.period_id = s.period_id
+                        and r2.id &lt;&gt; r.id
+                        and r2.status in (1, 2, 5)
+                  )
+            )
+        </if>
         order by r.id desc
         limit #{offset}, #{pageSize}
     </select>
@@ -35,7 +59,9 @@
     <select id="countPage" resultType="long">
         select count(*)
         from lab_reservation r
+        join lab l on l.id = r.lab_id
         where 1 = 1
+          and l.deleted = 0
         <if test="reservationNo != null and reservationNo != ''">
             and r.reservation_no like concat('%', #{reservationNo}, '%')
         </if>
@@ -57,6 +83,28 @@
                 from lab_reservation_slot s
                 where s.reservation_id = r.id
                   and s.reservation_date = #{reservationDate}
+            )
+        </if>
+        <if test="departmentId != null">
+            and l.department_id = #{departmentId}
+        </if>
+        <if test="conflictOnly">
+            and exists (
+                select 1
+                from lab_reservation_slot s
+                where s.reservation_id = r.id
+                  and s.slot_status = 1
+                  and exists (
+                      select 1
+                      from lab_reservation_slot s2
+                      join lab_reservation r2 on r2.id = s2.reservation_id
+                      where s2.slot_status = 1
+                        and s2.lab_id = s.lab_id
+                        and s2.reservation_date = s.reservation_date
+                        and s2.period_id = s.period_id
+                        and r2.id &lt;&gt; r.id
+                        and r2.status in (1, 2, 5)
+                  )
             )
         </if>
     </select>
@@ -84,8 +132,12 @@
     <select id="selectPendingAudit" resultType="com.nlt.domain.entity.ReservationEntity">
         select r.*
         from lab_reservation r
+        join lab l on l.id = r.lab_id
         left join sys_user u on u.id = r.applicant_user_id
         where r.status = 1
+        <if test="departmentId != null">
+            and l.department_id = #{departmentId}
+        </if>
         order by case r.reservation_type
             when 1 then 1
             when 2 then 2
@@ -99,8 +151,12 @@
 
     <select id="countPendingAudit" resultType="long">
         select count(*)
-        from lab_reservation
+        from lab_reservation r
+        join lab l on l.id = r.lab_id
         where status = 1
+        <if test="departmentId != null">
+            and l.department_id = #{departmentId}
+        </if>
     </select>
 
     <insert id="insert"
@@ -167,6 +223,49 @@
             status = 5
         where id = #{id}
     </update>
+
+    <select id="selectDashboardDailySlots" resultType="com.nlt.domain.vo.dashboard.DashboardReservationItemVo">
+        select s.reservation_id as reservationId,
+               r.reservation_no as reservationNo,
+               r.lab_id as labId,
+               l.lab_name as labName,
+               r.applicant_user_id as applicantUserId,
+               u.real_name as applicantName,
+               u.credit_score as applicantCreditScore,
+               r.reservation_type as reservationType,
+               r.priority_level as priorityLevel,
+               r.status as status,
+               date_format(s.reservation_date, '%Y-%m-%d') as reservationDate,
+               s.period_id as periodId,
+               p.period_no as periodNo,
+               p.period_name as periodName,
+               date_format(p.start_time, '%H:%i') as startTime,
+               date_format(p.end_time, '%H:%i') as endTime,
+               date_format(r.created_at, '%Y-%m-%d %H:%i:%s') as createdAt
+        from lab_reservation_slot s
+        join lab_reservation r on r.id = s.reservation_id
+        join lab l on l.id = r.lab_id
+        join sys_user u on u.id = r.applicant_user_id
+        join class_period p on p.id = s.period_id
+        where s.slot_status = 1
+          and r.status in (1, 2, 5)
+          and s.reservation_date = #{date}
+        <if test="departmentId != null">
+          and l.department_id = #{departmentId}
+        </if>
+        order by case r.status
+                     when 1 then 1
+                     when 2 then 2
+                     when 5 then 3
+                     else 4
+                 end asc,
+                 p.start_time asc,
+                 r.priority_level asc,
+                 u.credit_score desc,
+                 r.created_at asc,
+                 r.id asc,
+                 p.sort_order asc
+    </select>
 
     <!-- Statistics: all date-range filters use slot.reservation_date -->
     <select id="countByReservationType" resultType="map">

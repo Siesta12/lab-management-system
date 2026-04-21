@@ -25,6 +25,7 @@ async function signIn(payload: LoginPayload): Promise<void> {
       username: data.username,
       realName: data.realName,
       roleCodes: data.roleCodes,
+      departmentId: data.departmentId,
     };
   } finally {
     state.loading = false;

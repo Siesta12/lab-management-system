@@ -53,7 +53,7 @@ public class ReservationAuditLogServiceImpl implements ReservationAuditLogServic
     public ReservationAuditLogEntity getById(Long id) {
         ReservationAuditLogEntity entity = reservationAuditLogMapper.selectById(id);
         if (entity == null) {
-            throw new BusinessException(404, "预订审核日志不存在");
+            throw new BusinessException(404, "预约审核日志不存在");
         }
         return entity;
     }

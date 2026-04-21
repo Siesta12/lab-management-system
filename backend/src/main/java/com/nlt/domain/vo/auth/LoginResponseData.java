@@ -16,5 +16,7 @@ public class LoginResponseData {
 
     private List<String> roleCodes;
 
+    private Long departmentId;
+
 }
 

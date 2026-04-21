@@ -20,7 +20,8 @@ public interface DeviceMapper {
      */
     List<DeviceEntity> selectPage(@Param("offset") int offset, @Param("pageSize") int pageSize,
                                   @Param("labId") Long labId, @Param("deviceName") String deviceName,
-                                  @Param("deviceCode") String deviceCode, @Param("status") Integer status);
+                                  @Param("deviceCode") String deviceCode, @Param("status") Integer status,
+                                  @Param("departmentId") Long departmentId);
 
     /**
      * 统计设备信息数量
@@ -31,7 +32,8 @@ public interface DeviceMapper {
      * @return 总数
      */
     long countPage(@Param("labId") Long labId, @Param("deviceName") String deviceName,
-                   @Param("deviceCode") String deviceCode, @Param("status") Integer status);
+                   @Param("deviceCode") String deviceCode, @Param("status") Integer status,
+                   @Param("departmentId") Long departmentId);
 
     /**
      * 根据ID查询设备信息
@@ -45,7 +47,9 @@ public interface DeviceMapper {
      * @param labId 实验室ID
      * @return 数据列表
      */
-    List<DeviceEntity> selectOptions(@Param("labId") Long labId);
+    List<DeviceEntity> selectOptions(@Param("labId") Long labId, @Param("departmentId") Long departmentId);
+
+    List<DeviceEntity> selectWarningList(@Param("departmentId") Long departmentId);
 
     /**
      * 新增设备信息
@@ -77,4 +81,3 @@ public interface DeviceMapper {
     int softDelete(@Param("id") Long id);
 
 }
-

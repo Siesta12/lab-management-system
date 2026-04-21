@@ -1,6 +1,6 @@
 ﻿<template>
   <section class="content-grid split-grid">
-    <BasePanel tag="我的预订" title="预订记录列表" :note="`共${reservationState.total} 项`">
+    <BasePanel tag="我的预约" title="预约记录列表" :note="`共${reservationState.total} 项`">
       <div class="toolbar">
         <select v-model="statusFilter">
           <option value="">全部状态</option>
@@ -15,7 +15,7 @@
 
       <p v-if="message" class="info-text">{{ message }}</p>
 
-      <BaseTable :headers="['预订编号', '实验室', '时段详情', '状态', '操作']">
+      <BaseTable :headers="['预约编号', '实验室', '时段详情', '状态', '操作']">
         <tr v-for="item in filteredReservations" :key="item.id" class="clickable-row" @click="selectReservation(item.id)">
           <td>{{ item.reservationNo }}</td>
           <td>{{ labName(item.labId) }}</td>
@@ -125,7 +125,7 @@ function auditActionText(action: number): string {
   if (action === 1) return '提交申请';
   if (action === 2) return '审核通过';
   if (action === 3) return '审核驳回';
-  if (action === 4) return '取消预订';
+  if (action === 4) return '取消预约';
   if (action === 5) return '完成/结束';
   return '状态变更';
 }
@@ -142,13 +142,13 @@ async function loadReservations(): Promise<void> {
     ]);
     reservationState.value = reservationData;
     labs.value = labData.list;
-    message.value = '已加载当前用户的预订记录。';
+    message.value = '已加载当前用户的预约记录。';
 
     if (reservationData.list.length && !selectedReservation.value) {
       await selectReservation(reservationData.list[0].id);
     }
   } catch (error) {
-    message.value = error instanceof Error ? error.message : '预订记录加载失败。';
+    message.value = error instanceof Error ? error.message : '预约记录加载失败。';
   }
 }
 
@@ -161,18 +161,18 @@ async function selectReservation(id: number): Promise<void> {
     selectedReservation.value = reservation;
     auditLogs.value = logs;
   } catch (error) {
-    message.value = error instanceof Error ? error.message : '预订详情加载失败。';
+    message.value = error instanceof Error ? error.message : '预约详情加载失败。';
   }
 }
 
 async function handleCancel(id: number): Promise<void> {
   try {
     await cancelReservation(id, auth.token.value);
-    message.value = '预订已取消。';
+    message.value = '预约已取消。';
     selectedReservation.value = null;
     await loadReservations();
   } catch (error) {
-    message.value = error instanceof Error ? error.message : '取消预订失败。';
+    message.value = error instanceof Error ? error.message : '取消预约失败。';
   }
 }
 

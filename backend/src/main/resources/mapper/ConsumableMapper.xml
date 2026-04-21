@@ -2,34 +2,44 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.nlt.mapper.ConsumableMapper">
     <select id="selectPage" resultType="com.nlt.domain.entity.ConsumableEntity">
-        select *
-        from lab_consumable
-        where deleted = 0
+        select c.*
+        from lab_consumable c
+        join lab l on l.id = c.lab_id
+        where c.deleted = 0
+          and l.deleted = 0
         <if test="labId != null">
-            and lab_id = #{labId}
+            and c.lab_id = #{labId}
         </if>
         <if test="consumableName != null and consumableName != ''">
-            and consumable_name like concat('%', #{consumableName}, '%')
+            and c.consumable_name like concat('%', #{consumableName}, '%')
         </if>
         <if test="consumableCode != null and consumableCode != ''">
-            and consumable_code like concat('%', #{consumableCode}, '%')
+            and c.consumable_code like concat('%', #{consumableCode}, '%')
         </if>
-        order by id desc
+        <if test="departmentId != null">
+            and l.department_id = #{departmentId}
+        </if>
+        order by c.id desc
         limit #{offset}, #{pageSize}
     </select>
 
     <select id="countPage" resultType="long">
         select count(*)
-        from lab_consumable
-        where deleted = 0
+        from lab_consumable c
+        join lab l on l.id = c.lab_id
+        where c.deleted = 0
+          and l.deleted = 0
         <if test="labId != null">
-            and lab_id = #{labId}
+            and c.lab_id = #{labId}
         </if>
         <if test="consumableName != null and consumableName != ''">
-            and consumable_name like concat('%', #{consumableName}, '%')
+            and c.consumable_name like concat('%', #{consumableName}, '%')
         </if>
         <if test="consumableCode != null and consumableCode != ''">
-            and consumable_code like concat('%', #{consumableCode}, '%')
+            and c.consumable_code like concat('%', #{consumableCode}, '%')
+        </if>
+        <if test="departmentId != null">
+            and l.department_id = #{departmentId}
         </if>
     </select>
 
@@ -41,11 +51,16 @@
     </select>
 
     <select id="selectWarningList" resultType="com.nlt.domain.entity.ConsumableEntity">
-        select *
-        from lab_consumable
-        where deleted = 0
-            and stock_quantity &lt;= warning_threshold
-        order by id desc
+        select c.*
+        from lab_consumable c
+        join lab l on l.id = c.lab_id
+        where c.deleted = 0
+            and l.deleted = 0
+            and c.stock_quantity &lt;= c.warning_threshold
+        <if test="departmentId != null">
+            and l.department_id = #{departmentId}
+        </if>
+        order by c.id desc
     </select>
 
     <insert id="insert"

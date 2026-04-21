@@ -1,6 +1,7 @@
-﻿import type {
+import type {
   PageData,
   ReservationApplyResponse,
+  ReservationConflictSlotDto,
   ReservationCreatePayload,
   ReservationDto,
   SlotRecommendationItem,
@@ -10,13 +11,27 @@ import { get, post, put } from './http';
 export interface ReservationQuery {
   pageNum?: number;
   pageSize?: number;
+  conflictOnly?: boolean;
 }
 
 export function fetchReservations(query: ReservationQuery = {}, token?: string): Promise<PageData<ReservationDto>> {
   const params = new URLSearchParams();
   params.set('pageNum', String(query.pageNum ?? 1));
   params.set('pageSize', String(query.pageSize ?? 10));
+  if (query.conflictOnly) {
+    params.set('conflictOnly', 'true');
+  }
   return get<PageData<ReservationDto>>(`/reservations?${params.toString()}`, token);
+}
+
+export function fetchConflictReservations(
+  query: ReservationQuery = {},
+  token?: string,
+): Promise<PageData<ReservationConflictSlotDto>> {
+  const params = new URLSearchParams();
+  params.set('pageNum', String(query.pageNum ?? 1));
+  params.set('pageSize', String(query.pageSize ?? 10));
+  return get<PageData<ReservationConflictSlotDto>>(`/reservations/conflicts?${params.toString()}`, token);
 }
 
 export function fetchMyReservations(query: ReservationQuery = {}, token: string): Promise<PageData<ReservationDto>> {

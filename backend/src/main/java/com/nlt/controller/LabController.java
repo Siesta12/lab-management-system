@@ -43,6 +43,7 @@ public class LabController {
     @GetMapping
     public ApiResponse<PageData<LabEntity>> page(@RequestParam(defaultValue = "1") int pageNum,
         @RequestParam(defaultValue = "10") int pageSize,
+        @RequestParam(required = false) Long labId,
         @RequestParam(required = false) String labName,
         @RequestParam(required = false) String labCode,
         @RequestParam(required = false) String labType,
@@ -50,10 +51,8 @@ public class LabController {
         @RequestParam(required = false) Integer openStatus,
         @RequestParam(required = false) Integer labStatus,
         HttpServletRequest request) {
-        Long currentUserId = tokenService.getCurrentUserId(request);
-        List<String> currentRoleCodes = tokenService.getCurrentRoleCodes(request);
-        return ApiResponse.success(labService.page(pageNum, pageSize, labName, labCode, labType, departmentId,
-            openStatus, labStatus, currentUserId, currentRoleCodes));
+        return ApiResponse.success(labService.page(pageNum, pageSize, labId, labName, labCode, labType, departmentId,
+            openStatus, labStatus));
     }
 
     /**
@@ -73,10 +72,9 @@ public class LabController {
      */
     @GetMapping("/options")
     public ApiResponse<List<OptionItem>> options(@RequestParam(required = false) Integer openStatus,
+        @RequestParam(required = false) Long departmentId,
         HttpServletRequest request) {
-        Long currentUserId = tokenService.getCurrentUserId(request);
-        List<String> currentRoleCodes = tokenService.getCurrentRoleCodes(request);
-        return ApiResponse.success(labService.options(openStatus, currentUserId, currentRoleCodes));
+        return ApiResponse.success(labService.options(openStatus, departmentId));
     }
 
     /**
@@ -86,9 +84,7 @@ public class LabController {
      */
     @GetMapping("/{id}")
     public ApiResponse<LabEntity> getById(@PathVariable Long id, HttpServletRequest request) {
-        Long currentUserId = tokenService.getCurrentUserId(request);
-        List<String> currentRoleCodes = tokenService.getCurrentRoleCodes(request);
-        return ApiResponse.success(labService.getById(id, currentUserId, currentRoleCodes));
+        return ApiResponse.success(labService.getById(id));
     }
 
     /**
@@ -180,4 +176,3 @@ public class LabController {
     }
 
 }
-

@@ -1,12 +1,6 @@
 ﻿<template>
   <div class="shell">
     <aside class="sidebar">
-      <div v-if="showBrandBlock" class="brand-block">
-        <span class="brand-pill">精品设计</span>
-        <h1>高校实验室管理系统</h1>
-        <p>根据不同角色显示不同菜单，让学生端、管理员端功能回到各自正使用的环境里。</p>
-      </div>
-
       <div class="sidebar-card user-card">
         <div class="user-card-top">
           <h3>{{ auth.currentUser.value?.realName ?? '未登录' }}</h3>
@@ -17,6 +11,10 @@
           <div class="user-meta-row">
             <span class="user-meta-label">账号</span>
             <span class="user-meta-value">{{ auth.currentUser.value?.username ?? '--' }}</span>
+          </div>
+          <div v-if="auth.currentUser.value?.departmentId != null" class="user-meta-row">
+            <span class="user-meta-label">学院ID</span>
+            <span class="user-meta-value">{{ auth.currentUser.value?.departmentId }}</span>
           </div>
 
           <div v-if="showRoleHint" class="user-tip">
@@ -33,7 +31,7 @@
           :key="item.to"
           :to="item.to"
           class="nav-item"
-          active-class="active"
+          exact-active-class="active"
         >
           <span>{{ item.label }}</span>
           <small>{{ item.desc }}</small>
@@ -69,18 +67,31 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 
-const pageTitle = computed(() => String(route.meta.title ?? '高校实验室管理系统'));
-const pageDescription = computed(() => String(route.meta.description ?? ''));
 const roleText = computed(() => getRoleLabels(auth.currentUser.value?.roleCodes).join(' / '));
 const primaryRole = computed(() => getPrimaryRole(auth.currentUser.value?.roleCodes));
 const navItems = computed(() => getNavigationItems(auth.currentUser.value?.roleCodes));
 const showHeroActions = computed(() => primaryRole.value === 'ADMIN');
-const showBrandBlock = computed(() => primaryRole.value !== 'STUDENT');
 const showRoleHint = computed(() => primaryRole.value !== 'STUDENT');
+
+const pageTitle = computed(() => {
+  if (route.name === 'labs') {
+    return primaryRole.value === 'ADMIN' ? '实验室管理' : '实验室查询';
+  }
+  return String(route.meta.title ?? '高校实验室管理系统');
+});
+
+const pageDescription = computed(() => {
+  if (route.name === 'labs') {
+    return primaryRole.value === 'ADMIN'
+      ? '筛选、维护并更新实验室基础信息与开放状态。'
+      : '查询实验室状态、查看课表并提交预约申请。';
+  }
+  return String(route.meta.description ?? '');
+});
 
 const roleHint = computed(() => {
   if (primaryRole.value === 'ADMIN') {
-    return '当前是管理员视角，可管理用户、实验室、设备和统计信息';
+    return '当前是学院管理员视角，只能管理本学院的数据';
   }
 
   if (primaryRole.value === 'TEACHER') {
@@ -95,4 +106,3 @@ function handleLogout(): void {
   router.push('/login');
 }
 </script>
-

@@ -2,6 +2,7 @@ package com.nlt.common.exception;
 
 import com.nlt.common.api.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -30,6 +31,11 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<ApiResponse<Void>> handleBadRequest(Exception ex) {
         return ResponseEntity.badRequest().body(ApiResponse.error(400, "请求参数错误"));
+    }
+
+    @ExceptionHandler(DuplicateKeyException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDuplicateKey(DuplicateKeyException ex) {
+        return ResponseEntity.badRequest().body(ApiResponse.error(400, "当前时段已有并发申请，请刷新后重试。"));
     }
 
     @ExceptionHandler(Exception.class)

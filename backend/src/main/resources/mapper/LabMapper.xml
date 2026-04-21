@@ -5,6 +5,9 @@
         select *
         from lab
         where deleted = 0
+        <if test="labId != null">
+            and id = #{labId}
+        </if>
         <if test="labName != null and labName != ''">
             and lab_name like concat('%', #{labName}, '%')
         </if>
@@ -31,6 +34,9 @@
         select count(*)
         from lab
         where deleted = 0
+        <if test="labId != null">
+            and id = #{labId}
+        </if>
         <if test="labName != null and labName != ''">
             and lab_name like concat('%', #{labName}, '%')
         </if>
@@ -64,6 +70,9 @@
         where deleted = 0
         <if test="openStatus != null">
             and open_status = #{openStatus}
+        </if>
+        <if test="departmentId != null">
+            and department_id = #{departmentId}
         </if>
         order by id asc
     </select>

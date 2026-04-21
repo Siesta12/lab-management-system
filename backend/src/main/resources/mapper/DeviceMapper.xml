@@ -2,40 +2,50 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.nlt.mapper.DeviceMapper">
     <select id="selectPage" resultType="com.nlt.domain.entity.DeviceEntity">
-        select *
-        from lab_device
-        where deleted = 0
+        select d.*
+        from lab_device d
+        join lab l on l.id = d.lab_id
+        where d.deleted = 0
+          and l.deleted = 0
         <if test="labId != null">
-            and lab_id = #{labId}
+            and d.lab_id = #{labId}
         </if>
         <if test="deviceName != null and deviceName != ''">
-            and device_name like concat('%', #{deviceName}, '%')
+            and d.device_name like concat('%', #{deviceName}, '%')
         </if>
         <if test="deviceCode != null and deviceCode != ''">
-            and device_code like concat('%', #{deviceCode}, '%')
+            and d.device_code like concat('%', #{deviceCode}, '%')
         </if>
         <if test="status != null">
-            and status = #{status}
+            and d.status = #{status}
         </if>
-        order by id desc
+        <if test="departmentId != null">
+            and l.department_id = #{departmentId}
+        </if>
+        order by d.id desc
         limit #{offset}, #{pageSize}
     </select>
 
     <select id="countPage" resultType="long">
         select count(*)
-        from lab_device
-        where deleted = 0
+        from lab_device d
+        join lab l on l.id = d.lab_id
+        where d.deleted = 0
+          and l.deleted = 0
         <if test="labId != null">
-            and lab_id = #{labId}
+            and d.lab_id = #{labId}
         </if>
         <if test="deviceName != null and deviceName != ''">
-            and device_name like concat('%', #{deviceName}, '%')
+            and d.device_name like concat('%', #{deviceName}, '%')
         </if>
         <if test="deviceCode != null and deviceCode != ''">
-            and device_code like concat('%', #{deviceCode}, '%')
+            and d.device_code like concat('%', #{deviceCode}, '%')
         </if>
         <if test="status != null">
-            and status = #{status}
+            and d.status = #{status}
+        </if>
+        <if test="departmentId != null">
+            and l.department_id = #{departmentId}
         </if>
     </select>
 
@@ -47,13 +57,31 @@
     </select>
 
     <select id="selectOptions" resultType="com.nlt.domain.entity.DeviceEntity">
-        select *
-        from lab_device
-        where deleted = 0
+        select d.*
+        from lab_device d
+        join lab l on l.id = d.lab_id
+        where d.deleted = 0
+          and l.deleted = 0
         <if test="labId != null">
-            and lab_id = #{labId}
+            and d.lab_id = #{labId}
         </if>
-        order by id asc
+        <if test="departmentId != null">
+            and l.department_id = #{departmentId}
+        </if>
+        order by d.id asc
+    </select>
+
+    <select id="selectWarningList" resultType="com.nlt.domain.entity.DeviceEntity">
+        select d.*
+        from lab_device d
+        join lab l on l.id = d.lab_id
+        where d.deleted = 0
+          and l.deleted = 0
+          and d.status != 1
+        <if test="departmentId != null">
+            and l.department_id = #{departmentId}
+        </if>
+        order by d.id desc
     </select>
 
     <insert id="insert"

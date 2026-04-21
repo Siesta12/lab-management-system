@@ -1,6 +1,7 @@
 package com.nlt.mapper;
 
 import com.nlt.domain.entity.LabReservationSlotEntity;
+import com.nlt.domain.vo.reservation.ReservationConflictRowVo;
 import com.nlt.domain.vo.reservation.ReservationSlotVo;
 import com.nlt.domain.vo.schedule.ReservedSlotRow;
 import com.nlt.domain.vo.schedule.ReservedSlotRowWithLab;
@@ -27,5 +28,7 @@ public interface LabReservationSlotMapper {
         @Param("endDate") LocalDate endDate);
 
     List<ReservedSlotRowWithLab> selectReservedSlotsForDate(@Param("reservationDate") LocalDate reservationDate);
+
+    List<ReservationConflictRowVo> selectConflictRowsByDepartment(@Param("departmentId") Long departmentId);
 }
 

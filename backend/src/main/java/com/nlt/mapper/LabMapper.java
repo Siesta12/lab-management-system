@@ -21,7 +21,7 @@ public interface LabMapper {
      * @return 数据列表
      */
     List<LabEntity> selectPage(@Param("offset") int offset, @Param("pageSize") int pageSize,
-    @Param("labName") String labName, @Param("labCode") String labCode,
+    @Param("labId") Long labId, @Param("labName") String labName, @Param("labCode") String labCode,
     @Param("labType") String labType, @Param("departmentId") Long departmentId,
     @Param("openStatus") Integer openStatus, @Param("labStatus") Integer labStatus);
 
@@ -35,7 +35,7 @@ public interface LabMapper {
      * @param labStatus 实验室状态
      * @return 总数
      */
-    long countPage(@Param("labName") String labName, @Param("labCode") String labCode,
+    long countPage(@Param("labId") Long labId, @Param("labName") String labName, @Param("labCode") String labCode,
     @Param("labType") String labType, @Param("departmentId") Long departmentId,
     @Param("openStatus") Integer openStatus, @Param("labStatus") Integer labStatus);
 
@@ -51,7 +51,7 @@ public interface LabMapper {
      * @param openStatus 开放状态
      * @return 数据列表
      */
-    List<LabEntity> selectOptions(@Param("openStatus") Integer openStatus);
+    List<LabEntity> selectOptions(@Param("openStatus") Integer openStatus, @Param("departmentId") Long departmentId);
 
     /**
      * 新增实验室信息
