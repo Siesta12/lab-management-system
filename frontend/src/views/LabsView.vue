@@ -210,45 +210,49 @@
                   </p>
 
                   <div v-else-if="!isAdmin" class="beauty-form">
-                      <label v-if="isStudent" class="field-card">
-                        <span class="field-label">预约类型</span>
-                        <input :value="'个人预约'" disabled />
-                      </label>
-                      <label v-else class="field-card">
-                        <span class="field-label">预约类型</span>
-                        <select v-model.number="reservationForm.reservationType">
-                          <option :value="3">个人预约</option>
-                          <option :value="1">课程实验</option>
-                          <option :value="2">科研训练</option>
-                        </select>
-                      </label>
+                    <label class="field-card">
+                      <span class="field-label">预约类型</span>
+                      <select v-if="!isStudent" v-model.number="reservationForm.reservationType">
+                        <option v-for="item in teacherReservationTypeOptions" :key="item.value" :value="item.value">
+                          {{ item.label }}
+                        </option>
+                      </select>
+                      <input v-else :value="'个人预约'" disabled />
+                    </label>
+
+                    <label v-if="reservationForm.reservationType === 1" class="field-card">
+                      <span class="field-label">课程名称</span>
+                      <input v-model="reservationForm.courseName" placeholder="请输入课程名称" />
+                    </label>
+
+                    <label v-if="reservationForm.reservationType === 1" class="field-card">
+                      <span class="field-label">班级名称</span>
+                      <input v-model="reservationForm.className" placeholder="请输入班级名称" />
+                    </label>
+
+                    <label v-if="reservationForm.reservationType === 2" class="field-card">
+                      <span class="field-label">科研项目名称</span>
+                      <input v-model="reservationForm.projectName" placeholder="请输入科研项目名称" />
+                    </label>
 
                     <label class="field-card">
                       <span class="field-label">参与人数</span>
                       <input v-model.number="reservationForm.participantCount" type="number" min="1" />
                     </label>
 
-                    <label class="field-card field-full">
+                    <label v-if="reservationForm.reservationType === 3" class="field-card field-full">
                       <span class="field-label">用途说明</span>
                       <input
-                          v-model="reservationForm.usagePurpose"
-                          placeholder="例如：课程实验 / 科研训练 / 项目开发 / 设备调试等"
-                      />
-                    </label>
-
-                    <label class="field-card">
-                      <span class="field-label">课程/项目名称</span>
-                      <input
-                          v-model="reservationForm.courseOrProjectName"
-                          placeholder="可选"
+                        v-model="reservationForm.usagePurpose"
+                        placeholder="例如：课程实验 / 科研训练 / 项目开发 / 设备调试等"
                       />
                     </label>
 
                     <label class="field-card">
                       <span class="field-label">联系电话</span>
                       <input
-                          v-model="reservationForm.contactPhone"
-                          placeholder="请输入联系电话"
+                        v-model="reservationForm.contactPhone"
+                        placeholder="请输入联系电话"
                       />
                     </label>
                   </div>
@@ -487,6 +491,7 @@ const isAuthenticated = computed(() => Boolean(auth.token.value));
 const roleCodes = computed(() => auth.currentUser.value?.roleCodes ?? []);
 const isAdmin = computed(() => roleCodes.value.some((item) => item === 'ADMIN' || item === 'ROLE_ADMIN'));
 const isStudent = computed(() => roleCodes.value.some((item) => item === 'STUDENT' || item === 'ROLE_STUDENT'));
+const isTeacher = computed(() => roleCodes.value.some((item) => item === 'TEACHER' || item === 'ROLE_TEACHER'));
 const adminDepartmentId = computed(() => auth.currentUser.value?.departmentId ?? undefined);
 const isDepartmentScopedAdmin = computed(() => isAdmin.value && !!adminDepartmentId.value);
 
@@ -545,7 +550,9 @@ const reservationForm = reactive({
   reservationType: 3,
   priorityLevel: 3,
   usagePurpose: '',
-  courseOrProjectName: '',
+  courseName: '',
+  className: '',
+  projectName: '',
   participantCount: 1,
   contactPhone: '',
 });
@@ -559,6 +566,24 @@ watch(
     }
   },
   { immediate: true },
+);
+
+watch(
+  () => reservationForm.reservationType,
+  (value) => {
+    if (value === 1) {
+      reservationForm.projectName = '';
+      reservationForm.usagePurpose = '';
+    } else if (value === 2) {
+      reservationForm.courseName = '';
+      reservationForm.className = '';
+      reservationForm.usagePurpose = '';
+    } else {
+      reservationForm.courseName = '';
+      reservationForm.className = '';
+      reservationForm.projectName = '';
+    }
+  },
 );
 
 const labEditForm = reactive({
@@ -614,16 +639,44 @@ const canSubmitReservation = computed(() => {
   return (
     isAuthenticated.value &&
     selectedKeys.value.length > 0 &&
-    reservationForm.usagePurpose.trim().length > 0 &&
-    reservationForm.contactPhone.trim().length > 0
+    composeUsagePurpose().length > 0 &&
+    reservationForm.contactPhone.trim().length > 0 &&
+    reservationDetailsComplete.value
   );
 });
 
 const recommendationRequestKeys = computed(() => {
   return selectedKeys.value.length ? selectedKeys.value : blockedKeys.value;
 });
-const pagePanelTitle = computed(() => (isAdmin.value ? '实验室管理' : '实验室查询'));
+const pagePanelTitle = computed(() => {
+  if (isAdmin.value) {
+    return '实验室管理';
+  }
+  if (isTeacher.value) {
+    return '实验室预约';
+  }
+  return '实验室查询';
+});
 const canSubmitMaintenance = computed(() => isAdmin.value && blockedKeys.value.length > 0 && maintenanceForm.reason.trim().length > 0);
+const teacherReservationTypeOptions = computed(() => {
+  if (isStudent.value) {
+    return [{ value: 3, label: '个人预约' }];
+  }
+  return [
+    { value: 1, label: '课程实验预约' },
+    { value: 2, label: '科研训练预约' },
+    { value: 3, label: '个人预约' },
+  ];
+});
+const reservationDetailsComplete = computed(() => {
+  if (reservationForm.reservationType === 1) {
+    return reservationForm.courseName.trim().length > 0 && reservationForm.className.trim().length > 0;
+  }
+  if (reservationForm.reservationType === 2) {
+    return reservationForm.projectName.trim().length > 0;
+  }
+  return true;
+});
 
 
 
@@ -647,6 +700,29 @@ function weekdayText(weekday: number): string {
 function periodLabel(periodId: number): string {
   const p = schedule.value?.periods?.find((item) => item.id === periodId);
   return p?.periodName ?? `节次#${periodId}`;
+}
+
+function composeCourseOrProjectName(): string | undefined {
+  if (reservationForm.reservationType === 1) {
+    const parts = [reservationForm.courseName.trim(), reservationForm.className.trim()].filter(Boolean);
+    return parts.length ? parts.join(' / ') : undefined;
+  }
+  if (reservationForm.reservationType === 2) {
+    return reservationForm.projectName.trim() || undefined;
+  }
+  return '个人预约';
+}
+
+function composeUsagePurpose(): string {
+  if (reservationForm.reservationType === 1) {
+    const parts = [reservationForm.courseName.trim(), reservationForm.className.trim()].filter(Boolean);
+    return parts.length ? `课程实验：${parts.join(' / ')}` : '';
+  }
+  if (reservationForm.reservationType === 2) {
+    const projectName = reservationForm.projectName.trim();
+    return projectName ? `科研训练：${projectName}` : '';
+  }
+  return reservationForm.usagePurpose.trim();
 }
 
 async function loadLabs(pageNum = currentPage.value): Promise<void> {
@@ -932,7 +1008,9 @@ async function handleCellClick(day: ScheduleDayDto, periodId: number): Promise<v
 async function handleCreateReservation(): Promise<void> {
   if (!selectedLab.value || !auth.token.value) return;
   if (!canSubmitReservation.value) {
-    scheduleMessage.value = '请先选择空闲时段，并填写用途说明与联系电话。';
+    scheduleMessage.value = reservationForm.reservationType === 3
+      ? '请先选择空闲时段，并填写用途说明与联系电话。'
+      : '请先选择空闲时段，并完善课程/项目名称与联系电话。';
     return;
   }
   if (submittingReservation.value) return;
@@ -943,8 +1021,8 @@ async function handleCreateReservation(): Promise<void> {
         labId: selectedLab.value.id,
         reservationType: reservationForm.reservationType,
         priorityLevel: reservationForm.priorityLevel,
-        usagePurpose: reservationForm.usagePurpose,
-        courseOrProjectName: reservationForm.courseOrProjectName || undefined,
+        usagePurpose: composeUsagePurpose(),
+        courseOrProjectName: composeCourseOrProjectName(),
         participantCount: reservationForm.participantCount,
         contactPhone: reservationForm.contactPhone,
         slots: selectedKeys.value.map((k) => ({ reservationDate: k.date, periodId: k.periodId })),

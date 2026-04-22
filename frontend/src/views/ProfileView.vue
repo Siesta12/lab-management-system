@@ -3,7 +3,7 @@
     <BasePanel tag="个人信息" title="查看个人资料">
       <div v-if="profile" class="detail-list">
         <div><strong>姓名</strong><span>{{ profile.realName }}</span></div>
-        <div><strong>学号 / 工号</strong><span>{{ profile.userNo }} / {{ profile.username }}</span></div>
+        <div><strong>{{ identityLabel }} / 账号</strong><span>{{ profile.userNo }} / {{ profile.username }}</span></div>
         <div><strong>性别</strong><span>{{ genderText(profile.gender) }}</span></div>
         <div><strong>手机号</strong><span>{{ profile.phone || '未填写' }}</span></div>
         <div><strong>邮箱</strong><span>{{ profile.email || '未填写' }}</span></div>
@@ -48,6 +48,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
+import { getPrimaryRole } from '../access';
 import { fetchDepartmentOptions } from '../api/departments';
 import { fetchMyProfile, updateMyPassword, updateMyProfile } from '../api/users';
 import BasePanel from '../components/BasePanel.vue';
@@ -59,6 +60,7 @@ const profile = ref<UserVO | null>(null);
 const departments = ref<OptionItem[]>([]);
 const profileMessage = ref('');
 const passwordMessage = ref('');
+const primaryRole = computed(() => getPrimaryRole(auth.currentUser.value?.roleCodes));
 
 const profileForm = reactive({
   phone: '',
@@ -78,6 +80,8 @@ const departmentName = computed(() => {
 
   return departments.value.find((item) => item.value === profile.value?.departmentId)?.label ?? '未分配';
 });
+
+const identityLabel = computed(() => (primaryRole.value === 'STUDENT' ? '学号' : '工号'));
 
 function genderText(gender?: number): string {
   if (gender === 1) return '男';
@@ -136,4 +140,3 @@ onMounted(() => {
   void loadProfile();
 });
 </script>
-

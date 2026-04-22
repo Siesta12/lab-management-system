@@ -12,6 +12,7 @@ export interface ReservationQuery {
   pageNum?: number;
   pageSize?: number;
   status?: number;
+  reservationType?: number;
   conflictOnly?: boolean;
 }
 
@@ -45,6 +46,12 @@ export function fetchMyReservations(query: ReservationQuery = {}, token: string)
   const params = new URLSearchParams();
   params.set('pageNum', String(query.pageNum ?? 1));
   params.set('pageSize', String(query.pageSize ?? 10));
+  if (query.status !== undefined && query.status !== null) {
+    params.set('status', String(query.status));
+  }
+  if (query.reservationType !== undefined && query.reservationType !== null) {
+    params.set('reservationType', String(query.reservationType));
+  }
   return get<PageData<ReservationDto>>(`/reservations/my?${params.toString()}`, token);
 }
 

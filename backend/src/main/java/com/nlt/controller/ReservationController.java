@@ -69,8 +69,12 @@ public class ReservationController {
     @GetMapping("/my")
     public ApiResponse<PageData<ReservationDetailVo>> mine(@RequestParam(defaultValue = "1") int pageNum,
         @RequestParam(defaultValue = "10") int pageSize,
+        @RequestParam(required = false) Integer status,
+        @RequestParam(required = false) Integer reservationType,
         HttpServletRequest servletRequest) {
-        return ApiResponse.success(reservationService.mine(tokenService.getCurrentUserId(servletRequest), pageNum, pageSize));
+        return ApiResponse.success(
+            reservationService.mine(tokenService.getCurrentUserId(servletRequest), pageNum, pageSize, status, reservationType)
+        );
     }
 
     @GetMapping("/pending-audit")

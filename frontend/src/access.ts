@@ -25,11 +25,10 @@ const adminNavigation: NavigationItem[] = [
 ];
 
 const teacherNavigation: NavigationItem[] = [
-  { to: '/teacher-home', label: '首页', desc: '教师预约审核', roles: ['TEACHER'] },
-  { to: '/labs', label: '实验室查询', desc: '申请预约查询', roles: ['TEACHER'] },
+  { to: '/teacher-home', label: '首页', desc: '今日预约与提示', roles: ['TEACHER'] },
+  { to: '/labs', label: '实验室预约', desc: '选择实验室并提交预约', roles: ['TEACHER'] },
   { to: '/my-reservations', label: '我的预约', desc: '预约详情与记录', roles: ['TEACHER'] },
-  { to: '/statistics', label: '统计分析', desc: '使用情况与统计', roles: ['TEACHER'] },
-  { to: '/profile', label: '个人资料', desc: '个人资料与密码', roles: ['TEACHER'] },
+  { to: '/profile', label: '个人信息', desc: '个人资料与密码', roles: ['TEACHER'] },
 ];
 
 const studentNavigation: NavigationItem[] = [

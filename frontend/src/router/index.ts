@@ -104,7 +104,7 @@ const router = createRouter({
           component: DevicesView,
           meta: {
             title: '设备管理',
-            roles: ['ADMIN', 'TEACHER'] satisfies AppRole[],
+            roles: ['ADMIN'] satisfies AppRole[],
           },
         },
         {
@@ -113,7 +113,7 @@ const router = createRouter({
           component: ConsumablesView,
           meta: {
             title: '耗材管理',
-            roles: ['ADMIN', 'TEACHER'] satisfies AppRole[],
+            roles: ['ADMIN'] satisfies AppRole[],
           },
         },
         {
@@ -122,7 +122,7 @@ const router = createRouter({
           component: StatisticsView,
           meta: {
             title: '统计分析',
-            roles: ['ADMIN', 'TEACHER'] satisfies AppRole[],
+            roles: ['ADMIN'] satisfies AppRole[],
           },
         },
         {

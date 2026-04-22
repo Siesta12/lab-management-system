@@ -125,6 +125,12 @@
         from lab_reservation r
         join sys_user u on u.id = r.applicant_user_id
         where r.applicant_user_id = #{userId}
+        <if test="status != null">
+            and r.status = #{status}
+        </if>
+        <if test="reservationType != null">
+            and r.reservation_type = #{reservationType}
+        </if>
         order by r.id desc
         limit #{offset}, #{pageSize}
     </select>
@@ -133,6 +139,12 @@
         select count(*)
         from lab_reservation
         where applicant_user_id = #{userId}
+        <if test="status != null">
+            and status = #{status}
+        </if>
+        <if test="reservationType != null">
+            and reservation_type = #{reservationType}
+        </if>
     </select>
 
     <select id="selectPendingAudit" resultType="com.nlt.domain.entity.ReservationEntity">

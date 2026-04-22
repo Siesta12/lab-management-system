@@ -17,7 +17,7 @@ public interface ReservationService {
     PageData<ReservationDetailVo> page(int pageNum, int pageSize, String reservationNo, Long labId,
         Long applicantUserId, Long approverUserId, Integer status, String reservationDate, Boolean conflictOnly);
 
-    PageData<ReservationDetailVo> mine(Long userId, int pageNum, int pageSize);
+    PageData<ReservationDetailVo> mine(Long userId, int pageNum, int pageSize, Integer status, Integer reservationType);
 
     PageData<ReservationDetailVo> pendingAudit(int pageNum, int pageSize);
 

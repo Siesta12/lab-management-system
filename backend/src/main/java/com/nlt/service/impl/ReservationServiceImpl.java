@@ -84,10 +84,10 @@ public class ReservationServiceImpl implements ReservationService {
     }
 
     @Override
-    public PageData<ReservationDetailVo> mine(Long userId, int pageNum, int pageSize) {
+    public PageData<ReservationDetailVo> mine(Long userId, int pageNum, int pageSize, Integer status, Integer reservationType) {
         int offset = (pageNum - 1) * pageSize;
-        List<ReservationEntity> list = reservationMapper.selectMine(userId, offset, pageSize);
-        long total = reservationMapper.countMine(userId);
+        List<ReservationEntity> list = reservationMapper.selectMine(userId, offset, pageSize, status, reservationType);
+        long total = reservationMapper.countMine(userId, status, reservationType);
         return new PageData<>(attachSlots(list), total, pageNum, pageSize);
     }
 
@@ -337,14 +337,15 @@ public class ReservationServiceImpl implements ReservationService {
 
     private ReservationDetailVo persistReservation(ReservationCreateRequest request, Long currentUserId, List<SlotKey> requestedSlots) {
         ReservationEntity entity = new ReservationEntity();
+        Integer reservationType = request.getReservationType() == null ? 3 : request.getReservationType();
         entity.setReservationNo("RES" + System.currentTimeMillis());
         entity.setLabId(request.getLabId());
         entity.setApplicantUserId(currentUserId);
         entity.setApproverUserId(null);
-        entity.setReservationType(request.getReservationType() == null ? 3 : request.getReservationType());
+        entity.setReservationType(reservationType);
         entity.setPriorityLevel(resolvePriorityLevel(request));
         entity.setUsagePurpose(request.getUsagePurpose());
-        entity.setCourseOrProjectName(request.getCourseOrProjectName());
+        entity.setCourseOrProjectName(resolveCourseOrProjectName(request, reservationType));
         entity.setParticipantCount(request.getParticipantCount() == null ? 1 : request.getParticipantCount());
         entity.setContactPhone(request.getContactPhone());
         entity.setStatus(1);
@@ -373,6 +374,20 @@ public class ReservationServiceImpl implements ReservationService {
 
         insertAuditLog(entity.getId(), currentUserId, 1, "提交预约申请");
         return getById(entity.getId());
+    }
+
+    private String resolveCourseOrProjectName(ReservationCreateRequest request, Integer reservationType) {
+        String name = request.getCourseOrProjectName();
+        if (name != null && !name.isBlank()) {
+            return name.trim();
+        }
+        if (reservationType != null && reservationType == 1) {
+            return "课程实验预约";
+        }
+        if (reservationType != null && reservationType == 2) {
+            return "科研训练预约";
+        }
+        return "个人预约";
     }
 
     private int resolvePriorityLevel(ReservationCreateRequest request) {

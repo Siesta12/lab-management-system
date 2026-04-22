@@ -50,7 +50,7 @@ export interface ReservationItem {
   labName: string;
   date: string;
   timeRange: string;
-  type: '教学预约' | '科研预约' | '个人预约';
+  type: '课程实验预约' | '科研训练预约' | '个人预约';
   priority: '高' | '中' | '低';
   status: '待审核' | '已通过' | '已驳回' | '已取消' | '已完成';
 }
@@ -201,7 +201,7 @@ export interface TodayReservationItem {
   timeRange: string;
   labName: string;
   applicant: string;
-  type: '教学预约' | '科研预约' | '个人预约' | '维护';
+  type: '课程实验预约' | '科研训练预约' | '个人预约' | '维护';
   status: '待审核' | '已通过' | '冲突待处理' | '即将开始' | '进行中';
   note?: string;
 }
@@ -210,7 +210,7 @@ export interface PendingReservationItem {
   labName: string;
   applicant: string;
   timeRange: string;
-  type: '教学预约' | '科研预约' | '个人预约';
+  type: '课程实验预约' | '科研训练预约' | '个人预约';
   status: '待审核' | '优先待审核';
 }
 

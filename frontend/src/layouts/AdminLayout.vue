@@ -44,7 +44,7 @@
         <div>
           <span class="eyebrow">Campus Lab Console</span>
           <h2>{{ pageTitle }}</h2>
-          <p>{{ pageDescription }}</p>
+          <p v-if="pageDescription">{{ pageDescription }}</p>
         </div>
         <div v-if="showHeroActions" class="hero-actions">
           <button class="ghost-btn" type="button">导出报表</button>
@@ -75,16 +75,23 @@ const showRoleHint = computed(() => primaryRole.value !== 'STUDENT');
 
 const pageTitle = computed(() => {
   if (route.name === 'labs') {
-    return primaryRole.value === 'ADMIN' ? '实验室管理' : '实验室查询';
+    if (primaryRole.value === 'ADMIN') {
+      return '实验室管理';
+    }
+    if (primaryRole.value === 'TEACHER') {
+      return '实验室预约';
+    }
+    return '实验室查询';
   }
   return String(route.meta.title ?? '高校实验室管理系统');
 });
 
 const pageDescription = computed(() => {
   if (route.name === 'labs') {
-    return primaryRole.value === 'ADMIN'
-      ? '筛选、维护并更新实验室基础信息与开放状态。'
-      : '查询实验室状态、查看课表并提交预约申请。';
+    return '';
+  }
+  if (route.name === 'teacher-home') {
+    return '';
   }
   return String(route.meta.description ?? '');
 });
@@ -95,7 +102,7 @@ const roleHint = computed(() => {
   }
 
   if (primaryRole.value === 'TEACHER') {
-    return '当前是教师视角，支持预约审核、设备查询和统计查询';
+    return '当前是教师视角，仅显示首页、实验室预约、我的预约和个人信息';
   }
 
   return '';

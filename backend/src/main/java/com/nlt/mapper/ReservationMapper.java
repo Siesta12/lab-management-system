@@ -32,9 +32,15 @@ public interface ReservationMapper {
 
     ReservationEntity selectById(@Param("id") Long id);
 
-    List<ReservationEntity> selectMine(@Param("userId") Long userId, @Param("offset") int offset, @Param("pageSize") int pageSize);
+    List<ReservationEntity> selectMine(@Param("userId") Long userId,
+        @Param("offset") int offset,
+        @Param("pageSize") int pageSize,
+        @Param("status") Integer status,
+        @Param("reservationType") Integer reservationType);
 
-    long countMine(@Param("userId") Long userId);
+    long countMine(@Param("userId") Long userId,
+        @Param("status") Integer status,
+        @Param("reservationType") Integer reservationType);
 
     List<ReservationEntity> selectPendingAudit(@Param("offset") int offset, @Param("pageSize") int pageSize,
         @Param("departmentId") Long departmentId);

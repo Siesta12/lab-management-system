@@ -34,6 +34,9 @@ frontend/yarn-debug.log*
 frontend/yarn-error.log*
 frontend/pnpm-debug.log*
 
+# Backend static bundle assets
+backend/src/main/resources/static/assets/
+
 # Env files
 .env
 .env.*

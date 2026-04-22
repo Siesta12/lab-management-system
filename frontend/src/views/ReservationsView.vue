@@ -11,6 +11,15 @@
         </div>
 
         <div class="reservation-header-actions">
+          <select v-if="viewMode === 'list'" v-model="statusFilter" class="reservation-status-select" @change="changeListPage(1)">
+            <option value="">全部状态</option>
+            <option value="1">待审核</option>
+            <option value="2">已通过</option>
+            <option value="3">已驳回</option>
+            <option value="4">已取消</option>
+            <option value="5">已完成</option>
+          </select>
+
           <div class="mode-switch">
             <button
               type="button"
@@ -29,15 +38,6 @@
               冲突预约
             </button>
           </div>
-
-          <select v-if="viewMode === 'list'" v-model="statusFilter" class="reservation-status-select" @change="changeListPage(1)">
-            <option value="">全部状态</option>
-            <option value="1">待审核</option>
-            <option value="2">已通过</option>
-            <option value="3">已驳回</option>
-            <option value="4">已取消</option>
-            <option value="5">已完成</option>
-          </select>
 
           <button type="button" class="ghost-btn" @click="loadPage">刷新</button>
         </div>
