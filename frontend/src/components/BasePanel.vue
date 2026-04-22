@@ -1,11 +1,9 @@
-﻿<template>
+<template>
   <article class="panel" :class="panelClass">
-    <div class="panel-head" v-if="title || note || tag">
+    <div class="panel-head" v-if="title">
       <div>
-        <span v-if="tag" class="panel-tag">{{ tag }}</span>
-        <h3 v-if="title">{{ title }}</h3>
+        <h3>{{ title }}</h3>
       </div>
-      <span v-if="note" class="panel-note">{{ note }}</span>
     </div>
     <slot />
   </article>
@@ -19,4 +17,3 @@ defineProps<{
   panelClass?: string;
 }>();
 </script>
-

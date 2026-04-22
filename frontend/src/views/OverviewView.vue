@@ -17,19 +17,25 @@
             <small>点击查看今日预约时间轴</small>
           </button>
 
-          <div class="overview-summary-card overview-summary-card-duo">
-            <button type="button" class="summary-half" @click="goToReservations('pending')">
-              <span class="summary-label">待审核数量</span>
-              <strong>{{ dashboard.todayOverview.pending }}</strong>
-              <small>跳转预约管理</small>
-            </button>
-            <span class="summary-divider" />
-            <button type="button" class="summary-half" @click="goToReservations('conflict')">
-              <span class="summary-label">冲突数量</span>
-              <strong>{{ dashboard.todayOverview.conflict }}</strong>
-              <small>跳转冲突处理</small>
-            </button>
-          </div>
+          <button
+            type="button"
+            class="overview-summary-card overview-summary-card-action overview-summary-card-pending"
+            @click="goToReservations('pending')"
+          >
+            <span class="summary-label">待审核数量</span>
+            <strong>{{ dashboard.todayOverview.pending }}</strong>
+            <small>点击前往预约管理</small>
+          </button>
+
+          <button
+            type="button"
+            class="overview-summary-card overview-summary-card-action overview-summary-card-conflict"
+            @click="goToReservations('conflict')"
+          >
+            <span class="summary-label">冲突数量</span>
+            <strong>{{ dashboard.todayOverview.conflict }}</strong>
+            <small>点击前往冲突预约管理</small>
+          </button>
         </div>
       </template>
       <div v-else class="empty-state">正在加载每日预约概览...</div>
@@ -71,7 +77,11 @@
       </div>
 
       <div class="timeline-dialog-body">
-        <article v-for="item in pagedTimelineItems" :key="`${item.reservationId}-${item.labId}-${item.periodId}`" class="timeline-item">
+        <article
+          v-for="item in pagedTimelineItems"
+          :key="`${item.reservationId}-${item.labId}-${item.periodId}`"
+          class="timeline-item"
+        >
           <div class="timeline-time">{{ item.timeRange || '--' }}</div>
           <div class="timeline-body">
             <div class="timeline-title-row">
@@ -115,7 +125,7 @@ const timelinePageSize = 5;
 
 const fallbackCards: DashboardCardDto[] = [
   { label: '开放实验室', value: '--', trend: '当前可预约实验室', tone: 'success' },
-  { label: '待审核申请', value: '--', trend: '待管理员审核', tone: 'warning' },
+  { label: '待审核申请', value: '--', trend: '等待管理员审核', tone: 'warning' },
   { label: '低库存耗材', value: '--', trend: '需要补货提醒', tone: 'accent' },
   { label: '设备维护中', value: '--', trend: '需要关注设备状态', tone: 'brand' },
 ];
@@ -194,7 +204,7 @@ onMounted(() => {
 
 .overview-summary-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -238,38 +248,50 @@ onMounted(() => {
 
 .overview-summary-card-total {
   background: linear-gradient(180deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.04));
+  border-color: rgba(59, 130, 246, 0.18);
 }
 
-.overview-summary-card-duo {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  padding: 0;
-  overflow: hidden;
+.overview-summary-card-total .summary-label {
+  color: #1d4ed8;
 }
 
-.summary-half {
-  border: 0;
-  background: transparent;
-  text-align: left;
-  padding: 18px 20px;
-  cursor: pointer;
+.overview-summary-card-action {
+  position: relative;
 }
 
-.summary-half strong {
-  display: block;
-  margin-top: 8px;
-  font-size: 34px;
-  line-height: 1;
-  color: #0f172a;
+.overview-summary-card-action::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 
-.summary-half:hover {
-  background: rgba(255, 255, 255, 0.75);
+.overview-summary-card-pending {
+  background: linear-gradient(180deg, rgba(251, 191, 36, 0.16), rgba(251, 191, 36, 0.05));
+  border-color: rgba(245, 158, 11, 0.22);
 }
 
-.summary-divider {
-  width: 1px;
-  background: rgba(148, 163, 184, 0.28);
+.overview-summary-card-pending .summary-label {
+  color: #b45309;
+}
+
+.overview-summary-card-pending strong {
+  color: #92400e;
+}
+
+.overview-summary-card-conflict {
+  background: linear-gradient(180deg, rgba(248, 113, 113, 0.16), rgba(248, 113, 113, 0.05));
+  border-color: rgba(239, 68, 68, 0.22);
+}
+
+.overview-summary-card-conflict .summary-label {
+  color: #b91c1c;
+}
+
+.overview-summary-card-conflict strong {
+  color: #991b1b;
 }
 
 .occupancy-type-list {
@@ -524,7 +546,13 @@ onMounted(() => {
   font-size: 13px;
 }
 
-@media (max-width: 1440px) {
+@media (max-width: 1360px) {
+  .overview-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
   .overview-summary-grid {
     grid-template-columns: 1fr;
   }
@@ -534,15 +562,6 @@ onMounted(() => {
   .timeline-item {
     grid-template-columns: 1fr;
     align-items: flex-start;
-  }
-
-  .overview-summary-card-duo {
-    grid-template-columns: 1fr;
-  }
-
-  .summary-divider {
-    width: 100%;
-    height: 1px;
   }
 
   .timeline-dialog-footer {

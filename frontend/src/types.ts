@@ -413,6 +413,7 @@ export interface ReservationDto {
   reservationNo: string;
   labId: number;
   applicantUserId: number;
+  applicantName?: string;
   approverUserId?: number;
   reservationType: number;
   priorityLevel: number;

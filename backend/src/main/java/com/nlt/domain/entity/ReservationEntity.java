@@ -14,6 +14,8 @@ public class ReservationEntity {
 
     private Long applicantUserId;
 
+    private String applicantName;
+
     private Long approverUserId;
 
     private Integer reservationType;
@@ -41,4 +43,3 @@ public class ReservationEntity {
     private LocalDateTime updatedAt;
 
 }
-

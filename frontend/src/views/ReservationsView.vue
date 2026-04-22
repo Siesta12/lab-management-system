@@ -2,47 +2,53 @@
   <section class="content-grid">
     <BasePanel
       tag="预约管理"
-      :title="viewMode === 'conflict' ? '冲突预约列表' : '预约列表'"
-      :note="panelNote"
+      :note="viewMode === 'conflict' ? `共 ${conflictState.total} 条` : `共 ${state.total} 条`"
+      panel-class="reservation-panel"
     >
-      <div class="toolbar reservation-toolbar">
-        <div class="mode-switch">
-          <button
-            type="button"
-            class="ghost-btn"
-            :class="{ active: viewMode === 'list' }"
-            @click="switchMode('list')"
-          >
-            预约列表
-          </button>
-          <button
-            type="button"
-            class="ghost-btn"
-            :class="{ active: viewMode === 'conflict' }"
-            @click="switchMode('conflict')"
-          >
-            冲突预约
-          </button>
+      <div class="reservation-header-row">
+        <div class="reservation-header-copy">
+          <h3>{{ viewMode === 'conflict' ? '冲突预约列表' : '预约列表' }}</h3>
         </div>
 
-        <select v-if="viewMode === 'list'" v-model="statusFilter">
-          <option value="">全部状态</option>
-          <option value="1">待审核</option>
-          <option value="2">已通过</option>
-          <option value="3">已驳回</option>
-          <option value="4">已取消</option>
-          <option value="5">已完成</option>
-        </select>
+        <div class="reservation-header-actions">
+          <div class="mode-switch">
+            <button
+              type="button"
+              class="ghost-btn"
+              :class="{ active: viewMode === 'list' }"
+              @click="switchMode('list')"
+            >
+              预约列表
+            </button>
+            <button
+              type="button"
+              class="ghost-btn"
+              :class="{ active: viewMode === 'conflict' }"
+              @click="switchMode('conflict')"
+            >
+              冲突预约
+            </button>
+          </div>
 
-        <button type="button" class="ghost-btn" @click="loadPage">刷新</button>
+          <select v-if="viewMode === 'list'" v-model="statusFilter" class="reservation-status-select" @change="changeListPage(1)">
+            <option value="">全部状态</option>
+            <option value="1">待审核</option>
+            <option value="2">已通过</option>
+            <option value="3">已驳回</option>
+            <option value="4">已取消</option>
+            <option value="5">已完成</option>
+          </select>
+
+          <button type="button" class="ghost-btn" @click="loadPage">刷新</button>
+        </div>
       </div>
 
-      <p v-if="message" class="info-text">{{ message }}</p>
-      <p v-if="queryHint" class="info-text">{{ queryHint }}</p>
+      <p v-if="message" class="error-text">{{ message }}</p>
 
       <BaseTable
         v-if="viewMode === 'conflict'"
-        :headers="['实验室', '日期', '节次', '冲突数量', '预约详情']"
+        class="reservation-table"
+        :headers="['实验室', '日期', '节次', '冲突数量']"
       >
         <tr
           v-for="item in conflictState.list"
@@ -54,13 +60,13 @@
           <td>{{ item.reservationDate }}</td>
           <td>{{ item.periodName }}</td>
           <td><span class="badge badge-warning">{{ item.conflictCount }} 条</span></td>
-          <td>{{ conflictSummary(item) }}</td>
         </tr>
       </BaseTable>
 
       <BaseTable
         v-else
-        :headers="['预约编号', '实验室', '申请人', '时段详情', '状态']"
+        class="reservation-table"
+        :headers="['实验室', '申请人', '时段详情', '状态']"
       >
         <tr
           v-for="item in filteredReservations"
@@ -68,9 +74,12 @@
           class="clickable-row"
           @click="openReservationDialog(item.id)"
         >
-          <td>{{ item.reservationNo }}</td>
           <td>{{ labName(item.labId) }}</td>
-          <td>#{{ item.applicantUserId }}</td>
+          <td>
+            <div class="reservation-user-cell">
+              <span>{{ item.applicantName || `#${item.applicantUserId}` }}</span>
+            </div>
+          </td>
           <td>
             <div class="reservation-summary-cell">
               <span>{{ slotSummary(item) }}</span>
@@ -79,19 +88,54 @@
           </td>
           <td>
             <div class="status-stack">
-              <span v-if="isConflictReservation(item.id)" class="badge badge-warning">冲突预约</span>
-              <span :class="getBadgeClass(statusText(item.status))">{{ statusText(item.status) }}</span>
+              <span
+                v-if="isConflictReservation(item.id)"
+                class="badge badge-warning badge-inline"
+              >
+                冲突 · {{ statusText(item.status) }}
+              </span>
+              <span v-else :class="getBadgeClass(statusText(item.status))">{{ statusText(item.status) }}</span>
             </div>
           </td>
         </tr>
       </BaseTable>
 
-      <p v-if="viewMode === 'list' && !filteredReservations.length" class="info-text">
-        当前筛选条件下暂无预约记录。
-      </p>
-      <p v-if="viewMode === 'conflict' && !conflictState.list.length" class="info-text">
-        当前没有冲突预约。
-      </p>
+      <div v-if="viewMode === 'list'" class="pagination-wrap">
+        <span class="pagination-total">共 {{ state.total }} 条</span>
+        <span class="pagination-text">第 {{ listPage }} / {{ listPageCount }} 页</span>
+        <button type="button" class="ghost-btn small-btn" :disabled="listPage === 1" @click="changeListPage(listPage - 1)">
+          上一页
+        </button>
+        <button
+          type="button"
+          class="ghost-btn small-btn"
+          :disabled="listPage === listPageCount"
+          @click="changeListPage(listPage + 1)"
+        >
+          下一页
+        </button>
+      </div>
+
+      <div v-else class="pagination-wrap">
+        <span class="pagination-total">共 {{ conflictState.total }} 条</span>
+        <span class="pagination-text">第 {{ conflictPage }} / {{ conflictPageCount }} 页</span>
+        <button
+          type="button"
+          class="ghost-btn small-btn"
+          :disabled="conflictPage === 1"
+          @click="changeConflictPage(conflictPage - 1)"
+        >
+          上一页
+        </button>
+        <button
+          type="button"
+          class="ghost-btn small-btn"
+          :disabled="conflictPage === conflictPageCount"
+          @click="changeConflictPage(conflictPage + 1)"
+        >
+          下一页
+        </button>
+      </div>
     </BasePanel>
   </section>
 
@@ -154,7 +198,7 @@
         <div v-if="selected" class="detail-stack">
           <div class="detail-card">
             <h4>{{ labName(selected.labId) }}</h4>
-            <p>{{ selected.reservationNo }}</p>
+            <p>{{ selected.applicantName || `#${selected.applicantUserId}` }} / {{ selected.reservationNo }}</p>
           </div>
 
           <div class="detail-list">
@@ -234,11 +278,10 @@ import { getBadgeClass } from '../utils/format';
 const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
+
 const message = ref('');
-const queryHint = ref('');
 const viewMode = ref<'list' | 'conflict'>('list');
 const statusFilter = ref('');
-const queryView = ref('');
 const state = ref<{ list: ReservationDto[]; total: number }>({ list: [], total: 0 });
 const conflictState = ref<{ list: ReservationConflictSlotDto[]; total: number }>({ list: [], total: 0 });
 const conflictReservationIds = ref<Set<number>>(new Set());
@@ -249,24 +292,14 @@ const labs = ref<LabDto[]>([]);
 const auditComment = ref('');
 const rejectReason = ref('');
 const detailDialogVisible = ref(false);
+const listPage = ref(1);
+const conflictPage = ref(1);
+const listPageSize = 8;
+const conflictPageSize = 8;
 
-const filteredReservations = computed(() => {
-  if (!statusFilter.value) {
-    return state.value.list;
-  }
-  return state.value.list.filter((item) => String(item.status) === statusFilter.value);
-});
-
-const panelNote = computed(() => {
-  if (viewMode.value === 'conflict') {
-    return `已加载冲突时段，共 ${conflictState.value.total} 条`;
-  }
-  if (queryView.value === 'pending') {
-    return `当前为待审核视图，共 ${filteredReservations.value.length} 条`;
-  }
-  return `共 ${filteredReservations.value.length} 条`;
-});
-
+const filteredReservations = computed(() => state.value.list);
+const listPageCount = computed(() => Math.max(1, Math.ceil(state.value.total / listPageSize)));
+const conflictPageCount = computed(() => Math.max(1, Math.ceil(conflictState.value.total / conflictPageSize)));
 const detailDialogTag = computed(() => (viewMode.value === 'conflict' ? '冲突详情' : '预约详情'));
 const detailDialogTitle = computed(() => (viewMode.value === 'conflict' ? '冲突时段详情' : '预约详情与审批'));
 
@@ -289,21 +322,8 @@ function labName(id: number): string {
 
 function slotSummary(item: ReservationDto): string {
   const parts = item.slots?.map((slot) => `${slot.reservationDate} ${slot.periodName}`) ?? [];
-  if (parts.length <= 2) {
-    return parts.join('，') || '--';
-  }
+  if (parts.length <= 2) return parts.join('，') || '--';
   return `${parts.slice(0, 2).join('，')} 等（共 ${parts.length} 项）`;
-}
-
-function conflictSummary(item: ReservationConflictSlotDto): string {
-  const names = item.reservations.map((reservation) => reservation.applicantName).filter(Boolean);
-  if (!names.length) {
-    return '--';
-  }
-  if (names.length <= 2) {
-    return names.join('、');
-  }
-  return `${names.slice(0, 2).join('、')} 等`;
 }
 
 function isConflictReservation(id: number): boolean {
@@ -339,77 +359,62 @@ function auditActionText(action: number): string {
   return '状态变更';
 }
 
-function syncQueryFilter(): void {
-  const status = typeof route.query.status === 'string' ? route.query.status : '';
-  const view = typeof route.query.view === 'string' ? route.query.view : '';
-  queryView.value = view;
-
-  if (status === 'conflict' || view === 'conflict') {
-    viewMode.value = 'conflict';
-    statusFilter.value = '';
-    queryHint.value = '已定位到冲突预约列表。';
-    return;
-  }
-
-  viewMode.value = 'list';
-
-  if (status === 'pending' || view === 'pending') {
-    statusFilter.value = '1';
-    queryHint.value = '已定位到待审核预约。';
-    return;
-  }
-
-  if (/^\d+$/.test(status)) {
-    statusFilter.value = status;
-    queryHint.value = '';
-    return;
-  }
-
-  statusFilter.value = '';
-  queryHint.value = '';
-}
-
 async function loadPage(): Promise<void> {
   try {
     const labPromise = fetchLabs({ pageNum: 1, pageSize: 200 }, auth.token.value);
+
     if (viewMode.value === 'conflict') {
-      const [conflictPage, labData] = await Promise.all([
-        fetchConflictReservations({ pageNum: 1, pageSize: 30 }, auth.token.value),
+      const [conflictPageData, labData] = await Promise.all([
+        fetchConflictReservations({ pageNum: conflictPage.value, pageSize: conflictPageSize }, auth.token.value),
         labPromise,
       ]);
-      conflictState.value = conflictPage;
+      conflictState.value = conflictPageData;
       conflictReservationIds.value = new Set(
-        conflictPage.list.flatMap((item) => item.reservations.map((reservation) => reservation.reservationId)),
+        conflictPageData.list.flatMap((item) => item.reservations.map((reservation) => reservation.reservationId)),
       );
-      state.value = { list: [], total: 0 };
       labs.value = labData.list;
-      message.value = '已加载冲突预约列表。';
       return;
     }
 
-    const [page, conflictPage, labData] = await Promise.all([
-      fetchReservations({ pageNum: 1, pageSize: 30 }, auth.token.value),
+    const status = statusFilter.value ? Number(statusFilter.value) : undefined;
+    const [pageData, conflictPageData, labData] = await Promise.all([
+      fetchReservations(
+        { pageNum: listPage.value, pageSize: listPageSize, status },
+        auth.token.value,
+      ),
       fetchConflictReservations({ pageNum: 1, pageSize: 200 }, auth.token.value),
       labPromise,
     ]);
-    state.value = page;
-    conflictState.value = conflictPage;
+    state.value = pageData;
+    conflictState.value = conflictPageData;
     conflictReservationIds.value = new Set(
-      conflictPage.list.flatMap((item) => item.reservations.map((reservation) => reservation.reservationId)),
+      conflictPageData.list.flatMap((item) => item.reservations.map((reservation) => reservation.reservationId)),
     );
     labs.value = labData.list;
-    message.value = '已加载预约列表。';
   } catch (error) {
     message.value = error instanceof Error ? error.message : '加载失败。';
   }
 }
 
+function changeListPage(page: number): void {
+  listPage.value = Math.max(1, page);
+  void loadPage();
+}
+
+function changeConflictPage(page: number): void {
+  conflictPage.value = Math.max(1, page);
+  void loadPage();
+}
+
 async function switchMode(mode: 'list' | 'conflict'): Promise<void> {
-  if (viewMode.value === mode) {
-    return;
-  }
+  if (viewMode.value === mode) return;
   closeDetailDialog();
   viewMode.value = mode;
+  if (mode === 'list') {
+    listPage.value = 1;
+  } else {
+    conflictPage.value = 1;
+  }
   await loadPage();
 
   const query: Record<string, string> = { ...(route.query as Record<string, string>) };
@@ -449,7 +454,7 @@ function openConflictDialog(item: ReservationConflictSlotDto): void {
 
 async function viewReservation(id: number): Promise<void> {
   viewMode.value = 'list';
-  selectedConflict.value = null;
+  listPage.value = 1;
   const query: Record<string, string> = { ...(route.query as Record<string, string>) };
   delete query.view;
   await router.replace({ query });
@@ -461,7 +466,6 @@ async function handleApprove(): Promise<void> {
   if (!selected.value) return;
   try {
     await approveReservation(selected.value.id, auth.token.value, auditComment.value || undefined);
-    message.value = '已审核通过。';
     closeDetailDialog();
     await loadPage();
   } catch (error) {
@@ -482,7 +486,6 @@ async function handleReject(): Promise<void> {
       rejectReason.value.trim(),
       auditComment.value || undefined,
     );
-    message.value = '已驳回。';
     closeDetailDialog();
     await loadPage();
   } catch (error) {
@@ -490,22 +493,50 @@ async function handleReject(): Promise<void> {
   }
 }
 
-onMounted(async () => {
-  syncQueryFilter();
-  await loadPage();
-});
-
 watch(
   () => route.query,
   () => {
-    syncQueryFilter();
+    const view = typeof route.query.view === 'string' ? route.query.view : '';
+    if (view === 'conflict') {
+      viewMode.value = 'conflict';
+    } else {
+      viewMode.value = 'list';
+    }
   },
 );
+
+onMounted(async () => {
+  const view = typeof route.query.view === 'string' ? route.query.view : '';
+  viewMode.value = view === 'conflict' ? 'conflict' : 'list';
+  await loadPage();
+});
 </script>
 
 <style scoped>
-.reservation-toolbar {
-  gap: 12px;
+.reservation-panel {
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+.reservation-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.reservation-header-copy h3 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.15;
+}
+
+.reservation-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .mode-switch {
@@ -519,21 +550,120 @@ watch(
   border-color: #bdd0ff;
 }
 
+.reservation-status-select {
+  min-width: 160px;
+  padding: 10px 40px 10px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.9);
+  color: #0f172a;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 8px 20px rgba(15, 23, 42, 0.04);
+}
+
+.reservation-status-select:focus {
+  border-color: rgba(37, 99, 235, 0.44);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1), 0 14px 28px rgba(37, 99, 235, 0.08);
+  outline: none;
+}
+
 .reservation-summary-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.reservation-user-cell {
   display: grid;
-  gap: 4px;
+  gap: 0;
+  min-width: 0;
 }
 
 .conflict-inline-note {
   color: #c2410c;
   font-size: 12px;
   line-height: 1.2;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .status-stack {
-  display: grid;
-  gap: 6px;
-  justify-items: start;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.badge-inline {
+  white-space: nowrap;
+}
+
+.reservation-table :deep(table) {
+  table-layout: fixed;
+}
+
+.reservation-table :deep(th:nth-child(1)),
+.reservation-table :deep(td:nth-child(1)) {
+  width: 28%;
+}
+
+.reservation-table :deep(th:nth-child(2)),
+.reservation-table :deep(td:nth-child(2)) {
+  width: 18%;
+}
+
+.reservation-table :deep(th:nth-child(3)),
+.reservation-table :deep(td:nth-child(3)) {
+  width: 34%;
+}
+
+.reservation-table :deep(th:nth-child(4)),
+.reservation-table :deep(td:nth-child(4)) {
+  width: 20%;
+}
+
+.reservation-table :deep(th),
+.reservation-table :deep(td) {
+  height: 60px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  vertical-align: middle;
+}
+
+.reservation-table :deep(td) {
+  overflow: hidden;
+}
+
+.reservation-table :deep(td:nth-child(1)),
+.reservation-table :deep(td:nth-child(2)),
+.reservation-table :deep(td:nth-child(4)) {
+  white-space: nowrap;
+}
+
+.reservation-table :deep(td:nth-child(3) .reservation-summary-cell span) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pagination-wrap {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.pagination-total {
+  margin-right: auto;
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.72);
+}
+
+.pagination-text {
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.8);
 }
 
 .detail-dialog-mask {
@@ -637,6 +767,11 @@ watch(
 }
 
 @media (max-width: 640px) {
+  .reservation-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .detail-dialog-mask {
     padding: 12px;
   }

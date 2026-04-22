@@ -1196,8 +1196,19 @@ onMounted(async () => {
 }
 
 .toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
+}
+
+.toolbar-title {
+  margin-right: 8px;
+  color: #0f172a;
+  font-size: 28px;
+  line-height: 1.15;
+  font-weight: 700;
 }
 
 .toolbar input {

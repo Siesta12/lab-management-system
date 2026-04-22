@@ -440,6 +440,7 @@ public class ReservationServiceImpl implements ReservationService {
             entity.getReservationNo(),
             entity.getLabId(),
             entity.getApplicantUserId(),
+            entity.getApplicantName(),
             entity.getApproverUserId(),
             entity.getReservationType(),
             entity.getPriorityLevel(),

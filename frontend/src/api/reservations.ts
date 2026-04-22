@@ -11,6 +11,7 @@ import { get, post, put } from './http';
 export interface ReservationQuery {
   pageNum?: number;
   pageSize?: number;
+  status?: number;
   conflictOnly?: boolean;
 }
 
@@ -18,6 +19,9 @@ export function fetchReservations(query: ReservationQuery = {}, token?: string):
   const params = new URLSearchParams();
   params.set('pageNum', String(query.pageNum ?? 1));
   params.set('pageSize', String(query.pageSize ?? 10));
+  if (query.status !== undefined && query.status !== null) {
+    params.set('status', String(query.status));
+  }
   if (query.conflictOnly) {
     params.set('conflictOnly', 'true');
   }
@@ -31,6 +35,9 @@ export function fetchConflictReservations(
   const params = new URLSearchParams();
   params.set('pageNum', String(query.pageNum ?? 1));
   params.set('pageSize', String(query.pageSize ?? 10));
+  if (query.status !== undefined && query.status !== null) {
+    params.set('status', String(query.status));
+  }
   return get<PageData<ReservationConflictSlotDto>>(`/reservations/conflicts?${params.toString()}`, token);
 }
 

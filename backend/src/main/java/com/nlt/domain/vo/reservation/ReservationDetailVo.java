@@ -18,6 +18,8 @@ public class ReservationDetailVo {
 
     private Long applicantUserId;
 
+    private String applicantName;
+
     private Long approverUserId;
 
     private Integer reservationType;
@@ -46,5 +48,4 @@ public class ReservationDetailVo {
 
     private List<ReservationSlotVo> slots;
 }
-
 
