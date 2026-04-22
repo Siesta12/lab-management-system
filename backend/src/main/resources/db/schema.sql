@@ -108,6 +108,8 @@ CREATE TABLE `lab` (
     `lab_status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 normal, 2 maintenance, 0 disabled',
     `description` VARCHAR(500) DEFAULT NULL COMMENT 'Description',
     `usage_rule` VARCHAR(500) DEFAULT NULL COMMENT 'Usage rule',
+    `latitude` DOUBLE DEFAULT NULL COMMENT '实验室纬度',
+    `longitude` DOUBLE DEFAULT NULL COMMENT '实验室经度',
     `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '0 active, 1 deleted',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated time',

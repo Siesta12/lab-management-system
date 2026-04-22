@@ -1,6 +1,32 @@
 ﻿import type { ApiResponse } from '../types';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8080';
+function resolveApiBaseUrl(): string {
+  if (import.meta.env.DEV) {
+    return '';
+  }
+
+  const envApiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+
+  if (typeof window === 'undefined') {
+    return envApiBaseUrl || 'http://localhost:8080';
+  }
+
+  const currentHost = window.location.hostname;
+  const isLocalHost = currentHost === 'localhost' || currentHost === '127.0.0.1';
+  const envPointsToLocalHost = Boolean(envApiBaseUrl && /\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(envApiBaseUrl));
+
+  if (envApiBaseUrl && (!envPointsToLocalHost || isLocalHost)) {
+    return envApiBaseUrl;
+  }
+
+  return `${window.location.protocol}//${currentHost}:8080`;
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
+
+export function getApiBaseUrl(): string {
+  return API_BASE_URL || window.location.origin;
+}
 
 export class ApiError extends Error {
   code: number;
@@ -26,18 +52,32 @@ function buildHeaders(token?: string, hasBody = false): HeadersInit {
 }
 
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      ...buildHeaders(token, Boolean(init.body)),
-      ...(init.headers ?? {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: {
+        ...buildHeaders(token, Boolean(init.body)),
+        ...(init.headers ?? {}),
+      },
+    });
+  } catch {
+    throw new ApiError(0, `无法连接到服务端：${API_BASE_URL}`);
+  }
 
-  const body = (await response.json()) as ApiResponse<T>;
+  let body: ApiResponse<T> | null = null;
+  try {
+    body = (await response.json()) as ApiResponse<T>;
+  } catch {
+    body = null;
+  }
 
   if (!response.ok) {
-    throw new ApiError(response.status, body?.message ?? '请求失败');
+    throw new ApiError(response.status, body?.message ?? `请求失败：${response.status}`);
+  }
+
+  if (!body) {
+    throw new ApiError(response.status, '服务端返回了无效响应');
   }
 
   if (body.code !== 200) {

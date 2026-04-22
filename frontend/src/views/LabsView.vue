@@ -98,6 +98,9 @@
             <button v-if="isAdmin" type="button" class="tab-btn" :class="{ active: detailTab === 'manage' }" @click="detailTab = 'manage'">
               管理
             </button>
+            <button v-if="isAdmin" type="button" class="tab-btn" :class="{ active: detailTab === 'checkin' }" @click="detailTab = 'checkin'">
+              签到二维码
+            </button>
           </div>
 
           <div v-show="detailTab === 'schedule'" class="detail-pane">
@@ -431,6 +434,61 @@
               </button>
             </div>
           </div>
+
+          <div v-if="isAdmin" v-show="detailTab === 'checkin'" class="detail-pane">
+            <div class="checkin-qr-layout">
+              <div class="checkin-qr-main">
+                <div class="checkin-qr-left">
+                  <div class="checkin-qr-card">
+                    <h5 class="section-title">实验室信息</h5>
+                    <div class="detail-kv">
+                      <div class="kv">
+                        <span class="kv-label">实验室名称</span>
+                        <span class="kv-value">{{ selectedLab.labName || '未获取到实验室信息' }}</span>
+                      </div>
+                      <div class="kv">
+                        <span class="kv-label">实验室编号</span>
+                        <span class="kv-value">{{ buildLocation(selectedLab) || '未获取到实验室信息' }}</span>
+                      </div>
+                      <div class="kv">
+                        <span class="kv-label">所属学院</span>
+                        <span class="kv-value">{{ selectedDepartmentName }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="checkin-qr-card">
+                    <div class="checkin-link-head">
+                      <h5 class="section-title">签到链接</h5>
+                      <button type="button" class="ghost-btn small-btn" :disabled="checkinQrUnavailable" @click="copyCheckinLink">
+                        复制链接
+                      </button>
+                    </div>
+                    <div class="checkin-link-box" :class="{ disabled: checkinQrUnavailable }">
+                      {{ checkinLink || '未获取到实验室信息' }}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="checkin-qr-card checkin-qr-visual-card">
+                  <h5 class="section-title">签到二维码</h5>
+                  <div class="checkin-qr-preview" :class="{ empty: !checkinQrCodeDataUrl }">
+                    <img v-if="checkinQrCodeDataUrl" :src="checkinQrCodeDataUrl" alt="签到二维码" />
+                    <span v-else>未获取到实验室信息</span>
+                  </div>
+                  <button
+                    type="button"
+                    class="primary-btn checkin-download-btn"
+                    :disabled="!checkinQrCodeDataUrl"
+                    @click="downloadCheckinQrCode"
+                  >
+                    下载二维码
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
         </div>
 
         <p v-else class="info-text">请选择实验室查看详情与课表。</p>
@@ -454,6 +512,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import QRCode from 'qrcode';
 import { fetchConsumables } from '../api/consumables';
 import { fetchDepartmentOptions } from '../api/departments';
 import { fetchDevices } from '../api/devices';
@@ -506,9 +565,10 @@ const selectedConsumables = ref<ConsumableDto[]>([]);
 const maintenances = ref<LabMaintenanceDto[]>([]);
 const detailVisible = ref(false);
 const loadingDetail = ref(false);
-const detailTab = ref<'schedule' | 'detail' | 'manage'>('schedule');
+const detailTab = ref<'schedule' | 'detail' | 'manage' | 'checkin'>('schedule');
 const currentPage = ref(1);
 const pageSize = ref(10);
+const checkinQrCodeDataUrl = ref('');
 
 const schedule = ref<LabScheduleDto | null>(null);
 const scheduleMessage = ref('');
@@ -634,6 +694,22 @@ const selectedDepartmentName = computed(() => {
   }
   return departments.value.find((item) => item.value === selectedLab.value?.departmentId)?.label ?? '所属学院待补充';
 });
+const checkinPath = computed(() => {
+  if (!selectedLab.value?.id) {
+    return '';
+  }
+  return `/checkin?lab_id=${selectedLab.value.id}`;
+});
+const checkinLink = computed(() => {
+  if (!checkinPath.value) {
+    return '';
+  }
+  if (typeof window === 'undefined' || !window.location.origin) {
+    return checkinPath.value;
+  }
+  return `${window.location.origin}${checkinPath.value}`;
+});
+const checkinQrUnavailable = computed(() => !selectedLab.value?.id);
 
 const canSubmitReservation = computed(() => {
   return (
@@ -725,6 +801,61 @@ function composeUsagePurpose(): string {
   return reservationForm.usagePurpose.trim();
 }
 
+async function buildCheckinQrCode(): Promise<void> {
+  if (!selectedLab.value?.id || !checkinLink.value) {
+    checkinQrCodeDataUrl.value = '';
+    return;
+  }
+  try {
+    checkinQrCodeDataUrl.value = await QRCode.toDataURL(checkinLink.value, {
+      width: 280,
+      margin: 2,
+      color: {
+        dark: '#0f172a',
+        light: '#ffffff',
+      },
+    });
+  } catch (error) {
+    checkinQrCodeDataUrl.value = '';
+    showToast('error', error instanceof Error ? error.message : '签到二维码生成失败');
+  }
+}
+
+async function copyCheckinLink(): Promise<void> {
+  if (!checkinLink.value) {
+    showToast('error', '未获取到实验室信息');
+    return;
+  }
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(checkinLink.value);
+    } else {
+      const input = document.createElement('input');
+      input.value = checkinLink.value;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+    }
+    showToast('success', '复制成功');
+  } catch (error) {
+    showToast('error', error instanceof Error ? error.message : '复制链接失败');
+  }
+}
+
+function downloadCheckinQrCode(): void {
+  if (!checkinQrCodeDataUrl.value || !selectedLab.value?.labName) {
+    showToast('error', '未获取到实验室信息');
+    return;
+  }
+  const anchor = document.createElement('a');
+  anchor.href = checkinQrCodeDataUrl.value;
+  anchor.download = `${selectedLab.value.labName}-签到二维码.png`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+}
+
 async function loadLabs(pageNum = currentPage.value): Promise<void> {
   currentPage.value = Math.max(pageNum, 1);
   try {
@@ -801,6 +932,7 @@ function closeDetailModal(): void {
   schedule.value = null;
   scheduleMessage.value = '';
   recommendations.value = [];
+  checkinQrCodeDataUrl.value = '';
   clearSelection();
 }
 
@@ -1182,6 +1314,16 @@ watch(
       return;
     }
     await loadLabs(1);
+  },
+);
+
+watch(
+  [detailTab, selectedLab],
+  async ([tab, lab]) => {
+    if (!isAdmin.value || tab !== 'checkin' || !lab) {
+      return;
+    }
+    await buildCheckinQrCode();
   },
 );
 
@@ -1653,6 +1795,90 @@ onMounted(async () => {
   margin-bottom: 8px;
 }
 
+.checkin-qr-layout {
+  display: grid;
+  gap: 12px;
+}
+
+.checkin-qr-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.checkin-qr-left {
+  display: grid;
+  gap: 12px;
+}
+
+.checkin-qr-card {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  padding: 18px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+  display: grid;
+  gap: 14px;
+}
+
+.checkin-link-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.checkin-link-box {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(248, 250, 252, 0.92);
+  color: #0f172a;
+  line-height: 1.7;
+  word-break: break-all;
+}
+
+.checkin-link-box.disabled {
+  color: #64748b;
+}
+
+.checkin-qr-visual-card {
+  justify-items: center;
+  align-content: start;
+}
+
+.checkin-qr-preview {
+  width: 100%;
+  min-height: 320px;
+  border-radius: 20px;
+  border: 1px dashed rgba(148, 163, 184, 0.3);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.92));
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.checkin-qr-preview img {
+  width: min(280px, 100%);
+  height: auto;
+  display: block;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 14px;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12);
+}
+
+.checkin-qr-preview.empty {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.checkin-download-btn {
+  min-width: 180px;
+}
+
 .schedule-head {
   display: flex;
   align-items: center;
@@ -2025,6 +2251,11 @@ onMounted(async () => {
     flex-direction: column;
     align-items: stretch;
   }
+
+  .checkin-qr-main {
+    grid-template-columns: 1fr;
+  }
+
 }
 
 .legend-item.free {

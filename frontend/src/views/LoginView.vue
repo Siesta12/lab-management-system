@@ -56,19 +56,16 @@
           </label>
 
           <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
+          <p v-if="statusMessage" class="status-text">{{ statusMessage }}</p>
 
           <button
               type="submit"
               class="login-btn"
-              :disabled="auth.state.loading || !canSubmit"
+              :disabled="submitting || !canSubmit"
           >
-            {{ auth.state.loading ? '登录中...' : '登录' }}
+            {{ submitting ? '登录中...' : '登录' }}
           </button>
         </form>
-
-        <div class="login-footer">
-          <span>建议使用 Chrome 浏览器访问</span>
-        </div>
       </div>
     </div>
   </section>
@@ -89,28 +86,49 @@ const form = reactive({
 });
 
 const errorMessage = ref('');
+const statusMessage = ref('');
+const submitting = ref(false);
 const canSubmit = computed(() => Boolean(form.username.trim()) && Boolean(form.password.trim()));
 
 async function handleSubmit(): Promise<void> {
   errorMessage.value = '';
+  statusMessage.value = '准备提交登录请求...';
 
   if (!form.username.trim()) {
     errorMessage.value = '请输入用户名';
+    statusMessage.value = '';
     return;
   }
 
   if (!form.password.trim()) {
     errorMessage.value = '请输入密码';
+    statusMessage.value = '';
     return;
   }
 
   try {
+    submitting.value = true;
+    statusMessage.value = '正在请求登录接口...';
     await auth.signIn(form);
-    await auth.loadProfile();
-    await router.push(getFirstAccessiblePath(auth.currentUser.value?.roleCodes));
+    const roleCodes = auth.currentUser.value?.roleCodes ?? [];
+    const targetPath = getFirstAccessiblePath(roleCodes);
+    statusMessage.value = `登录成功，角色=${roleCodes.join(',') || '空'}，目标=${targetPath}`;
+    await router.push(targetPath);
+    statusMessage.value = '';
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '登录失败，请稍后重试';
+    statusMessage.value = '';
+  } finally {
+    submitting.value = false;
   }
 }
 </script>
 
+<style scoped>
+.status-text {
+  margin: 0;
+  color: #2563eb;
+  font-size: 13px;
+  line-height: 1.5;
+}
+</style>

@@ -6,6 +6,7 @@ export interface LabQuery {
   pageSize?: number;
   labId?: number;
   labName?: string;
+  labCode?: string;
   labType?: string;
   departmentId?: number;
   openStatus?: number;
@@ -22,6 +23,9 @@ export function fetchLabs(query: LabQuery = {}, token?: string): Promise<PageDat
   }
   if (query.labName) {
     params.set('labName', query.labName);
+  }
+  if (query.labCode) {
+    params.set('labCode', query.labCode);
   }
   if (query.labType) {
     params.set('labType', query.labType);

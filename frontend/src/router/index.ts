@@ -12,6 +12,7 @@ import ProfileView from '../views/ProfileView.vue';
 import ReservationsView from '../views/ReservationsView.vue';
 import StatisticsView from '../views/StatisticsView.vue';
 import StudentHomeView from '../views/StudentHomeView.vue';
+import CheckinView from '../views/checkin/CheckinView.vue';
 import TeacherHomeView from '../views/TeacherHomeView.vue';
 import UsersView from '../views/UsersView.vue';
 import { useAuthStore } from '../stores/auth';
@@ -26,6 +27,15 @@ const router = createRouter({
       meta: {
         public: true,
         title: '登录',
+      },
+    },
+    {
+      path: '/checkin',
+      name: 'checkin',
+      component: CheckinView,
+      meta: {
+        public: true,
+        title: '实验室签到',
       },
     },
     {
@@ -151,32 +161,52 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
 
+  async function ensureCurrentUser(): Promise<boolean> {
+    if (!auth.isAuthenticated.value) {
+      return false;
+    }
+
+    if (auth.currentUser.value || auth.state.loading) {
+      return Boolean(auth.currentUser.value);
+    }
+
+    try {
+      await auth.loadProfile();
+      return Boolean(auth.currentUser.value);
+    } catch {
+      return false;
+    }
+  }
+
   if (to.meta.public) {
-    if (auth.isAuthenticated.value && to.path === '/login') {
-      return getFirstAccessiblePath(auth.currentUser.value?.roleCodes);
+    if (to.path === '/login') {
+      const hasUser = await ensureCurrentUser();
+      if (hasUser) {
+        const targetPath = getFirstAccessiblePath(auth.currentUser.value?.roleCodes);
+        if (targetPath !== to.path) {
+          return targetPath;
+        }
+      }
     }
     return true;
   }
 
-  if (!auth.isAuthenticated.value) {
+  const hasUser = await ensureCurrentUser();
+  if (!hasUser) {
     return '/login';
   }
 
-  if (!auth.currentUser.value && !auth.state.loading) {
-    try {
-      await auth.loadProfile();
-    } catch {
-      return '/login';
-    }
-  }
-
-  if (!auth.currentUser.value) {
+  const currentUser = auth.currentUser.value;
+  if (!currentUser) {
     return '/login';
   }
 
   const roles = to.meta.roles as AppRole[] | undefined;
-  if (!hasRouteAccess(auth.currentUser.value.roleCodes, roles)) {
-    return getFirstAccessiblePath(auth.currentUser.value.roleCodes);
+  if (!hasRouteAccess(currentUser.roleCodes, roles)) {
+    const targetPath = getFirstAccessiblePath(currentUser.roleCodes);
+    if (targetPath !== to.path) {
+      return targetPath;
+    }
   }
 
   return true;
