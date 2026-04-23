@@ -150,6 +150,14 @@
         where id = #{id}
     </update>
 
+    <update id="adjustCreditAndViolation">
+        update sys_user
+        set credit_score = greatest(0, credit_score + #{scoreDelta}),
+            violation_count = violation_count + #{violationDelta}
+        where id = #{id}
+            and deleted = 0
+    </update>
+
     <update id="softDelete">
         update sys_user
         set deleted = 1

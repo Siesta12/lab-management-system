@@ -1,7 +1,9 @@
 package com.nlt.mapper;
 
 import com.nlt.domain.entity.ReservationEntity;
+import com.nlt.domain.vo.reservation.ReservationCheckCandidateVo;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import org.apache.ibatis.annotations.Mapper;
@@ -55,7 +57,20 @@ public interface ReservationMapper {
 
     int checkIn(@Param("id") Long id);
 
-    int checkOut(@Param("id") Long id);
+    int checkInAt(@Param("id") Long id, @Param("checkInTime") LocalDateTime checkInTime);
+
+    List<ReservationCheckCandidateVo> selectCheckInCandidates(@Param("userId") Long userId,
+        @Param("labId") Long labId,
+        @Param("reservationDate") LocalDate reservationDate);
+
+    List<ReservationCheckCandidateVo> selectCheckInCandidatesByLab(@Param("labId") Long labId,
+        @Param("reservationDate") LocalDate reservationDate);
+
+    List<ReservationCheckCandidateVo> selectNoShowCandidates(@Param("currentDate") LocalDate currentDate);
+
+    List<ReservationCheckCandidateVo> selectCompletedCandidates(@Param("currentDateTime") LocalDateTime currentDateTime);
+
+    int markCompleted(@Param("id") Long id);
 
     List<com.nlt.domain.vo.dashboard.DashboardReservationItemVo> selectDashboardDailySlots(@Param("date") LocalDate date,
         @Param("departmentId") Long departmentId);

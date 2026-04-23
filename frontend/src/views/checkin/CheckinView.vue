@@ -24,9 +24,33 @@
       </div>
 
       <p class="checkin-tip">请确认您在实验室内进行签到。</p>
-      <p v-if="statusMessage" class="status-message">{{ statusMessage }}</p>
 
-      <button type="button" class="checkin-btn" :disabled="!labIdentifier || !labInfo || submitting" @click="handleCheckin">
+      <p
+        v-if="statusMessage"
+        class="status-message"
+        :class="{
+          success: messageTone === 'success',
+          error: messageTone === 'error',
+        }"
+        >
+        {{ statusMessage }}
+      </p>
+
+      <div v-if="checkinResult" class="result-card" :class="{ late: checkinResult.late }">
+        <strong>{{ checkinResult.message }}</strong>
+        <span>预约单号：{{ checkinResult.reservationNo }}</span>
+        <span>时间：{{ checkinResult.reservationDate }} / {{ checkinResult.periodName }}</span>
+        <span v-if="checkinResult.checkInTime">签到时间：{{ checkinResult.checkInTime }}</span>
+        <span>距离：{{ checkinResult.distanceMeters }} 米</span>
+        <span v-if="checkinResult.scoreChange">信誉分变化：{{ checkinResult.scoreChange }}</span>
+      </div>
+
+      <button
+        type="button"
+        class="checkin-btn"
+        :disabled="!canCheckIn"
+        @click="handleCheckin"
+      >
         {{ submitting ? '正在签到...' : '立即签到' }}
       </button>
     </section>
@@ -37,15 +61,19 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { fetchDepartmentById } from '../../api/departments';
-import { fetchLabById, fetchLabs } from '../../api/labs';
 import { submitCheckin } from '../../api/checkin';
-import type { LabDto } from '../../types';
+import { fetchLabById } from '../../api/labs';
+import type { CheckinResultDto, LabDto } from '../../types';
+
+const TOKEN_KEY = 'lab-system-token';
 
 const route = useRoute();
 const currentTime = ref('');
 const labInfo = ref<LabDto | null>(null);
 const departmentName = ref('');
 const statusMessage = ref('');
+const messageTone = ref<'info' | 'success' | 'error'>('info');
+const checkinResult = ref<CheckinResultDto | null>(null);
 const submitting = ref(false);
 let timerId: number | undefined;
 
@@ -57,12 +85,30 @@ const labIdentifier = computed(() => {
   return typeof value === 'string' ? value.trim() : '';
 });
 
+const labId = computed<number | null>(() => {
+  if (!/^\d+$/.test(labIdentifier.value)) {
+    return null;
+  }
+  return Number(labIdentifier.value);
+});
+
+const authToken = computed(() => localStorage.getItem(TOKEN_KEY) ?? '');
+
+const canCheckIn = computed(() =>
+  Boolean(labId.value && labInfo.value && authToken.value && !submitting.value),
+);
+
 const labRoomLabel = computed(() => {
   if (!labInfo.value) {
     return '加载中...';
   }
   return [labInfo.value.buildingName, labInfo.value.roomNo].filter(Boolean).join(' / ') || '未设置';
 });
+
+function setStatus(message: string, tone: 'info' | 'success' | 'error' = 'info'): void {
+  statusMessage.value = message;
+  messageTone.value = tone;
+}
 
 function refreshTime(): void {
   currentTime.value = new Date().toLocaleString('zh-CN', {
@@ -76,37 +122,19 @@ function refreshTime(): void {
   });
 }
 
-function isNumericIdentifier(value: string): boolean {
-  return /^\d+$/.test(value);
-}
-
 async function loadLabInfo(): Promise<void> {
   labInfo.value = null;
   departmentName.value = '';
-
-  if (!labIdentifier.value) {
-    statusMessage.value = '未获取到实验室信息';
+  checkinResult.value = null;
+  if (!labId.value) {
+    setStatus('未获取到实验室信息', 'error');
     return;
   }
 
   try {
-    let lab: LabDto | null = null;
-    if (isNumericIdentifier(labIdentifier.value)) {
-      lab = await fetchLabById(Number(labIdentifier.value));
-    } else {
-      const result = await fetchLabs(
-        { pageNum: 1, pageSize: 1, labCode: labIdentifier.value },
-      );
-      lab = result.list[0] ?? null;
-    }
-
-    if (!lab) {
-      statusMessage.value = '未找到对应的实验室信息';
-      return;
-    }
-
+    const lab = await fetchLabById(labId.value);
     labInfo.value = lab;
-    statusMessage.value = '';
+    setStatus('', 'info');
 
     if (lab.departmentId != null) {
       try {
@@ -117,14 +145,14 @@ async function loadLabInfo(): Promise<void> {
       }
     }
   } catch (error) {
-    statusMessage.value = error instanceof Error ? error.message : '实验室信息加载失败';
+    setStatus(error instanceof Error ? error.message : '实验室信息加载失败', 'error');
   }
 }
 
-function readPosition(): Promise<{ latitude: number | null; longitude: number | null; accuracy: number | null }> {
-  return new Promise((resolve) => {
+function readPosition(): Promise<{ latitude: number; longitude: number; accuracy?: number }> {
+  return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      resolve({ latitude: null, longitude: null, accuracy: null });
+      reject(new Error('当前设备不支持定位，请更换浏览器后重试'));
       return;
     }
 
@@ -136,8 +164,12 @@ function readPosition(): Promise<{ latitude: number | null; longitude: number | 
           accuracy: position.coords.accuracy,
         });
       },
-      () => {
-        resolve({ latitude: null, longitude: null, accuracy: null });
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          reject(new Error('请先允许定位权限，再进行签到'));
+          return;
+        }
+        reject(new Error('未获取到定位信息，请稍后重试'));
       },
       {
         enableHighAccuracy: true,
@@ -149,28 +181,36 @@ function readPosition(): Promise<{ latitude: number | null; longitude: number | 
 }
 
 async function handleCheckin(): Promise<void> {
-  if (!labIdentifier.value) {
-    statusMessage.value = '未获取到实验室信息';
+  if (!labId.value) {
+    setStatus('未获取到实验室信息', 'error');
+    return;
+  }
+  if (!authToken.value) {
+    setStatus('请先登录系统后再进行签到', 'error');
     return;
   }
 
   submitting.value = true;
+  setStatus('正在获取当前位置...', 'info');
+
   try {
     const location = await readPosition();
-    console.log('点击签到', labIdentifier.value, location);
-    await submitCheckin({
-      labIdentifier: labIdentifier.value,
-      latitude: location.latitude,
-      longitude: location.longitude,
-      accuracy: location.accuracy,
-      capturedAt: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-    });
-    statusMessage.value = location.latitude != null && location.longitude != null
-      ? '签到信息已提交'
-      : '签到信息已提交，但未获取到定位';
+    setStatus('正在提交签到请求...', 'info');
+    const result = await submitCheckin(
+      {
+        labIdentifier: String(labId.value),
+        latitude: location.latitude,
+        longitude: location.longitude,
+        accuracy: location.accuracy,
+        capturedAt: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+      },
+      authToken.value,
+    );
+    checkinResult.value = result;
+    setStatus(result.message || '签到成功', 'success');
   } catch (error) {
-    statusMessage.value = error instanceof Error ? error.message : '签到提交失败';
+    setStatus(error instanceof Error ? error.message : '签到提交失败', 'error');
   } finally {
     submitting.value = false;
   }
@@ -185,7 +225,6 @@ watch(
 );
 
 onMounted(() => {
-  console.log('当前 lab_id:', labIdentifier.value || null);
   refreshTime();
   timerId = window.setInterval(refreshTime, 1000);
 });
@@ -283,6 +322,32 @@ onUnmounted(() => {
   font-size: 14px;
 }
 
+.result-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  text-align: left;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.18);
+  color: #065f46;
+}
+
+.result-card.late {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.22);
+  color: #92400e;
+}
+
+.result-card strong {
+  font-size: 15px;
+}
+
+.result-card span {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .status-message {
   margin: 0;
   padding: 12px 14px;
@@ -291,6 +356,16 @@ onUnmounted(() => {
   color: #1d4ed8;
   font-size: 14px;
   line-height: 1.6;
+}
+
+.status-message.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: #047857;
+}
+
+.status-message.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
 }
 
 .checkin-btn {

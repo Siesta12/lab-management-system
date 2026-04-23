@@ -303,6 +303,8 @@ export interface LabDto {
   labStatus: number;
   description?: string;
   usageRule?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface LabOpenRuleDto {
@@ -536,4 +538,28 @@ export interface ReservationApplyResponse {
   conflictNote?: string;
   reservation?: ReservationDto;
   recommendations: SlotRecommendationItem[];
+}
+
+export interface CheckinSubmitPayload {
+  labIdentifier: string;
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  capturedAt?: string;
+  userAgent?: string;
+}
+
+export interface CheckinResultDto {
+  action: string;
+  reservationId: number;
+  reservationNo: string;
+  labId: number;
+  labName: string;
+  reservationDate: string;
+  periodName: string;
+  checkInTime?: string | null;
+  late: boolean;
+  scoreChange: number;
+  distanceMeters: number;
+  message: string;
 }

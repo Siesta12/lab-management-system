@@ -236,11 +236,186 @@
         where id = #{id}
     </update>
 
-    <update id="checkOut">
+    <update id="checkInAt">
         update lab_reservation
-        set check_out_time = now(),
-            status = 5
+        set check_in_time = #{checkInTime}
         where id = #{id}
+    </update>
+
+    <select id="selectCheckInCandidates" resultType="com.nlt.domain.vo.reservation.ReservationCheckCandidateVo">
+        select r.id as reservationId,
+               r.reservation_no as reservationNo,
+               r.lab_id as labId,
+               l.lab_name as labName,
+               r.applicant_user_id as applicantUserId,
+               first_slot.reservation_date as reservationDate,
+               first_slot.period_id as periodId,
+               first_slot.period_name as periodName,
+               first_slot.start_time as startTime,
+               first_slot.end_time as endTime,
+               r.check_in_time as checkInTime
+        from lab_reservation r
+        join lab l on l.id = r.lab_id
+        join (
+            select s.reservation_id,
+                   s.reservation_date,
+                   s.period_id,
+                   p.period_name,
+                   p.start_time,
+                   p.end_time
+            from lab_reservation_slot s
+            join class_period p on p.id = s.period_id
+            join (
+                select s1.reservation_id,
+                       min(timestamp(s1.reservation_date, p1.start_time)) as first_start_at
+                from lab_reservation_slot s1
+                join class_period p1 on p1.id = s1.period_id
+                where s1.slot_status = 1
+                  and s1.reservation_date = #{reservationDate}
+                group by s1.reservation_id
+            ) first_time on first_time.reservation_id = s.reservation_id
+                and timestamp(s.reservation_date, p.start_time) = first_time.first_start_at
+            where s.slot_status = 1
+              and s.reservation_date = #{reservationDate}
+        ) first_slot on first_slot.reservation_id = r.id
+        where r.applicant_user_id = #{userId}
+          and r.lab_id = #{labId}
+          and r.status = 2
+        order by first_slot.start_time asc, r.id asc
+    </select>
+
+    <select id="selectCheckInCandidatesByLab" resultType="com.nlt.domain.vo.reservation.ReservationCheckCandidateVo">
+        select r.id as reservationId,
+               r.reservation_no as reservationNo,
+               r.lab_id as labId,
+               l.lab_name as labName,
+               r.applicant_user_id as applicantUserId,
+               first_slot.reservation_date as reservationDate,
+               first_slot.period_id as periodId,
+               first_slot.period_name as periodName,
+               first_slot.start_time as startTime,
+               first_slot.end_time as endTime,
+               r.check_in_time as checkInTime
+        from lab_reservation r
+        join lab l on l.id = r.lab_id
+        join (
+            select s.reservation_id,
+                   s.reservation_date,
+                   s.period_id,
+                   p.period_name,
+                   p.start_time,
+                   p.end_time
+            from lab_reservation_slot s
+            join class_period p on p.id = s.period_id
+            join (
+                select s1.reservation_id,
+                       min(timestamp(s1.reservation_date, p1.start_time)) as first_start_at
+                from lab_reservation_slot s1
+                join class_period p1 on p1.id = s1.period_id
+                where s1.slot_status = 1
+                  and s1.reservation_date = #{reservationDate}
+                group by s1.reservation_id
+            ) first_time on first_time.reservation_id = s.reservation_id
+                and timestamp(s.reservation_date, p.start_time) = first_time.first_start_at
+            where s.slot_status = 1
+              and s.reservation_date = #{reservationDate}
+        ) first_slot on first_slot.reservation_id = r.id
+        where r.lab_id = #{labId}
+          and r.status = 2
+        order by first_slot.start_time asc, r.id asc
+    </select>
+
+    <select id="selectNoShowCandidates" resultType="com.nlt.domain.vo.reservation.ReservationCheckCandidateVo">
+        select r.id as reservationId,
+               r.reservation_no as reservationNo,
+               r.lab_id as labId,
+               l.lab_name as labName,
+               r.applicant_user_id as applicantUserId,
+               first_slot.reservation_date as reservationDate,
+               first_slot.period_id as periodId,
+               first_slot.period_name as periodName,
+               first_slot.start_time as startTime,
+               first_slot.end_time as endTime,
+               r.check_in_time as checkInTime
+        from lab_reservation r
+        join lab l on l.id = r.lab_id
+        join (
+            select s.reservation_id,
+                   s.reservation_date,
+                   s.period_id,
+                   p.period_name,
+                   p.start_time,
+                   p.end_time
+            from lab_reservation_slot s
+            join class_period p on p.id = s.period_id
+            join (
+                select s1.reservation_id,
+                       min(timestamp(s1.reservation_date, p1.start_time)) as first_start_at
+                from lab_reservation_slot s1
+                join class_period p1 on p1.id = s1.period_id
+                where s1.slot_status = 1
+                group by s1.reservation_id
+            ) first_time on first_time.reservation_id = s.reservation_id
+                and timestamp(s.reservation_date, p.start_time) = first_time.first_start_at
+            where s.slot_status = 1
+        ) first_slot on first_slot.reservation_id = r.id
+        where r.status = 2
+          and r.check_in_time is null
+          and not exists (
+              select 1
+              from sys_user_role ur
+              join sys_role sr on sr.id = ur.role_id
+              where ur.user_id = r.applicant_user_id
+                and (sr.role_code = 'TEACHER' or sr.role_code = 'ROLE_TEACHER')
+          )
+          and first_slot.reservation_date <![CDATA[ <= ]]> #{currentDate}
+        order by first_slot.reservation_date asc, first_slot.start_time asc, r.id asc
+    </select>
+
+    <select id="selectCompletedCandidates" resultType="com.nlt.domain.vo.reservation.ReservationCheckCandidateVo">
+        select r.id as reservationId,
+               r.reservation_no as reservationNo,
+               r.lab_id as labId,
+               l.lab_name as labName,
+               r.applicant_user_id as applicantUserId,
+               first_slot.reservation_date as reservationDate,
+               first_slot.period_id as periodId,
+               first_slot.period_name as periodName,
+               first_slot.start_time as startTime,
+               first_slot.end_time as endTime,
+               r.check_in_time as checkInTime
+        from lab_reservation r
+        join lab l on l.id = r.lab_id
+        join (
+            select s.reservation_id,
+                   s.reservation_date,
+                   s.period_id,
+                   p.period_name,
+                   p.start_time,
+                   p.end_time
+            from lab_reservation_slot s
+            join class_period p on p.id = s.period_id
+            join (
+                select s1.reservation_id,
+                       min(timestamp(s1.reservation_date, p1.start_time)) as first_start_at
+                from lab_reservation_slot s1
+                join class_period p1 on p1.id = s1.period_id
+                where s1.slot_status = 1
+                group by s1.reservation_id
+            ) first_time on first_time.reservation_id = s.reservation_id
+                and timestamp(s.reservation_date, p.start_time) = first_time.first_start_at
+            where s.slot_status = 1
+        ) first_slot on first_slot.reservation_id = r.id
+        where r.status = 2
+          and timestamp(first_slot.reservation_date, first_slot.end_time) <![CDATA[ <= ]]> #{currentDateTime}
+        order by first_slot.reservation_date asc, first_slot.end_time asc, r.id asc
+    </select>
+
+    <update id="markCompleted">
+        update lab_reservation
+        set status = 5
+        where id = #{id}
+          and status = 2
     </update>
 
     <select id="selectDashboardDailySlots" resultType="com.nlt.domain.vo.dashboard.DashboardReservationItemVo">

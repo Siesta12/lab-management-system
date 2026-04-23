@@ -94,6 +94,8 @@
             lab_status,
             description,
             usage_rule,
+            latitude,
+            longitude,
             deleted
         )
         values(
@@ -109,6 +111,8 @@
             #{labStatus},
             #{description},
             #{usageRule},
+            #{latitude},
+            #{longitude},
             0
         )
     </insert>
@@ -126,7 +130,9 @@
                 open_status = #{openStatus},
                 lab_status = #{labStatus},
                 description = #{description},
-                usage_rule = #{usageRule}
+                usage_rule = #{usageRule},
+                latitude = #{latitude},
+                longitude = #{longitude}
         where id = #{id}
             and deleted = 0
     </update>

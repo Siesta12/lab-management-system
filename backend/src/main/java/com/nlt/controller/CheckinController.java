@@ -2,53 +2,51 @@ package com.nlt.controller;
 
 import com.nlt.common.api.ApiResponse;
 import com.nlt.common.exception.BusinessException;
+import com.nlt.common.security.TokenService;
 import com.nlt.domain.dto.checkin.CheckinSubmitRequest;
-import com.nlt.domain.entity.DepartmentEntity;
 import com.nlt.domain.entity.LabEntity;
-import com.nlt.service.DepartmentService;
+import com.nlt.domain.vo.checkin.CheckinResultVo;
+import com.nlt.service.CheckinService;
 import com.nlt.service.LabService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Slf4j
 @RestController
 @RequestMapping("/checkin")
 @RequiredArgsConstructor
 public class CheckinController {
 
     private final LabService labService;
-    private final DepartmentService departmentService;
+    private final TokenService tokenService;
+    private final CheckinService checkinService;
 
     @PostMapping("/submit")
-    public ApiResponse<Void> submit(@Valid @RequestBody CheckinSubmitRequest request) {
+    public ApiResponse<CheckinResultVo> submit(@Valid @RequestBody CheckinSubmitRequest request,
+        HttpServletRequest servletRequest) {
         LabEntity lab = resolveLab(request.getLabIdentifier());
-        DepartmentEntity department = lab.getDepartmentId() == null ? null : departmentService.getById(lab.getDepartmentId());
-        System.out.println("实验室签到提交");
-        System.out.println("labIdentifier=" + request.getLabIdentifier());
-        System.out.println("实验室ID=" + lab.getId());
-        System.out.println("实验室名称=" + lab.getLabName());
-        System.out.println("实验室编号=" + lab.getLabCode());
-        System.out.println("实验室位置=" + lab.getBuildingName() + " / " + lab.getRoomNo());
-        System.out.println("所属学院=" + (department == null ? lab.getDepartmentId() : department.getDepartmentName()));
-        System.out.println("手机定位 lat=" + request.getLatitude() + ", lng=" + request.getLongitude() + ", accuracy=" + request.getAccuracy());
-        System.out.println("capturedAt=" + request.getCapturedAt());
-        System.out.println("userAgent=" + request.getUserAgent());
-
-        return ApiResponse.success();
+        Long currentUserId = tokenService.getCurrentUserId(servletRequest);
+        return ApiResponse.success(checkinService.submit(request, lab, currentUserId));
     }
 
     private LabEntity resolveLab(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            throw new BusinessException(400, "实验室编号不能为空");
+        }
+
         try {
             if (identifier.matches("\\d+")) {
-                return labService.getById(Long.parseLong(identifier));
+                LabEntity lab = labService.getById(Long.parseLong(identifier));
+                if (lab != null) {
+                    return lab;
+                }
             }
         } catch (Exception ignored) {
-            // Fallback to code lookup below.
+            // Fall back to code lookup below.
         }
 
         var page = labService.page(1, 1, null, null, identifier, null, null, null, null);

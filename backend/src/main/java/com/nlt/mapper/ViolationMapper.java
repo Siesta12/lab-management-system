@@ -63,6 +63,9 @@ public interface ViolationMapper {
      */
     int insert(ViolationRecordEntity entity);
 
+    boolean existsByReservationAndType(@Param("reservationId") Long reservationId,
+        @Param("violationType") Integer violationType);
+
     /**
      * 删除违规记录
      * @param id 主键ID

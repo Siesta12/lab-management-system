@@ -13,10 +13,10 @@
     <article class="metric-card success">
       <span>最新得分</span>
       <strong>{{ latestScoreChange }}</strong>
-      <small>鏌ョ湅杩濊璁板綍浜嗚В鎵ｅ垎鍘熷洜</small>
+      <small>查看违规记录了解扣分原因</small>
     </article>
     <article class="metric-card accent">
-      <span>璁板綍鎬绘暟</span>
+      <span>记录总数</span>
       <strong>{{ violations.length }}</strong>
       <small>当前用户可查看自己的违纪详情</small>
     </article>

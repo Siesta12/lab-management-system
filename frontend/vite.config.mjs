@@ -16,7 +16,7 @@ export default defineConfig({
       '/devices': { target: 'http://127.0.0.1:8080', changeOrigin: true },
       '/consumables': { target: 'http://127.0.0.1:8080', changeOrigin: true },
       '/violations': { target: 'http://127.0.0.1:8080', changeOrigin: true },
-      '/checkin': { target: 'http://127.0.0.1:8080', changeOrigin: true },
+      '/checkin/submit': { target: 'http://127.0.0.1:8080', changeOrigin: true },
     },
   },
 });

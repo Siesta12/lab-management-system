@@ -37,6 +37,7 @@ import com.nlt.service.ReservationRecommendationService;
 import com.nlt.service.ReservationService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -57,6 +58,7 @@ public class ReservationServiceImpl implements ReservationService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final int RESERVATION_CUTOFF_MINUTES = 30;
 
     private final ReservationMapper reservationMapper;
     private final ReservationAuditLogMapper reservationAuditLogMapper;
@@ -147,6 +149,7 @@ public class ReservationServiceImpl implements ReservationService {
         validateWithinNext21Days(requestedSlots);
         Map<SlotKey, LabOpenSlotEntity> openSlotMap = loadOpenSlots(request.getLabId(), requestedSlots);
         validateRoleAllowed(openSlotMap, requestedSlots, currentUserId);
+        validateReservationLeadTime(requestedSlots);
         validateNoMaintenance(request.getLabId(), requestedSlots);
 
         ReservationConflictService.ReservationConflictResult conflictResult =
@@ -188,6 +191,7 @@ public class ReservationServiceImpl implements ReservationService {
         validateWithinNext21Days(requestedSlots);
         Map<SlotKey, LabOpenSlotEntity> openSlotMap = loadOpenSlots(request.getLabId(), requestedSlots);
         validateRoleAllowed(openSlotMap, requestedSlots, currentUserId);
+        validateReservationLeadTime(requestedSlots);
         validateNoMaintenance(request.getLabId(), requestedSlots);
         validateNoReservationConflict(request.getLabId(), requestedSlots, currentUserId);
 
@@ -238,6 +242,11 @@ public class ReservationServiceImpl implements ReservationService {
             LabMaintenanceEntity maintenance = maintenanceMap.get(slotMapKey);
             if (maintenance != null) {
                 items.add(new SlotStatusItem(period.getId(), period.getPeriodName(), "UNAVAILABLE", "不可用", maintenance.getReason()));
+                continue;
+            }
+
+            if (isWithinReservationCutoff(targetDate, period)) {
+                items.add(new SlotStatusItem(period.getId(), period.getPeriodName(), "UNAVAILABLE", "不可约", "距课程开始不足30分钟，当前不可预约"));
                 continue;
             }
 
@@ -309,24 +318,6 @@ public class ReservationServiceImpl implements ReservationService {
         reservationMapper.cancel(id);
         labReservationSlotMapper.cancelByReservationId(id);
         insertAuditLog(id, currentUserId, 4, "取消预约");
-        return getById(id);
-    }
-
-    @Transactional
-    @Override
-    public ReservationDetailVo checkIn(Long id, Long currentUserId) {
-        requireReservation(id);
-        reservationMapper.checkIn(id);
-        insertAuditLog(id, currentUserId, 5, "签到");
-        return getById(id);
-    }
-
-    @Transactional
-    @Override
-    public ReservationDetailVo checkOut(Long id, Long currentUserId) {
-        requireReservation(id);
-        reservationMapper.checkOut(id);
-        insertAuditLog(id, currentUserId, 6, "签退");
         return getById(id);
     }
 
@@ -563,6 +554,37 @@ public class ReservationServiceImpl implements ReservationService {
                 throw new BusinessException(400, "预约日期超出允许范围：仅支持今天起未来 21 天");
             }
         }
+    }
+
+    /**
+     * 课程开始前 30 分钟内不允许提交预约。
+     * 这一步会直接拦截真正的预约提交。
+     */
+    private void validateReservationLeadTime(List<SlotKey> requestedSlots) {
+        Map<Long, LocalTime> periodStartMap = classPeriodMapper.selectActiveList().stream()
+            .collect(Collectors.toMap(ClassPeriodEntity::getId, ClassPeriodEntity::getStartTime, (left, right) -> left));
+        LocalDateTime now = LocalDateTime.now();
+        for (SlotKey key : requestedSlots) {
+            LocalTime startTime = periodStartMap.get(key.periodId());
+            if (startTime == null) {
+                continue;
+            }
+            LocalDateTime deadline = LocalDateTime.of(key.reservationDate(), startTime).minusMinutes(RESERVATION_CUTOFF_MINUTES);
+            if (!now.isBefore(deadline)) {
+                throw new BusinessException(400, "距课程开始不足30分钟，当前不可预约");
+            }
+        }
+    }
+
+    /**
+     * 如果今天的节次已经进入不可预约窗口，则在课表里直接显示为不可约。
+     */
+    private boolean isWithinReservationCutoff(LocalDate targetDate, ClassPeriodEntity period) {
+        if (!LocalDate.now().equals(targetDate) || period.getStartTime() == null) {
+            return false;
+        }
+        LocalDateTime deadline = LocalDateTime.of(targetDate, period.getStartTime()).minusMinutes(RESERVATION_CUTOFF_MINUTES);
+        return !LocalDateTime.now().isBefore(deadline);
     }
 
     private Map<SlotKey, LabOpenSlotEntity> loadOpenSlots(Long labId, List<SlotKey> requestedSlots) {

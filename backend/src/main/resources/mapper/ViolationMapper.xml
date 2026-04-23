@@ -73,6 +73,15 @@
         )
     </insert>
 
+    <select id="existsByReservationAndType" resultType="boolean">
+        select exists(
+            select 1
+            from user_violation_record
+            where reservation_id = #{reservationId}
+              and violation_type = #{violationType}
+        )
+    </select>
+
     <delete id="deleteById">
         delete from user_violation_record
         where id = #{id}

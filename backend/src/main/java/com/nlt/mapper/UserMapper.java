@@ -98,6 +98,10 @@ public interface UserMapper {
      */
     int updateLastLoginAt(@Param("id") Long id);
 
+    int adjustCreditAndViolation(@Param("id") Long id,
+        @Param("scoreDelta") int scoreDelta,
+        @Param("violationDelta") int violationDelta);
+
     /**
      * 软删除用户信息
      * @param id 主键ID

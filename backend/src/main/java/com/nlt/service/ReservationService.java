@@ -37,9 +37,5 @@ public interface ReservationService {
 
     ReservationDetailVo cancel(Long id, Long currentUserId);
 
-    ReservationDetailVo checkIn(Long id, Long currentUserId);
-
-    ReservationDetailVo checkOut(Long id, Long currentUserId);
-
     List<SlotRecommendationItem> recommend(ReservationRecommendationRequest request, Long currentUserId);
 }

@@ -32,6 +32,10 @@ public class LabEntity {
 
     private String usageRule;
 
+    private Double latitude;
+
+    private Double longitude;
+
     private Integer deleted;
 
     private LocalDateTime createdAt;

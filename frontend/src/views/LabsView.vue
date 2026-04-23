@@ -575,6 +575,7 @@ const scheduleMessage = ref('');
 
 const selectedKeys = ref<Array<{ date: string; periodId: number }>>([]);
 const blockedKeys = ref<Array<{ date: string; periodId: number }>>([]);
+const focusedKey = ref<{ date: string; periodId: number } | null>(null);
 const recommendations = ref<SlotRecommendationItem[]>([]);
 const conflictPanel = reactive<{
   visible: boolean;
@@ -1020,6 +1021,8 @@ function cellClass(day: ScheduleDayDto, periodId: number): Record<string, boolea
   const c = cell(day, periodId);
   const status = c?.status ?? 'CLOSED';
   const pendingStatus = isAdmin.value ? (status === 'PENDING' || status === 'PENDING_SELF' || status === 'PENDING_OTHERS') : (status === 'PENDING' || status === 'PENDING_SELF');
+  const adminBlocked = isAdmin.value && isBlocked(day.date, periodId);
+  const adminFocused = isAdmin.value && isFocused(day.date, periodId);
   return {
     free: status === 'FREE',
     reserved: status === 'RESERVED',
@@ -1027,9 +1030,17 @@ function cellClass(day: ScheduleDayDto, periodId: number): Record<string, boolea
     pendingOther: !isAdmin.value && status === 'PENDING_OTHERS',
     maintenance: status === 'MAINTENANCE',
     closed: status === 'CLOSED',
-    selected: isSelected(day.date, periodId) || (isAdmin.value && isBlocked(day.date, periodId)),
-    clickable: status === 'FREE' || (!isAdmin.value && status === 'PENDING_OTHERS'),
+    selected: isSelected(day.date, periodId) || (adminBlocked && status === 'FREE'),
+    blockedFocused:
+      (adminBlocked && status !== 'FREE') ||
+      (adminFocused && status !== 'FREE') ||
+      (!isAdmin.value && (isBlocked(day.date, periodId) || isFocused(day.date, periodId))),
+    clickable: isAdmin.value ? (status === 'FREE' || status === 'MAINTENANCE') : status !== 'CLOSED',
   };
+}
+
+function isFocused(date: string, periodId: number): boolean {
+  return focusedKey.value?.date === date && focusedKey.value?.periodId === periodId;
 }
 
 function isBlocked(date: string, periodId: number): boolean {
@@ -1065,6 +1076,7 @@ async function reloadSchedule(): Promise<void> {
 function clearSelection(): void {
   selectedKeys.value = [];
   blockedKeys.value = [];
+  focusedKey.value = null;
   recommendations.value = [];
   conflictPanel.visible = false;
   conflictPanel.title = '';
@@ -1077,6 +1089,7 @@ async function handleCellClick(day: ScheduleDayDto, periodId: number): Promise<v
   if (!c) return;
 
   if (isAdmin.value) {
+    focusedKey.value = { date: day.date, periodId };
     if (c.status === 'FREE' || c.status === 'MAINTENANCE') {
       blockedKeys.value = [{ date: day.date, periodId }];
       selectedKeys.value = [];
@@ -1085,11 +1098,18 @@ async function handleCellClick(day: ScheduleDayDto, periodId: number): Promise<v
       scheduleMessage.value = c.status === 'MAINTENANCE'
         ? '已选中维护中的节次，可在下方取消维护。'
         : '已选中节次，可填写维护原因后保存。';
+    } else {
+      blockedKeys.value = [];
+      selectedKeys.value = [];
+      recommendations.value = [];
+      conflictPanel.visible = false;
+      scheduleMessage.value = '当前节次不可设置维护，仅提供选中查看。';
     }
     return;
   }
 
   if (c.status === 'FREE') {
+    focusedKey.value = null;
     blockedKeys.value = [];
     recommendations.value = [];
     conflictPanel.visible = false;
@@ -1104,6 +1124,7 @@ async function handleCellClick(day: ScheduleDayDto, periodId: number): Promise<v
   }
 
   if (c.status === 'PENDING_OTHERS') {
+    focusedKey.value = null;
     blockedKeys.value = [];
     recommendations.value = [];
     conflictPanel.visible = true;
@@ -1116,6 +1137,7 @@ async function handleCellClick(day: ScheduleDayDto, periodId: number): Promise<v
   }
 
   if (c.status === 'PENDING_SELF') {
+    focusedKey.value = { date: day.date, periodId };
     selectedKeys.value = [];
     blockedKeys.value = [{ date: day.date, periodId }];
     conflictPanel.visible = true;
@@ -1127,6 +1149,7 @@ async function handleCellClick(day: ScheduleDayDto, periodId: number): Promise<v
     return;
   }
 
+  focusedKey.value = { date: day.date, periodId };
   selectedKeys.value = [];
   blockedKeys.value = [{ date: day.date, periodId }];
   recommendations.value = [];
@@ -1201,6 +1224,7 @@ async function applyRecommendation(item: SlotRecommendationItem): Promise<void> 
   }
   selectedKeys.value = [{ date: item.reservationDate, periodId: item.periodId }];
   blockedKeys.value = [];
+  focusedKey.value = null;
   recommendations.value = [];
   conflictPanel.visible = false;
   detailTab.value = 'schedule';
@@ -1277,6 +1301,7 @@ async function handleCreateMaintenance(): Promise<void> {
     maintenances.value = await fetchLabMaintenance(selectedLab.value.id, auth.token.value);
     maintenanceForm.reason = '';
     blockedKeys.value = [];
+    focusedKey.value = null;
     await reloadSchedule();
     showToast('success', '维护设置成功');
   } catch (error) {
@@ -2052,13 +2077,34 @@ onMounted(async () => {
   background: rgba(148, 163, 184, 0.16);
 }
 
-.schedule-cell.selected {
+.schedule-cell.selected,
+.schedule-cell.free.selected,
+.schedule-cell.pendingOther.selected {
   background: rgba(219, 234, 254, 0.92);
   box-shadow: inset 0 0 0 3px rgba(37, 99, 235, 0.95);
 }
 
-.schedule-cell.selected .cell-status {
+.schedule-cell.selected .cell-status,
+.schedule-cell.free.selected .cell-status,
+.schedule-cell.pendingOther.selected .cell-status {
   color: #1d4ed8;
+}
+
+.schedule-cell.blockedFocused,
+.schedule-cell.reserved.blockedFocused,
+.schedule-cell.pending.blockedFocused,
+.schedule-cell.maintenance.blockedFocused,
+.schedule-cell.closed.blockedFocused {
+  background: linear-gradient(180deg, rgba(255, 248, 240, 0.98), rgba(255, 237, 213, 0.92));
+  box-shadow: inset 0 0 0 3px rgba(249, 115, 22, 0.88);
+}
+
+.schedule-cell.blockedFocused .cell-status,
+.schedule-cell.reserved.blockedFocused .cell-status,
+.schedule-cell.pending.blockedFocused .cell-status,
+.schedule-cell.maintenance.blockedFocused .cell-status,
+.schedule-cell.closed.blockedFocused .cell-status {
+  color: #c2410c;
 }
 
 .schedule-forms {

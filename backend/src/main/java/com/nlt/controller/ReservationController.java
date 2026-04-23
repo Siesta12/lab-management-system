@@ -114,16 +114,5 @@ public class ReservationController {
         return ApiResponse.success(reservationService.cancel(id, tokenService.getCurrentUserId(servletRequest)));
     }
 
-    @PutMapping("/{id}/check-in")
-    public ApiResponse<ReservationDetailVo> checkIn(@PathVariable Long id,
-        HttpServletRequest servletRequest) {
-        return ApiResponse.success(reservationService.checkIn(id, tokenService.getCurrentUserId(servletRequest)));
-    }
-
-    @PutMapping("/{id}/check-out")
-    public ApiResponse<ReservationDetailVo> checkOut(@PathVariable Long id,
-        HttpServletRequest servletRequest) {
-        return ApiResponse.success(reservationService.checkOut(id, tokenService.getCurrentUserId(servletRequest)));
-    }
 }
 

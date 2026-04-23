@@ -1,11 +1,19 @@
 ﻿import type { ApiResponse } from '../types';
 
 function resolveApiBaseUrl(): string {
-  if (import.meta.env.DEV) {
-    return '';
-  }
-
   const envApiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+
+  if (import.meta.env.DEV) {
+    if (envApiBaseUrl) {
+      return envApiBaseUrl;
+    }
+
+    if (typeof window === 'undefined') {
+      return 'http://localhost:8080';
+    }
+
+    return `${window.location.protocol}//${window.location.hostname}:8080`;
+  }
 
   if (typeof window === 'undefined') {
     return envApiBaseUrl || 'http://localhost:8080';
@@ -123,5 +131,4 @@ export function put<T>(path: string, payload?: unknown, token?: string): Promise
     token,
   );
 }
-
 
