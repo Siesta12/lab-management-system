@@ -48,6 +48,27 @@ public interface UserMapper {
     UserEntity selectByUsername(@Param("username") String username);
 
     /**
+     * 鏍规嵁瀛﹀彿/宸ュ彿鏌ヨ鐢ㄦ埛淇℃伅
+     * @param userNo 瀛﹀彿/宸ュ彿
+     * @return 鍚敤鐢ㄦ埛
+     */
+    UserEntity selectByUserNo(@Param("userNo") String userNo);
+
+    /**
+     * 鏍规嵁鎵嬫満鍙锋煡璇㈢敤鎴蜂俊鎭?
+     * @param phone 鎵嬫満鍙?
+     * @return 鍚敤鐢ㄦ埛
+     */
+    UserEntity selectByPhone(@Param("phone") String phone);
+
+    /**
+     * 鏍规嵁閭鏌ヨ鐢ㄦ埛淇℃伅
+     * @param email 閭
+     * @return 鍚敤鐢ㄦ埛
+     */
+    UserEntity selectByEmail(@Param("email") String email);
+
+    /**
      * 查询用户选项列表
      * @param status 状态值
      * @return 数据列表

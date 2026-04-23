@@ -1,39 +1,9 @@
-﻿import type { ApiResponse } from '../types';
+import type { ApiResponse } from '../types';
 
-function resolveApiBaseUrl(): string {
-  const envApiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
-
-  if (import.meta.env.DEV) {
-    if (envApiBaseUrl) {
-      return envApiBaseUrl;
-    }
-
-    if (typeof window === 'undefined') {
-      return 'http://localhost:8080';
-    }
-
-    return `${window.location.protocol}//${window.location.hostname}:8080`;
-  }
-
-  if (typeof window === 'undefined') {
-    return envApiBaseUrl || 'http://localhost:8080';
-  }
-
-  const currentHost = window.location.hostname;
-  const isLocalHost = currentHost === 'localhost' || currentHost === '127.0.0.1';
-  const envPointsToLocalHost = Boolean(envApiBaseUrl && /\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(envApiBaseUrl));
-
-  if (envApiBaseUrl && (!envPointsToLocalHost || isLocalHost)) {
-    return envApiBaseUrl;
-  }
-
-  return `${window.location.protocol}//${currentHost}:8080`;
-}
-
-const API_BASE_URL = resolveApiBaseUrl();
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || '/api';
 
 export function getApiBaseUrl(): string {
-  return API_BASE_URL || window.location.origin;
+  return API_BASE_URL;
 }
 
 export class ApiError extends Error {

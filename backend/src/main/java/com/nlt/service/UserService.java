@@ -7,8 +7,10 @@ import com.nlt.domain.dto.user.UserCreateRequest;
 import com.nlt.domain.dto.user.UserProfileUpdateRequest;
 import com.nlt.domain.dto.user.UserUpdateRequest;
 import com.nlt.domain.vo.common.OptionItem;
+import com.nlt.domain.vo.user.UserImportResultVo;
 import com.nlt.domain.vo.user.UserVO;
 import java.util.List;
+import org.springframework.web.multipart.MultipartFile;
 
 public interface UserService {
 
@@ -94,6 +96,19 @@ public interface UserService {
      * @param request 请求参数
      */
     void updatePassword(Long userId, PasswordUpdateRequest request);
+
+    /**
+     * 批量导入用户
+     * @param file Excel 文件
+     * @return 导入结果
+     */
+    UserImportResultVo importUsers(MultipartFile file);
+
+    /**
+     * 下载导入模板
+     * @return 模板文件字节数组
+     */
+    byte[] downloadImportTemplate();
 
 }
 

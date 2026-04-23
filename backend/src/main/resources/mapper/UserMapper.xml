@@ -75,6 +75,27 @@
             and deleted = 0
     </select>
 
+    <select id="selectByUserNo" resultType="com.nlt.domain.entity.UserEntity">
+        select *
+        from sys_user
+        where user_no = #{userNo}
+            and deleted = 0
+    </select>
+
+    <select id="selectByPhone" resultType="com.nlt.domain.entity.UserEntity">
+        select *
+        from sys_user
+        where phone = #{phone}
+            and deleted = 0
+    </select>
+
+    <select id="selectByEmail" resultType="com.nlt.domain.entity.UserEntity">
+        select *
+        from sys_user
+        where email = #{email}
+            and deleted = 0
+    </select>
+
     <select id="selectOptions" resultType="com.nlt.domain.entity.UserEntity">
         select *
         from sys_user

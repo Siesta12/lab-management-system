@@ -21,6 +21,10 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
+      path: '/',
+      redirect: '/admin',
+    },
+    {
       path: '/login',
       name: 'login',
       component: LoginView,
@@ -39,7 +43,7 @@ const router = createRouter({
       },
     },
     {
-      path: '/',
+      path: '/admin',
       component: AdminLayout,
       meta: {
         requiresAuth: true,

@@ -278,6 +278,18 @@ export interface UserVO {
   roleIds: number[];
 }
 
+export interface UserImportFailDetail {
+  row: number;
+  reason: string;
+}
+
+export interface UserImportResult {
+  total: number;
+  success: number;
+  fail: number;
+  failDetails: UserImportFailDetail[];
+}
+
 export interface UserCreatePayload {
   departmentId?: number | null;
   username: string;

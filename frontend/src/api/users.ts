@@ -1,13 +1,14 @@
 import type {
   PageData,
   PasswordUpdatePayload,
+  UserImportResult,
   UserCreatePayload,
   UserProfileUpdatePayload,
   UserUpdatePayload,
   UserVO,
   ViolationRecordDto,
 } from '../types';
-import { del, get, patch, post, put } from './http';
+import { ApiError, del, get, getApiBaseUrl, patch, post, put } from './http';
 
 export interface UserQuery {
   pageNum?: number;
@@ -71,4 +72,41 @@ export function updateMyPassword(payload: PasswordUpdatePayload, token: string):
 
 export function fetchUserViolations(id: number, token: string, pageNum = 1, pageSize = 20): Promise<PageData<ViolationRecordDto>> {
   return get<PageData<ViolationRecordDto>>(`/users/${id}/violations?pageNum=${pageNum}&pageSize=${pageSize}`, token);
+}
+
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new ApiError(response.status, payload?.message ?? `请求失败：${response.status}`);
+  }
+  if (!payload) {
+    throw new ApiError(response.status, '服务端返回了无效响应');
+  }
+  if (payload.code !== 200) {
+    throw new ApiError(payload.code, payload.message || '请求失败');
+  }
+  return payload.data as T;
+}
+
+export async function importUsers(file: File, token: string): Promise<UserImportResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await fetch(`${getApiBaseUrl()}/admin/users/import`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: formData,
+  });
+  return parseJsonResponse<UserImportResult>(response);
+}
+
+export async function downloadImportTemplate(token: string): Promise<Blob> {
+  const response = await fetch(`${getApiBaseUrl()}/admin/users/import/template`, {
+    method: 'GET',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new ApiError(response.status, payload?.message ?? `请求失败：${response.status}`);
+  }
+  return response.blob();
 }

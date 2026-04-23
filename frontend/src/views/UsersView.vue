@@ -17,6 +17,7 @@
           <option :value="0">禁用</option>
         </select>
         <button type="button" class="ghost-btn" @click="handleReset">重置筛选</button>
+        <button type="button" class="ghost-btn" @click="openImportDialog">批量导入</button>
         <button type="button" class="primary-btn" @click="openCreateDialog">新增用户</button>
       </div>
 
@@ -183,6 +184,82 @@
       </div>
     </div>
   </teleport>
+
+  <teleport to="body">
+    <div v-if="importDialogVisible" class="dialog-mask" @click.self="closeImportDialog">
+      <div class="dialog-card import-dialog-card">
+        <div class="dialog-head">
+          <div class="dialog-head-left">
+            <p class="dialog-tag">批量导入</p>
+            <h3>Excel 用户导入</h3>
+            <p class="dialog-subtitle">支持 `.xlsx` 文件，逐行校验并返回导入结果明细。</p>
+          </div>
+          <button type="button" class="ghost-btn small-btn" @click="closeImportDialog">关闭</button>
+        </div>
+
+        <div class="import-body">
+          <aside class="import-side">
+            <div class="import-side-title">导入说明</div>
+            <ul class="import-guide">
+              <li>模板字段必须保持固定顺序</li>
+              <li>部门名称和角色名称会按名称匹配</li>
+              <li>默认密码统一为 123456</li>
+              <li>单元格为空或格式不合法时会逐行提示</li>
+            </ul>
+            <button type="button" class="ghost-btn import-template-btn" @click="handleDownloadTemplate">
+              下载导入模板
+            </button>
+          </aside>
+
+          <section class="import-main">
+            <div class="import-actions">
+              <button type="button" class="ghost-btn" @click="pickImportFile">选择文件</button>
+              <button type="button" class="primary-btn" :disabled="importSubmitting" @click="handleImportSubmit">
+                {{ importSubmitting ? '导入中...' : '开始导入' }}
+              </button>
+              <span class="import-file-name">{{ importFileName }}</span>
+            </div>
+            <input
+              ref="importFileInput"
+              type="file"
+              accept=".xlsx"
+              class="import-file-input"
+              @change="handleImportFileChange"
+            />
+
+            <div class="import-result-card">
+              <div class="import-summary">
+                <div class="import-summary-item">
+                  <strong>{{ importResult?.total ?? 0 }}</strong>
+                  <span>总行数</span>
+                </div>
+                <div class="import-summary-item success">
+                  <strong>{{ importResult?.success ?? 0 }}</strong>
+                  <span>成功</span>
+                </div>
+                <div class="import-summary-item danger">
+                  <strong>{{ importResult?.fail ?? 0 }}</strong>
+                  <span>失败</span>
+                </div>
+              </div>
+
+              <div v-if="importResult?.failDetails?.length" class="import-fail-list">
+                <div class="import-fail-head">
+                  <span>失败行</span>
+                  <span>失败原因</span>
+                </div>
+                <div v-for="item in importResult.failDetails" :key="item.row" class="import-fail-row">
+                  <span class="import-fail-row-num">第 {{ item.row }} 行</span>
+                  <span class="import-fail-row-reason">{{ item.reason }}</span>
+                </div>
+              </div>
+              <div v-else class="import-empty">上传后会在这里显示导入结果。</div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </teleport>
 </template>
 
 <script setup lang="ts">
@@ -191,10 +268,10 @@ import BasePanel from '../components/BasePanel.vue';
 import BaseTable from '../components/BaseTable.vue';
 import { useGlobalToast } from '../composables/useGlobalToast';
 import { fetchDepartmentOptions } from '../api/departments';
-import { createUser, deleteUser, fetchUsers, updateUser } from '../api/users';
+import { createUser, deleteUser, downloadImportTemplate, fetchUsers, importUsers, updateUser } from '../api/users';
 import { fetchRoleOptions } from '../api/roles';
 import { useAuthStore } from '../stores/auth';
-import type { OptionItem, UserVO } from '../types';
+import type { OptionItem, UserImportResult, UserVO } from '../types';
 
 type DialogMode = 'create' | 'edit';
 
@@ -209,6 +286,11 @@ const message = ref('');
 const dialogVisible = ref(false);
 const dialogMode = ref<DialogMode>('create');
 const saving = ref(false);
+const importDialogVisible = ref(false);
+const importSubmitting = ref(false);
+const importFileInput = ref<HTMLInputElement | null>(null);
+const importFile = ref<File | null>(null);
+const importResult = ref<UserImportResult | null>(null);
 const departmentOptions = ref<OptionItem[]>([]);
 const roleOptions = ref<OptionItem[]>([]);
 const keyword = ref('');
@@ -272,6 +354,7 @@ const departmentSummary = computed(() => {
   }
   return departmentOptions.value.find((item) => item.value === userForm.departmentId)?.label ?? '未分配部门';
 });
+const importFileName = computed(() => importFile.value?.name ?? '未选择文件');
 
 let queryTimer: number | null = null;
 function departmentLabel(departmentId?: number): string {
@@ -314,6 +397,14 @@ function resetForm(): void {
   userForm.status = 1;
   userForm.creditScore = 0;
   userForm.violationCount = 0;
+}
+
+function resetImportState(): void {
+  importFile.value = null;
+  importResult.value = null;
+  if (importFileInput.value) {
+    importFileInput.value.value = '';
+  }
 }
 
 async function loadOptions(): Promise<void> {
@@ -383,6 +474,16 @@ function openCreateDialog(): void {
   dialogVisible.value = true;
 }
 
+function openImportDialog(): void {
+  resetImportState();
+  importDialogVisible.value = true;
+}
+
+function closeImportDialog(): void {
+  importDialogVisible.value = false;
+  resetImportState();
+}
+
 function openEditDialog(user: UserVO): void {
   dialogMode.value = 'edit';
   userForm.id = user.id;
@@ -403,6 +504,65 @@ function openEditDialog(user: UserVO): void {
 
 function closeDialog(): void {
   dialogVisible.value = false;
+}
+
+function pickImportFile(): void {
+  importFileInput.value?.click();
+}
+
+function handleImportFileChange(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0] ?? null;
+  importFile.value = file;
+  importResult.value = null;
+}
+
+async function handleDownloadTemplate(): Promise<void> {
+  try {
+    const blob = await downloadImportTemplate(auth.token.value);
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = '用户导入模板.xlsx';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    showToast('success', '模板下载成功', 2200);
+  } catch (error) {
+    showToast('error', error instanceof Error ? error.message : '模板下载失败。', 2600);
+  }
+}
+
+async function handleImportSubmit(): Promise<void> {
+  if (!importFile.value) {
+    showToast('error', '请先选择 Excel 文件。', 2400);
+    return;
+  }
+  if (!importFile.value.name.toLowerCase().endsWith('.xlsx')) {
+    showToast('error', '只支持 .xlsx 文件。', 2400);
+    return;
+  }
+
+  importSubmitting.value = true;
+  try {
+    const result = await importUsers(importFile.value, auth.token.value);
+    importResult.value = result;
+    if (result.success > 0) {
+      showToast('success', `导入完成，成功 ${result.success} 条，失败 ${result.fail} 条`, 2600);
+    } else {
+      showToast('error', `导入失败，失败 ${result.fail} 条`, 2600);
+    }
+    try {
+      await loadUsers();
+    } catch {
+      message.value = '导入已完成，列表刷新失败，请手动刷新页面。';
+    }
+  } catch (error) {
+    showToast('error', error instanceof Error ? error.message : '批量导入失败。', 2600);
+  } finally {
+    importSubmitting.value = false;
+  }
 }
 
 async function handleSubmit(): Promise<void> {
@@ -546,7 +706,7 @@ onUnmounted(() => {
 .toolbar {
   display: flex;
   flex-wrap: nowrap;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
   margin-bottom: 16px;
   overflow-x: auto;
@@ -556,22 +716,22 @@ onUnmounted(() => {
 .toolbar-input,
 .toolbar-select {
   min-width: 0;
-  border-radius: 18px;
+  border-radius: 16px;
   border: 1px solid rgba(148, 163, 184, 0.32);
   background: rgba(255, 255, 255, 0.88);
-  padding: 12px 16px;
-  font-size: 0.98rem;
+  padding: 10px 14px;
+  font-size: 0.94rem;
   color: var(--ink, #1b2b49);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .toolbar-input {
-  flex: 1.2;
-  min-width: 220px;
+  flex: 1.25;
+  min-width: 200px;
 }
 
 .toolbar-select {
-  flex: 0 0 180px;
+  flex: 0 0 156px;
 }
 
 .toolbar-select {
@@ -583,15 +743,15 @@ onUnmounted(() => {
     linear-gradient(135deg, #64748b 50%, transparent 50%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.96));
   background-position:
-    calc(100% - 18px) calc(50% - 3px),
-    calc(100% - 12px) calc(50% - 3px),
+    calc(100% - 16px) calc(50% - 3px),
+    calc(100% - 10px) calc(50% - 3px),
     0 0;
   background-size:
     6px 6px,
     6px 6px,
     100% 100%;
   background-repeat: no-repeat;
-  padding-right: 42px;
+  padding-right: 34px;
 }
 
 .toolbar-input:focus,
@@ -607,6 +767,14 @@ onUnmounted(() => {
 
 .user-row:hover {
   background: rgba(56, 102, 219, 0.04);
+}
+
+.toolbar .ghost-btn,
+.toolbar .primary-btn {
+  min-height: 42px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 0.92rem;
 }
 
 .cell-text {
@@ -998,6 +1166,166 @@ onUnmounted(() => {
   margin: 6px 0 14px;
 }
 
+.import-dialog-card {
+  width: min(1080px, 94vw);
+}
+
+.import-body {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.import-side {
+  border-radius: 24px;
+  padding: 18px;
+  background: linear-gradient(180deg, rgba(234, 242, 255, 0.96), rgba(247, 250, 255, 0.98));
+  border: 1px solid rgba(56, 102, 219, 0.14);
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  box-shadow: 0 18px 36px rgba(56, 102, 219, 0.08);
+}
+
+.import-side-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--ink, #1b2b49);
+}
+
+.import-guide {
+  margin: 0;
+  padding-left: 18px;
+  color: #5b6d8d;
+  display: grid;
+  gap: 8px;
+  line-height: 1.5;
+  font-size: 0.92rem;
+}
+
+.import-template-btn {
+  justify-self: start;
+}
+
+.import-main {
+  border-radius: 24px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  display: grid;
+  gap: 16px;
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.05);
+}
+
+.import-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.import-file-name {
+  color: #5b6d8d;
+  font-size: 0.92rem;
+}
+
+.import-file-input {
+  display: none;
+}
+
+.import-result-card {
+  border-radius: 22px;
+  padding: 16px;
+  background: rgba(250, 252, 255, 0.98);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  display: grid;
+  gap: 14px;
+}
+
+.import-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.import-summary-item {
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  display: grid;
+  gap: 4px;
+}
+
+.import-summary-item strong {
+  font-size: 1.3rem;
+  color: var(--ink, #1b2b49);
+}
+
+.import-summary-item span {
+  color: #617393;
+  font-size: 0.86rem;
+}
+
+.import-summary-item.success {
+  border-color: rgba(16, 185, 129, 0.18);
+  background: rgba(236, 253, 245, 0.92);
+}
+
+.import-summary-item.success strong {
+  color: #059669;
+}
+
+.import-summary-item.danger {
+  border-color: rgba(239, 68, 68, 0.16);
+  background: rgba(254, 242, 242, 0.92);
+}
+
+.import-summary-item.danger strong {
+  color: #dc2626;
+}
+
+.import-fail-list {
+  display: grid;
+  gap: 10px;
+}
+
+.import-fail-head,
+.import-fail-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.import-fail-head {
+  color: #627391;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.import-fail-row {
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(248, 113, 113, 0.14);
+}
+
+.import-fail-row-num {
+  font-weight: 700;
+  color: #1f2f4d;
+}
+
+.import-fail-row-reason {
+  color: #b42318;
+  line-height: 1.5;
+}
+
+.import-empty {
+  color: #71829e;
+  font-size: 0.92rem;
+}
+
 @media (max-width: 1100px) {
   .dialog-body {
     grid-template-columns: 1fr;
@@ -1005,6 +1333,10 @@ onUnmounted(() => {
 
   .dialog-preview {
     position: static;
+  }
+
+  .import-body {
+    grid-template-columns: 1fr;
   }
 }
 
