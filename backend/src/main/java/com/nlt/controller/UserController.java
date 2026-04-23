@@ -41,8 +41,9 @@ public class UserController {
         @RequestParam(required = false) String username,
         @RequestParam(required = false) String realName,
         @RequestParam(required = false) Long departmentId,
+        @RequestParam(required = false) String roleCode,
         @RequestParam(required = false) Integer status) {
-        return ApiResponse.success(userService.page(pageNum, pageSize, username, realName, departmentId, status));
+        return ApiResponse.success(userService.page(pageNum, pageSize, username, realName, departmentId, roleCode, status));
     }
 
     /**

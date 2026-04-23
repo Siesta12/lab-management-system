@@ -495,10 +495,6 @@
       </div>
     </div>
 
-    <div v-if="feedback.visible && feedback.mode === 'toast'" class="toast" :class="feedback.type" role="status" aria-live="polite">
-      {{ feedback.text }}
-    </div>
-
     <div v-if="successDialogVisible" class="success-dialog-mask">
       <div class="success-dialog" role="dialog" aria-modal="true" aria-labelledby="success-dialog-title">
         <div class="success-dialog-badge">预约创建成功</div>
@@ -513,6 +509,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import QRCode from 'qrcode';
+import { useGlobalToast } from '../composables/useGlobalToast';
 import { fetchConsumables } from '../api/consumables';
 import { fetchDepartmentOptions } from '../api/departments';
 import { fetchDevices } from '../api/devices';
@@ -546,6 +543,7 @@ import type {
 import { getBadgeClass } from '../utils/format';
 
 const auth = useAuthStore();
+const { showToast } = useGlobalToast();
 const isAuthenticated = computed(() => Boolean(auth.token.value));
 const roleCodes = computed(() => auth.currentUser.value?.roleCodes ?? []);
 const isAdmin = computed(() => roleCodes.value.some((item) => item === 'ADMIN' || item === 'ROLE_ADMIN'));
@@ -590,12 +588,6 @@ const conflictPanel = reactive<{
 });
 
 const submittingReservation = ref(false);
-const feedback = reactive<{ visible: boolean; mode: 'toast' | 'dialog'; type: 'success' | 'error'; text: string; timer?: number }>({
-  visible: false,
-  mode: 'toast',
-  type: 'success',
-  text: '',
-});
 const successDialogVisible = ref(false);
 const successDialogText = ref('');
 const savingLab = ref(false);
@@ -935,21 +927,6 @@ function closeDetailModal(): void {
   recommendations.value = [];
   checkinQrCodeDataUrl.value = '';
   clearSelection();
-}
-
-function showToast(type: 'success' | 'error', text: string, durationMs = 1800): void {
-  if (feedback.timer) {
-    window.clearTimeout(feedback.timer);
-  }
-  feedback.visible = true;
-  feedback.mode = 'toast';
-  feedback.type = type;
-  feedback.text = text;
-  feedback.timer = window.setTimeout(() => {
-    feedback.visible = false;
-    feedback.text = '';
-    feedback.timer = undefined;
-  }, durationMs);
 }
 
 function showSuccessDialog(text: string): void {
@@ -1546,54 +1523,6 @@ onMounted(async () => {
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 12px 24px rgba(255, 255, 255, 0.16);
-}
-
-.toast {
-  position: fixed;
-  top: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1300;
-  padding: 12px 16px;
-  border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.18);
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 22px 42px rgba(15, 23, 42, 0.22);
-  font-size: 14px;
-  font-weight: 650;
-  color: rgba(15, 23, 42, 0.94);
-  max-width: min(640px, 92vw);
-  text-align: center;
-  backdrop-filter: blur(10px);
-  animation: toast-pop 160ms ease-out;
-}
-
-.toast.success {
-  padding: 14px 28px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, #2fd18a 0%, #18b977 100%);
-  border-color: rgba(16, 185, 129, 0.28);
-  color: #ffffff;
-  box-shadow: 0 18px 34px rgba(16, 185, 129, 0.28);
-  font-size: 16px;
-  letter-spacing: 0.02em;
-}
-
-.toast.error {
-  background: rgba(239, 68, 68, 0.92);
-  border-color: rgba(239, 68, 68, 0.55);
-  color: #ffffff;
-}
-
-@keyframes toast-pop {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-8px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
-  }
 }
 
 .detail-modal-head {

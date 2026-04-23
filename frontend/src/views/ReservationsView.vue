@@ -594,8 +594,8 @@ onMounted(async () => {
 
 .reservation-header-copy h3 {
   margin: 0;
-  font-size: 28px;
-  line-height: 1.15;
+  font-size: var(--page-title-size);
+  line-height: var(--page-title-line-height);
 }
 
 .reservation-header-actions {
@@ -633,9 +633,9 @@ onMounted(async () => {
 
 .reservation-table :deep(th),
 .reservation-table :deep(td) {
-  padding-top: 14px;
-  padding-bottom: 14px;
-  height: 68px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  height: var(--table-row-height);
   vertical-align: middle;
 }
 

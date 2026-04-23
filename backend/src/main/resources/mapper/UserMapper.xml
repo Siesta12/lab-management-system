@@ -14,6 +14,17 @@
         <if test="departmentId != null">
             and department_id = #{departmentId}
         </if>
+        <if test="roleCode != null and roleCode != ''">
+            and exists (
+                select 1
+                from sys_user_role ur
+                join sys_role r on r.id = ur.role_id
+                where ur.user_id = sys_user.id
+                  and r.role_code = #{roleCode}
+                  and r.deleted = 0
+                  and r.status = 1
+            )
+        </if>
         <if test="status != null">
             and status = #{status}
         </if>
@@ -33,6 +44,17 @@
         </if>
         <if test="departmentId != null">
             and department_id = #{departmentId}
+        </if>
+        <if test="roleCode != null and roleCode != ''">
+            and exists (
+                select 1
+                from sys_user_role ur
+                join sys_role r on r.id = ur.role_id
+                where ur.user_id = sys_user.id
+                  and r.role_code = #{roleCode}
+                  and r.deleted = 0
+                  and r.status = 1
+            )
         </if>
         <if test="status != null">
             and status = #{status}

@@ -132,3 +132,6 @@ export function put<T>(path: string, payload?: unknown, token?: string): Promise
   );
 }
 
+export function del<T>(path: string, token?: string): Promise<T> {
+  return request<T>(path, { method: 'DELETE' }, token);
+}

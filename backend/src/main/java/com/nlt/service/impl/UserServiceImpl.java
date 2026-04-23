@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,18 +30,20 @@ public class UserServiceImpl implements UserService {
     private final UserRoleMapper userRoleMapper;
 
     @Override
-    public PageData<UserVO> page(int pageNum, int pageSize, String username, String realName, Long departmentId, Integer status) {
+    public PageData<UserVO> page(int pageNum, int pageSize, String username, String realName, Long departmentId, String roleCode, Integer status) {
         int offset = (pageNum - 1) * pageSize;
-        List<UserVO> list = userMapper.selectPage(offset, pageSize, username, realName, departmentId, status)
+        List<UserVO> list = userMapper.selectPage(offset, pageSize, username, realName, departmentId, roleCode, status)
             .stream()
             .map(this::toVo)
             .toList();
-        return new PageData<>(list, userMapper.countPage(username, realName, departmentId, status), pageNum, pageSize);
+        return new PageData<>(list, userMapper.countPage(username, realName, departmentId, roleCode, status), pageNum, pageSize);
     }
 
     @Transactional
     @Override
     public UserVO create(UserCreateRequest request) {
+        ensureUsernameAvailable(request.getUsername(), null);
+
         UserEntity entity = new UserEntity();
         BeanUtils.copyProperties(request, entity);
         entity.setCreditScore(100);
@@ -48,7 +51,11 @@ public class UserServiceImpl implements UserService {
         if (entity.getStatus() == null) {
             entity.setStatus(1);
         }
-        userMapper.insert(entity);
+        try {
+            userMapper.insert(entity);
+        } catch (DuplicateKeyException ex) {
+            throw new BusinessException(400, "用户名已存在");
+        }
         rebuildUserRoles(entity.getId(), request.getRoleIds());
         return getById(entity.getId());
     }
@@ -150,5 +157,11 @@ public class UserServiceImpl implements UserService {
             userRoleMapper.insert(userId, roleId);
         }
     }
-}
 
+    private void ensureUsernameAvailable(String username, Long currentUserId) {
+        UserEntity existing = userMapper.selectByUsername(username);
+        if (existing != null && (currentUserId == null || !existing.getId().equals(currentUserId))) {
+            throw new BusinessException(400, "用户名已存在");
+        }
+    }
+}

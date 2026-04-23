@@ -1,11 +1,13 @@
-﻿import type {
+import type {
   PageData,
   PasswordUpdatePayload,
+  UserCreatePayload,
   UserProfileUpdatePayload,
+  UserUpdatePayload,
   UserVO,
   ViolationRecordDto,
 } from '../types';
-import { get, patch, put } from './http';
+import { del, get, patch, post, put } from './http';
 
 export interface UserQuery {
   pageNum?: number;
@@ -13,6 +15,7 @@ export interface UserQuery {
   username?: string;
   realName?: string;
   departmentId?: number;
+  roleCode?: string;
   status?: number;
 }
 
@@ -29,6 +32,9 @@ export function fetchUsers(query: UserQuery = {}, token: string): Promise<PageDa
   if (query.departmentId !== undefined) {
     params.set('departmentId', String(query.departmentId));
   }
+  if (query.roleCode) {
+    params.set('roleCode', query.roleCode);
+  }
   if (query.status !== undefined) {
     params.set('status', String(query.status));
   }
@@ -37,6 +43,22 @@ export function fetchUsers(query: UserQuery = {}, token: string): Promise<PageDa
 
 export function fetchMyProfile(token: string): Promise<UserVO> {
   return get<UserVO>('/users/profile', token);
+}
+
+export function fetchUserById(id: number, token: string): Promise<UserVO> {
+  return get<UserVO>(`/users/${id}`, token);
+}
+
+export function createUser(payload: UserCreatePayload, token: string): Promise<UserVO> {
+  return post<UserVO>('/users', payload, token);
+}
+
+export function updateUser(id: number, payload: UserUpdatePayload, token: string): Promise<UserVO> {
+  return put<UserVO>(`/users/${id}`, payload, token);
+}
+
+export function deleteUser(id: number, token: string): Promise<void> {
+  return del<void>(`/users/${id}`, token);
 }
 
 export function updateMyProfile(payload: UserProfileUpdatePayload, token: string): Promise<UserVO> {
@@ -50,4 +72,3 @@ export function updateMyPassword(payload: PasswordUpdatePayload, token: string):
 export function fetchUserViolations(id: number, token: string, pageNum = 1, pageSize = 20): Promise<PageData<ViolationRecordDto>> {
   return get<PageData<ViolationRecordDto>>(`/users/${id}/violations?pageNum=${pageNum}&pageSize=${pageSize}`, token);
 }
-

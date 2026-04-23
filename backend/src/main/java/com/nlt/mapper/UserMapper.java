@@ -20,7 +20,7 @@ public interface UserMapper {
      */
     List<UserEntity> selectPage(@Param("offset") int offset, @Param("pageSize") int pageSize,
     @Param("username") String username, @Param("realName") String realName,
-    @Param("departmentId") Long departmentId, @Param("status") Integer status);
+    @Param("departmentId") Long departmentId, @Param("roleCode") String roleCode, @Param("status") Integer status);
 
     /**
      * 统计用户信息数量
@@ -31,7 +31,7 @@ public interface UserMapper {
      * @return 处理结果
      */
     long countPage(@Param("username") String username, @Param("realName") String realName,
-    @Param("departmentId") Long departmentId, @Param("status") Integer status);
+    @Param("departmentId") Long departmentId, @Param("roleCode") String roleCode, @Param("status") Integer status);
 
     /**
      * 根据ID查询用户信息

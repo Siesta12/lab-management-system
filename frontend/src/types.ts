@@ -278,6 +278,30 @@ export interface UserVO {
   roleIds: number[];
 }
 
+export interface UserCreatePayload {
+  departmentId?: number | null;
+  username: string;
+  password: string;
+  realName: string;
+  userNo?: string;
+  gender?: number | null;
+  phone?: string;
+  email?: string;
+  status?: number | null;
+  roleIds?: number[];
+}
+
+export interface UserUpdatePayload {
+  departmentId?: number | null;
+  realName?: string;
+  userNo?: string;
+  gender?: number | null;
+  phone?: string;
+  email?: string;
+  status?: number | null;
+  roleIds?: number[];
+}
+
 export interface UserProfileUpdatePayload {
   phone?: string;
   email?: string;

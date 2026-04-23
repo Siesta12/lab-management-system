@@ -64,7 +64,7 @@ public class StatisticsServiceImpl implements StatisticsService {
         Long departmentId = currentUserScopeService.resolveAdminDepartmentId();
         return Map.of(
             "totalLabs", labMapper.countPage(null, null, null, null, departmentId, null, null),
-            "totalUsers", userMapper.countPage(null, null, departmentId, null),
+            "totalUsers", userMapper.countPage(null, null, departmentId, null, null),
             "totalReservations", reservationMapper.countPage(null, null, null, null, null, null, departmentId, false),
             "pendingReservations", reservationMapper.countPage(null, null, null, null, 1, null, departmentId, false),
             "totalViolations", violationMapper.countPage(null, null, null),

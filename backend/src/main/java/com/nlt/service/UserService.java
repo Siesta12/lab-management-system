@@ -22,7 +22,7 @@ public interface UserService {
      * @param status 状态值
      * @return 分页数据
      */
-    PageData<UserVO> page(int pageNum, int pageSize, String username, String realName, Long departmentId, Integer status);
+    PageData<UserVO> page(int pageNum, int pageSize, String username, String realName, Long departmentId, String roleCode, Integer status);
 
     /**
      * 新增用户信息

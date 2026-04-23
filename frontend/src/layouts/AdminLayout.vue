@@ -40,18 +40,6 @@
     </aside>
 
     <main class="main-panel">
-      <section class="hero-panel">
-        <div>
-          <span class="eyebrow">Campus Lab Console</span>
-          <h2>{{ pageTitle }}</h2>
-          <p v-if="pageDescription">{{ pageDescription }}</p>
-        </div>
-        <div v-if="showHeroActions" class="hero-actions">
-          <button class="ghost-btn" type="button">导出报表</button>
-          <button class="primary-btn" type="button">新增记录</button>
-        </div>
-      </section>
-
       <RouterView />
     </main>
   </div>
@@ -59,42 +47,17 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
+import { RouterLink, RouterView, useRouter } from 'vue-router';
 import { getNavigationItems, getPrimaryRole, getRoleLabels } from '../access';
 import { useAuthStore } from '../stores/auth';
 
-const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 
 const roleText = computed(() => getRoleLabels(auth.currentUser.value?.roleCodes).join(' / '));
 const primaryRole = computed(() => getPrimaryRole(auth.currentUser.value?.roleCodes));
 const navItems = computed(() => getNavigationItems(auth.currentUser.value?.roleCodes));
-const showHeroActions = computed(() => primaryRole.value === 'ADMIN');
 const showRoleHint = computed(() => primaryRole.value !== 'STUDENT');
-
-const pageTitle = computed(() => {
-  if (route.name === 'labs') {
-    if (primaryRole.value === 'ADMIN') {
-      return '实验室管理';
-    }
-    if (primaryRole.value === 'TEACHER') {
-      return '实验室预约';
-    }
-    return '实验室查询';
-  }
-  return String(route.meta.title ?? '高校实验室管理系统');
-});
-
-const pageDescription = computed(() => {
-  if (route.name === 'labs') {
-    return '';
-  }
-  if (route.name === 'teacher-home') {
-    return '';
-  }
-  return String(route.meta.description ?? '');
-});
 
 const roleHint = computed(() => {
   if (primaryRole.value === 'ADMIN') {
