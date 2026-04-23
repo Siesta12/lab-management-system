@@ -35,12 +35,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DuplicateKeyException.class)
     public ResponseEntity<ApiResponse<Void>> handleDuplicateKey(DuplicateKeyException ex) {
-        return ResponseEntity.badRequest().body(ApiResponse.error(400, "当前时段已有并发申请，请刷新后重试。"));
+        return ResponseEntity.badRequest().body(ApiResponse.error(400, "数据已存在或发生冲突，请刷新后重试。"));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleException(Exception ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(ApiResponse.error(500, ex.getMessage() == null ? "服务器内部错误" : ex.getMessage()));
+            .body(ApiResponse.error(500, ex.getMessage() == null ? "服务端内部错误" : ex.getMessage()));
     }
 }

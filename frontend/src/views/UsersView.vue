@@ -441,8 +441,6 @@ async function handleSubmit(): Promise<void> {
         },
         auth.token.value,
       );
-      message.value = '';
-      showToast('success', '用户创建成功。', 2400);
     } else if (userForm.id != null) {
       await updateUser(
         userForm.id,
@@ -458,10 +456,20 @@ async function handleSubmit(): Promise<void> {
         },
         auth.token.value,
       );
-      message.value = '';
-      showToast('success', '用户信息已更新。', 2400);
     }
-    await loadUsers();
+
+    message.value = '';
+    if (dialogMode.value === 'create') {
+      console.log("用户创建成功，准备刷新列表...");
+      showToast('success', '用户创建成功', 2400);
+    } else {
+      showToast('success', '用户信息已更新', 2400);
+    }
+    try {
+      await loadUsers();
+    } catch {
+      message.value = '操作已完成，列表刷新失败，请手动刷新页面。';
+    }
     dialogVisible.value = false;
   } catch (error) {
     showToast('error', error instanceof Error ? error.message : '保存用户失败。', 2600);
@@ -496,10 +504,14 @@ async function handleDelete(user: UserVO): Promise<void> {
   }
   try {
     await deleteUser(user.id, auth.token.value);
-    await loadUsers();
-    closeDialog();
     message.value = '';
     showToast('success', '用户已删除。', 2400);
+    try {
+      await loadUsers();
+    } catch {
+      message.value = '删除已完成，列表刷新失败，请手动刷新页面。';
+    }
+    closeDialog();
   } catch (error) {
     showToast('error', error instanceof Error ? error.message : '删除用户失败。', 2600);
   }

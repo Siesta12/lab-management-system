@@ -1,15 +1,41 @@
 <template>
   <teleport to="body">
-    <div v-if="toast.visible" class="toast" :class="toast.type" role="status" aria-live="polite">
+    <div v-if="toast.visible" class="toast" :style="toastStyle" role="status" aria-live="polite">
       {{ toast.text }}
     </div>
   </teleport>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useGlobalToast } from '../composables/useGlobalToast';
 
 const { toast } = useGlobalToast();
+const toastStyle = computed<Record<string, string>>(() => {
+  if (toast.type === 'success') {
+    return {
+      padding: '14px 28px',
+      borderRadius: '18px',
+      background: 'linear-gradient(180deg, #2fd18a 0%, #18b977 100%)',
+      borderColor: 'rgba(16, 185, 129, 0.28)',
+      color: '#ffffff',
+      boxShadow: '0 18px 34px rgba(16, 185, 129, 0.28)',
+      fontSize: '16px',
+      letterSpacing: '0.02em',
+    };
+  }
+
+  return {
+    padding: '14px 28px',
+    borderRadius: '18px',
+    background: 'linear-gradient(180deg, #f87171 0%, #ef4444 100%)',
+    borderColor: 'rgba(239, 68, 68, 0.24)',
+    color: '#ffffff',
+    boxShadow: '0 18px 34px rgba(239, 68, 68, 0.24)',
+    fontSize: '16px',
+    letterSpacing: '0.02em',
+  };
+});
 </script>
 
 <style scoped>
@@ -31,28 +57,6 @@ const { toast } = useGlobalToast();
   text-align: center;
   backdrop-filter: blur(10px);
   animation: toast-pop 160ms ease-out;
-}
-
-.toast.success {
-  padding: 14px 28px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, #2fd18a 0%, #18b977 100%);
-  border-color: rgba(16, 185, 129, 0.28);
-  color: #ffffff;
-  box-shadow: 0 18px 34px rgba(16, 185, 129, 0.28);
-  font-size: 16px;
-  letter-spacing: 0.02em;
-}
-
-.toast.error {
-  padding: 14px 28px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, #f87171 0%, #ef4444 100%);
-  border-color: rgba(239, 68, 68, 0.24);
-  color: #ffffff;
-  box-shadow: 0 18px 34px rgba(239, 68, 68, 0.24);
-  font-size: 16px;
-  letter-spacing: 0.02em;
 }
 
 @keyframes toast-pop {
