@@ -22,7 +22,7 @@ async function signIn(payload: LoginPayload): Promise<void> {
     localStorage.setItem(TOKEN_KEY, data.token);
     state.user = {
       id: data.id,
-      username: data.username,
+      userNo: data.userNo,
       realName: data.realName,
       roleCodes: data.roleCodes,
       departmentId: data.departmentId,

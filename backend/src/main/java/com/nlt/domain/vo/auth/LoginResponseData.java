@@ -8,7 +8,7 @@ public class LoginResponseData {
 
     private Long id;
 
-    private String username;
+    private String userNo;
 
     private String realName;
 

@@ -82,6 +82,14 @@
         )
     </select>
 
+    <select id="existsByReservationId" resultType="boolean">
+        select exists(
+            select 1
+            from user_violation_record
+            where reservation_id = #{reservationId}
+        )
+    </select>
+
     <delete id="deleteById">
         delete from user_violation_record
         where id = #{id}

@@ -5,6 +5,7 @@ import com.nlt.common.exception.BusinessException;
 import com.nlt.domain.dto.checkin.CheckinSubmitRequest;
 import com.nlt.domain.entity.DepartmentEntity;
 import com.nlt.domain.entity.LabEntity;
+import com.nlt.domain.entity.UserEntity;
 import com.nlt.domain.entity.ReservationAuditLogEntity;
 import com.nlt.domain.entity.ViolationRecordEntity;
 import com.nlt.domain.vo.checkin.CheckinResultVo;
@@ -164,6 +165,7 @@ public class CheckinServiceImpl implements CheckinService {
                 ReservationCheckConstants.AUDIT_ACTION_CHECK_OUT,
                 "\u5B9E\u9A8C\u5DF2\u5B8C\u6210"
             );
+            applyNormalCompletionReward(candidate);
             handledCount++;
         }
         return handledCount;
@@ -265,6 +267,7 @@ public class CheckinServiceImpl implements CheckinService {
             return;
         }
         userMapper.adjustCreditAndViolation(userId, scoreDelta, 1);
+        userMapper.resetNormalReservationStreak(userId);
         ViolationRecordEntity entity = new ViolationRecordEntity();
         entity.setUserId(userId);
         entity.setReservationId(reservationId);
@@ -272,6 +275,32 @@ public class CheckinServiceImpl implements CheckinService {
         entity.setScoreChange(scoreDelta);
         entity.setRemark(remark);
         violationMapper.insert(entity);
+    }
+
+    private void applyNormalCompletionReward(ReservationCheckCandidateVo candidate) {
+        if (candidate == null || candidate.getApplicantUserId() == null || candidate.getCheckInTime() == null) {
+            return;
+        }
+        LocalDateTime startDateTime = buildStartDateTime(candidate);
+        if (candidate.getCheckInTime().isAfter(startDateTime)) {
+            return;
+        }
+        if (violationMapper.existsByReservationId(candidate.getReservationId())) {
+            return;
+        }
+
+        Long userId = candidate.getApplicantUserId();
+        userMapper.adjustCreditAndViolation(userId, 2, 0);
+
+        UserEntity user = userMapper.selectById(userId);
+        int streak = user == null || user.getNormalReservationStreak() == null ? 0 : user.getNormalReservationStreak();
+        streak++;
+        if (streak >= 3) {
+            userMapper.adjustCreditAndViolation(userId, 5, 0);
+            userMapper.resetNormalReservationStreak(userId);
+            return;
+        }
+        userMapper.updateNormalReservationStreak(userId, streak);
     }
 
     private void insertAuditLog(Long reservationId, Long auditUserId, Integer action, String comment) {

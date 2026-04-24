@@ -10,8 +10,6 @@ public class UserEntity {
 
     private Long departmentId;
 
-    private String username;
-
     private String password;
 
     private String realName;
@@ -27,6 +25,8 @@ public class UserEntity {
     private Integer creditScore;
 
     private Integer violationCount;
+
+    private Integer normalReservationStreak;
 
     private Integer status;
 

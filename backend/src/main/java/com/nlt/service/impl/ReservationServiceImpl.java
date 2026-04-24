@@ -58,7 +58,7 @@ public class ReservationServiceImpl implements ReservationService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final int RESERVATION_CUTOFF_MINUTES = 30;
+    private static final int RESERVATION_CUTOFF_MINUTES = 0;
 
     private final ReservationMapper reservationMapper;
     private final ReservationAuditLogMapper reservationAuditLogMapper;

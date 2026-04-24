@@ -3,7 +3,7 @@
     <BasePanel tag="个人信息" title="查看个人资料">
       <div v-if="profile" class="detail-list">
         <div><strong>姓名</strong><span>{{ profile.realName }}</span></div>
-        <div><strong>{{ identityLabel }} / 账号</strong><span>{{ profile.userNo }} / {{ profile.username }}</span></div>
+        <div><strong>{{ identityLabel }} / 账号</strong><span>{{ profile.userNo }}</span></div>
         <div><strong>性别</strong><span>{{ genderText(profile.gender) }}</span></div>
         <div><strong>手机号</strong><span>{{ profile.phone || '未填写' }}</span></div>
         <div><strong>邮箱</strong><span>{{ profile.email || '未填写' }}</span></div>

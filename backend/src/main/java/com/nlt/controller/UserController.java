@@ -2,9 +2,14 @@ package com.nlt.controller;
 
 import com.nlt.common.api.ApiResponse;
 import com.nlt.common.api.PageData;
+import com.nlt.common.exception.BusinessException;
 import com.nlt.common.security.TokenService;
 import com.nlt.domain.dto.common.StatusUpdateRequest;
-import com.nlt.domain.dto.user.*;
+import com.nlt.domain.dto.user.PasswordResetRequest;
+import com.nlt.domain.dto.user.PasswordUpdateRequest;
+import com.nlt.domain.dto.user.UserCreateRequest;
+import com.nlt.domain.dto.user.UserProfileUpdateRequest;
+import com.nlt.domain.dto.user.UserUpdateRequest;
 import com.nlt.domain.entity.ViolationRecordEntity;
 import com.nlt.domain.vo.common.OptionItem;
 import com.nlt.domain.vo.user.UserVO;
@@ -14,7 +19,16 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/users")
@@ -25,154 +39,115 @@ public class UserController {
     private final ViolationService violationService;
     private final TokenService tokenService;
 
-    /**
-     * 分页查询用户列表
-     * @param pageNum 页码
-     * @param pageSize 每页大小
-     * @param username 用户名
-     * @param realName 真实姓名
-     * @param departmentId 部门ID
-     * @param status 状态
-     * @return 分页数据
-     */
     @GetMapping
-    public ApiResponse<PageData<UserVO>> page(@RequestParam(defaultValue = "1") int pageNum,
+    public ApiResponse<PageData<UserVO>> page(HttpServletRequest request,
+        @RequestParam(defaultValue = "1") int pageNum,
         @RequestParam(defaultValue = "10") int pageSize,
-        @RequestParam(required = false) String username,
+        @RequestParam(name = "userNo", required = false) String userNo,
         @RequestParam(required = false) String realName,
         @RequestParam(required = false) Long departmentId,
         @RequestParam(required = false) String roleCode,
         @RequestParam(required = false) Integer status) {
-        return ApiResponse.success(userService.page(pageNum, pageSize, username, realName, departmentId, roleCode, status));
+        Long scopedDepartmentId = resolveAdminDepartmentId(request);
+        return ApiResponse.success(userService.page(pageNum, pageSize, userNo, realName, scopedDepartmentId, roleCode, status));
     }
 
-    /**
-     * 创建用户
-     * @param request 创建请求
-     * @return 创建后的用户信息
-     */
     @PostMapping
-    public ApiResponse<UserVO> create(@Valid @RequestBody UserCreateRequest request) {
-        return ApiResponse.created(userService.create(request));
+    public ApiResponse<UserVO> create(HttpServletRequest request, @Valid @RequestBody UserCreateRequest body) {
+        Long scopedDepartmentId = resolveAdminDepartmentId(request);
+        body.setDepartmentId(scopedDepartmentId);
+        return ApiResponse.created(userService.create(body));
     }
 
-    /**
-     * 获取用户选项列表
-     * @param status 状态
-     * @return 选项列表
-     */
     @GetMapping("/options")
     public ApiResponse<List<OptionItem>> options(@RequestParam(required = false) Integer status) {
         return ApiResponse.success(userService.options(status));
     }
 
-    /**
-     * 获取当前用户信息
-     * @param request HTTP请求
-     * @return 当前用户信息
-     */
     @GetMapping("/profile")
     public ApiResponse<UserVO> profile(HttpServletRequest request) {
         return ApiResponse.success(userService.currentUser(tokenService.getCurrentUserId(request)));
     }
 
-    /**
-     * 更新当前用户资料
-     * @param request HTTP请求
-     * @param req 更新请求
-     * @return 更新后的用户信息
-     */
     @PutMapping("/profile")
-    public ApiResponse<UserVO> updateProfile(HttpServletRequest request,
-        @RequestBody UserProfileUpdateRequest req) {
+    public ApiResponse<UserVO> updateProfile(HttpServletRequest request, @RequestBody UserProfileUpdateRequest req) {
         return ApiResponse.success(userService.updateProfile(tokenService.getCurrentUserId(request), req));
     }
 
-    /**
-     * 更新当前用户密码
-     * @param request HTTP请求
-     * @param req 密码更新请求
-     * @return 操作结果
-     */
     @PatchMapping("/password")
-    public ApiResponse<Void> updatePassword(HttpServletRequest request,
-        @Valid @RequestBody PasswordUpdateRequest req) {
+    public ApiResponse<Void> updatePassword(HttpServletRequest request, @Valid @RequestBody PasswordUpdateRequest req) {
         userService.updatePassword(tokenService.getCurrentUserId(request), req);
         return ApiResponse.success();
     }
 
-    /**
-     * 根据ID获取用户详情
-     * @param id 用户ID
-     * @return 用户详情
-     */
     @GetMapping("/{id}")
-    public ApiResponse<UserVO> getById(@PathVariable Long id) {
-        return ApiResponse.success(userService.getById(id));
+    public ApiResponse<UserVO> getById(HttpServletRequest request, @PathVariable Long id) {
+        UserVO user = requireSameDepartment(request, id);
+        return ApiResponse.success(user);
     }
 
-    /**
-     * 更新用户信息
-     * @param id 用户ID
-     * @param request 更新请求
-     * @return 更新后的用户信息
-     */
     @PutMapping("/{id}")
-    public ApiResponse<UserVO> update(@PathVariable Long id,
-        @RequestBody UserUpdateRequest request) {
-        return ApiResponse.success(userService.update(id, request));
+    public ApiResponse<UserVO> update(HttpServletRequest request, @PathVariable Long id,
+        @RequestBody UserUpdateRequest body) {
+        Long scopedDepartmentId = resolveAdminDepartmentId(request);
+        requireSameDepartment(request, id);
+        body.setDepartmentId(scopedDepartmentId);
+        return ApiResponse.success(userService.update(id, body));
     }
 
-    /**
-     * 删除用户
-     * @param id 用户ID
-     * @return 操作结果
-     */
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> delete(@PathVariable Long id) {
+    public ApiResponse<Void> delete(HttpServletRequest request, @PathVariable Long id) {
+        requireSameDepartment(request, id);
         userService.delete(id);
         return ApiResponse.success();
     }
 
-    /**
-     * 重置用户密码
-     * @param id 用户ID
-     * @param request 密码重置请求
-     * @return 操作结果
-     */
     @PatchMapping("/{id}/reset-password")
-    public ApiResponse<Void> resetPassword(@PathVariable Long id,
-        @Valid @RequestBody PasswordResetRequest request) {
-        userService.resetPassword(id, request);
+    public ApiResponse<Void> resetPassword(HttpServletRequest request, @PathVariable Long id,
+        @Valid @RequestBody PasswordResetRequest body) {
+        requireSameDepartment(request, id);
+        userService.resetPassword(id, body);
         return ApiResponse.success();
     }
 
-    /**
-     * 更新用户状态
-     * @param id 用户ID
-     * @param request 状态更新请求
-     * @return 操作结果
-     */
     @PatchMapping("/{id}/status")
-    public ApiResponse<Void> updateStatus(@PathVariable Long id,
-        @Valid @RequestBody StatusUpdateRequest request) {
-        userService.updateStatus(id, request.getStatus());
+    public ApiResponse<Void> updateStatus(HttpServletRequest request, @PathVariable Long id,
+        @Valid @RequestBody StatusUpdateRequest body) {
+        requireSameDepartment(request, id);
+        userService.updateStatus(id, body.getStatus());
         return ApiResponse.success();
     }
 
-    /**
-     * 获取用户违规记录列表
-     * @param id 用户ID
-     * @param pageNum 页码
-     * @param pageSize 每页大小
-     * @return 违规记录分页数据
-     */
     @GetMapping("/{id}/violations")
-    public ApiResponse<PageData<ViolationRecordEntity>> violations(@PathVariable Long id,
+    public ApiResponse<PageData<ViolationRecordEntity>> violations(HttpServletRequest request, @PathVariable Long id,
         @RequestParam(defaultValue = "1") int pageNum,
         @RequestParam(defaultValue = "10") int pageSize) {
+        requireSameDepartment(request, id);
         return ApiResponse.success(violationService.page(pageNum, pageSize, id, null, null));
     }
 
-}
+    private Long resolveAdminDepartmentId(HttpServletRequest request) {
+        var roleCodes = tokenService.getCurrentRoleCodes(request);
+        boolean admin = roleCodes != null && roleCodes.stream()
+            .anyMatch(code -> code != null && code.toUpperCase().contains("ADMIN"));
+        if (!admin) {
+            throw new BusinessException(403, "无权访问");
+        }
 
+        Long currentUserId = tokenService.getCurrentUserId(request);
+        UserVO currentUser = userService.currentUser(currentUserId);
+        if (currentUser.getDepartmentId() == null) {
+            throw new BusinessException(403, "当前账号未绑定学院");
+        }
+        return currentUser.getDepartmentId();
+    }
+
+    private UserVO requireSameDepartment(HttpServletRequest request, Long targetUserId) {
+        Long scopedDepartmentId = resolveAdminDepartmentId(request);
+        UserVO user = userService.getById(targetUserId);
+        if (user.getDepartmentId() == null || !scopedDepartmentId.equals(user.getDepartmentId())) {
+            throw new BusinessException(403, "无权访问其他学院的用户");
+        }
+        return user;
+    }
+}

@@ -13,7 +13,7 @@ import { ApiError, del, get, getApiBaseUrl, patch, post, put } from './http';
 export interface UserQuery {
   pageNum?: number;
   pageSize?: number;
-  username?: string;
+  userNo?: string;
   realName?: string;
   departmentId?: number;
   roleCode?: string;
@@ -24,8 +24,8 @@ export function fetchUsers(query: UserQuery = {}, token: string): Promise<PageDa
   const params = new URLSearchParams();
   params.set('pageNum', String(query.pageNum ?? 1));
   params.set('pageSize', String(query.pageSize ?? 10));
-  if (query.username) {
-    params.set('username', query.username);
+  if (query.userNo) {
+    params.set('userNo', query.userNo);
   }
   if (query.realName) {
     params.set('realName', query.realName);

@@ -9,8 +9,6 @@ public class UserImportRowDto {
 
     private String userNo;
 
-    private String username;
-
     private String realName;
 
     private String gender;

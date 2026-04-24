@@ -10,11 +10,9 @@ public class UserVO {
 
     private Long departmentId;
 
-    private String username;
+    private String userNo;
 
     private String realName;
-
-    private String userNo;
 
     private Integer gender;
 

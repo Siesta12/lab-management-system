@@ -10,7 +10,7 @@
         <div class="user-meta">
           <div class="user-meta-row">
             <span class="user-meta-label">账号</span>
-            <span class="user-meta-value">{{ auth.currentUser.value?.username ?? '--' }}</span>
+            <span class="user-meta-value">{{ auth.currentUser.value?.userNo ?? '--' }}</span>
           </div>
           <div v-if="auth.currentUser.value?.departmentId != null" class="user-meta-row">
             <span class="user-meta-label">学院ID</span>

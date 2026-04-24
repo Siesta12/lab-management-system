@@ -25,7 +25,7 @@ export interface ReservationAlert {
 
 export interface UserItem {
   id: number;
-  username: string;
+  userNo: string;
   realName: string;
   role: string;
   department: string;
@@ -244,7 +244,7 @@ export interface OptionItem {
 
 export interface AuthUser {
   id: number;
-  username: string;
+  userNo: string;
   realName: string;
   roleCodes: string[];
   departmentId?: number | null;
@@ -266,9 +266,8 @@ export interface DepartmentDto {
 export interface UserVO {
   id: number;
   departmentId?: number;
-  username: string;
-  realName: string;
   userNo: string;
+  realName: string;
   gender?: number;
   phone?: string;
   email?: string;
@@ -292,10 +291,9 @@ export interface UserImportResult {
 
 export interface UserCreatePayload {
   departmentId?: number | null;
-  username: string;
+  userNo: string;
   password: string;
   realName: string;
-  userNo?: string;
   gender?: number | null;
   phone?: string;
   email?: string;

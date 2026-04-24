@@ -8,7 +8,7 @@ public class CurrentUserData {
 
     private Long id;
 
-    private String username;
+    private String userNo;
 
     private String realName;
 

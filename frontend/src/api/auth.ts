@@ -2,7 +2,7 @@
 import { get, post } from './http';
 
 export interface LoginPayload {
-  username: string;
+  userNo: string;
   password: string;
 }
 

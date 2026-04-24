@@ -40,16 +40,16 @@ public class TokenService {
      * 生成登录令牌
      *
      * @param userId 用户ID
-     * @param username 用户名
+     * @param userNo 学号/工号
      * @param roleCodes 角色编码列表
      * @return JWT
      */
-    public String generateToken(Long userId, String username, List<String> roleCodes) {
+    public String generateToken(Long userId, String userNo, List<String> roleCodes) {
         if (userId == null) {
             throw new BusinessException(400, "用户ID不能为空");
         }
-        if (!StringUtils.hasText(username)) {
-            throw new BusinessException(400, "用户名不能为空");
+        if (!StringUtils.hasText(userNo)) {
+            throw new BusinessException(400, "学号/工号不能为空");
         }
 
         Date issuedAt = new Date();
@@ -57,7 +57,7 @@ public class TokenService {
 
         return Jwts.builder()
                 .subject(String.valueOf(userId))
-                .claim("username", username)
+                .claim("userNo", userNo)
                 .claim("roleCodes", roleCodes == null ? Collections.emptyList() : roleCodes)
                 .issuedAt(issuedAt)
                 .expiration(expiration)
@@ -110,8 +110,11 @@ public class TokenService {
      */
     public String parseUsername(String token) {
         Claims claims = parseClaims(token);
-        Object username = claims.get("username");
-        return username == null ? null : String.valueOf(username);
+        Object userNo = claims.get("userNo");
+        if (userNo == null) {
+            userNo = claims.get("username");
+        }
+        return userNo == null ? null : String.valueOf(userNo);
     }
 
     /**

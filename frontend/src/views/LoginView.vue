@@ -30,16 +30,16 @@
       <div class="login-card">
         <div class="card-header">
           <h2>账号登录</h2>
-          <p>请输入用户名和密码进入系统</p>
+          <p>请输入学号/工号和密码进入系统</p>
         </div>
 
         <form class="login-form" @submit.prevent="handleSubmit">
           <label class="form-item">
-            <span>用户名</span>
+            <span>学号 / 工号</span>
             <input
-              v-model.trim="form.username"
-              placeholder="请输入用户名"
-              autocomplete="username"
+              v-model.trim="form.userNo"
+              placeholder="请输入学号或工号"
+              autocomplete="off"
               required
             />
           </label>
@@ -81,21 +81,21 @@ const router = useRouter();
 const auth = useAuthStore();
 
 const form = reactive({
-  username: '',
+  userNo: '',
   password: '',
 });
 
 const errorMessage = ref('');
 const statusMessage = ref('');
 const submitting = ref(false);
-const canSubmit = computed(() => Boolean(form.username.trim()) && Boolean(form.password.trim()));
+const canSubmit = computed(() => Boolean(form.userNo.trim()) && Boolean(form.password.trim()));
 
 async function handleSubmit(): Promise<void> {
   errorMessage.value = '';
   statusMessage.value = '准备提交登录请求...';
 
-  if (!form.username.trim()) {
-    errorMessage.value = '请输入用户名';
+  if (!form.userNo.trim()) {
+    errorMessage.value = '请输入学号/工号';
     statusMessage.value = '';
     return;
   }

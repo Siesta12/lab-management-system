@@ -55,12 +55,11 @@ public class UserServiceImpl implements UserService {
     private static final String DEFAULT_PASSWORD = "123456";
 
     private static final String[] IMPORT_HEADERS = {
-        "学号/工号", "用户名", "姓名", "性别", "手机号", "邮箱", "所属部门", "角色"
+        "学号/工号", "姓名", "性别", "手机号", "邮箱", "所属部门", "角色"
     };
 
     private static final String[] IMPORT_HEADER_ALIASES = {
         "userNo|学号/工号",
-        "username|用户名",
         "realName|姓名",
         "gender|性别",
         "phone|手机号",
@@ -70,7 +69,6 @@ public class UserServiceImpl implements UserService {
     };
 
     private static final Pattern PHONE_PATTERN = Pattern.compile("^1\\d{10}$");
-
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
     private final UserMapper userMapper;
@@ -80,33 +78,38 @@ public class UserServiceImpl implements UserService {
     private final PlatformTransactionManager transactionManager;
 
     @Override
-    public PageData<UserVO> page(int pageNum, int pageSize, String username, String realName, Long departmentId,
+    public PageData<UserVO> page(int pageNum, int pageSize, String userNo, String realName, Long departmentId,
         String roleCode, Integer status) {
         int offset = (pageNum - 1) * pageSize;
-        List<UserVO> list = userMapper.selectPage(offset, pageSize, username, realName, departmentId, roleCode, status)
+        List<UserVO> list = userMapper.selectPage(offset, pageSize, userNo, realName, departmentId, roleCode, status)
             .stream()
             .map(this::toVo)
             .toList();
-        return new PageData<>(list, userMapper.countPage(username, realName, departmentId, roleCode, status), pageNum,
-            pageSize);
+        return new PageData<>(list, userMapper.countPage(userNo, realName, departmentId, roleCode, status), pageNum, pageSize);
     }
 
     @Transactional
     @Override
     public UserVO create(UserCreateRequest request) {
-        ensureUsernameAvailable(request.getUsername(), null);
+        String userNo = normalizeUserNo(request.getUserNo());
+        if (userNo == null) {
+            throw new BusinessException(400, "学号/工号不能为空");
+        }
+        ensureUserNoAvailable(userNo, null);
 
         UserEntity entity = new UserEntity();
         BeanUtils.copyProperties(request, entity);
+        entity.setUserNo(userNo);
         entity.setCreditScore(100);
         entity.setViolationCount(0);
+        entity.setNormalReservationStreak(0);
         if (entity.getStatus() == null) {
             entity.setStatus(1);
         }
         try {
             userMapper.insert(entity);
         } catch (DuplicateKeyException ex) {
-            throw new BusinessException(400, "用户名已存在");
+            throw new BusinessException(400, "学号/工号已存在");
         }
         rebuildUserRoles(entity.getId(), request.getRoleIds());
         return getById(entity.getId());
@@ -128,7 +131,13 @@ public class UserServiceImpl implements UserService {
         if (entity == null) {
             throw new BusinessException(404, "用户不存在");
         }
+        String userNo = normalizeUserNo(request.getUserNo());
+        if (userNo == null) {
+            userNo = entity.getUserNo();
+        }
+        ensureUserNoAvailable(userNo, id);
         BeanUtils.copyProperties(request, entity);
+        entity.setUserNo(userNo);
         userMapper.update(entity);
         rebuildUserRoles(id, request.getRoleIds());
         return getById(id);
@@ -136,7 +145,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<OptionItem> options(Integer status) {
-        return userMapper.selectOptions(status).stream().map(item -> new OptionItem(item.getRealName(), item.getId()))
+        return userMapper.selectOptions(status).stream()
+            .map(item -> new OptionItem(item.getRealName(), item.getId()))
             .toList();
     }
 
@@ -223,7 +233,6 @@ public class UserServiceImpl implements UserService {
             }
         }
 
-        Set<String> usernameSet = new HashSet<>();
         Set<String> userNoSet = new HashSet<>();
         Set<String> phoneSet = new HashSet<>();
         Set<String> emailSet = new HashSet<>();
@@ -231,7 +240,7 @@ public class UserServiceImpl implements UserService {
         List<UserImportFailDetailVo> failDetails = new ArrayList<>();
 
         for (UserImportRowDto row : rows) {
-            String reason = validateImportRow(row, departmentMap, roleMap, usernameSet, userNoSet, phoneSet, emailSet);
+            String reason = validateImportRow(row, departmentMap, roleMap, userNoSet, phoneSet, emailSet);
             if (reason != null) {
                 failDetails.add(new UserImportFailDetailVo(row.getRowNum(), reason));
                 continue;
@@ -248,15 +257,15 @@ public class UserServiceImpl implements UserService {
                 transactionTemplate.executeWithoutResult(status -> {
                     UserEntity entity = new UserEntity();
                     entity.setDepartmentId(candidate.department().getId());
-                    entity.setUsername(candidate.row().getUsername().trim());
+                    entity.setUserNo(normalizeUserNo(candidate.row().getUserNo()));
                     entity.setPassword(DEFAULT_PASSWORD);
                     entity.setRealName(candidate.row().getRealName().trim());
-                    entity.setUserNo(candidate.row().getUserNo().trim());
                     entity.setGender(resolveGender(candidate.row().getGender()));
                     entity.setPhone(candidate.row().getPhone().trim());
                     entity.setEmail(candidate.row().getEmail().trim());
                     entity.setCreditScore(100);
                     entity.setViolationCount(0);
+                    entity.setNormalReservationStreak(0);
                     entity.setStatus(1);
                     userMapper.insert(entity);
                     userRoleMapper.insert(entity.getId(), candidate.role().getId());
@@ -288,6 +297,11 @@ public class UserServiceImpl implements UserService {
         }
     }
 
+    @Override
+    public int recoverCreditScores() {
+        return userMapper.recoverCreditScore();
+    }
+
     private UserVO toVo(UserEntity entity) {
         UserVO vo = new UserVO();
         BeanUtils.copyProperties(entity, vo);
@@ -305,10 +319,10 @@ public class UserServiceImpl implements UserService {
         }
     }
 
-    private void ensureUsernameAvailable(String username, Long currentUserId) {
-        UserEntity existing = userMapper.selectByUsername(username);
+    private void ensureUserNoAvailable(String userNo, Long currentUserId) {
+        UserEntity existing = userMapper.selectByUserNo(userNo);
         if (existing != null && (currentUserId == null || !existing.getId().equals(currentUserId))) {
-            throw new BusinessException(400, "用户名已存在");
+            throw new BusinessException(400, "学号/工号已存在");
         }
     }
 
@@ -335,13 +349,12 @@ public class UserServiceImpl implements UserService {
                 UserImportRowDto dto = new UserImportRowDto();
                 dto.setRowNum(i + 1);
                 dto.setUserNo(getCellText(row, 0, formatter, evaluator));
-                dto.setUsername(getCellText(row, 1, formatter, evaluator));
-                dto.setRealName(getCellText(row, 2, formatter, evaluator));
-                dto.setGender(getCellText(row, 3, formatter, evaluator));
-                dto.setPhone(getCellText(row, 4, formatter, evaluator));
-                dto.setEmail(getCellText(row, 5, formatter, evaluator));
-                dto.setDepartmentName(getCellText(row, 6, formatter, evaluator));
-                dto.setRoleName(getCellText(row, 7, formatter, evaluator));
+                dto.setRealName(getCellText(row, 1, formatter, evaluator));
+                dto.setGender(getCellText(row, 2, formatter, evaluator));
+                dto.setPhone(getCellText(row, 3, formatter, evaluator));
+                dto.setEmail(getCellText(row, 4, formatter, evaluator));
+                dto.setDepartmentName(getCellText(row, 5, formatter, evaluator));
+                dto.setRoleName(getCellText(row, 6, formatter, evaluator));
                 rows.add(dto);
             }
             return rows;
@@ -389,13 +402,10 @@ public class UserServiceImpl implements UserService {
     }
 
     private String validateImportRow(UserImportRowDto row, Map<String, DepartmentEntity> departmentMap,
-        Map<String, RoleEntity> roleMap, Set<String> usernameSet, Set<String> userNoSet,
-        Set<String> phoneSet, Set<String> emailSet) {
-        if (row.getUserNo() == null || row.getUserNo().trim().isEmpty()) {
+        Map<String, RoleEntity> roleMap, Set<String> userNoSet, Set<String> phoneSet, Set<String> emailSet) {
+        String userNo = normalizeUserNo(row.getUserNo());
+        if (userNo == null) {
             return "学号/工号不能为空";
-        }
-        if (row.getUsername() == null || row.getUsername().trim().isEmpty()) {
-            return "用户名不能为空";
         }
         if (row.getRealName() == null || row.getRealName().trim().isEmpty()) {
             return "姓名不能为空";
@@ -415,7 +425,6 @@ public class UserServiceImpl implements UserService {
         if (row.getRoleName() == null || row.getRoleName().trim().isEmpty()) {
             return "角色不能为空";
         }
-
         if (resolveGender(row.getGender()) == null) {
             return "性别值不合法";
         }
@@ -426,34 +435,22 @@ public class UserServiceImpl implements UserService {
             return "邮箱格式不合法";
         }
 
-        String usernameKey = normalizeKey(row.getUsername());
-        String userNoKey = normalizeKey(row.getUserNo());
-        String phoneKey = normalizeKey(row.getPhone());
-        String emailKey = normalizeKey(row.getEmail());
-        if (!usernameSet.add(usernameKey)) {
-            return "Excel文件内用户名重复";
-        }
-        if (!userNoSet.add(userNoKey)) {
+        if (!userNoSet.add(normalizeKey(userNo))) {
             return "Excel文件内学号/工号重复";
         }
-        if (!phoneSet.add(phoneKey)) {
+        if (!phoneSet.add(normalizeKey(row.getPhone()))) {
             return "Excel文件内手机号重复";
         }
-        if (!emailSet.add(emailKey)) {
+        if (!emailSet.add(normalizeKey(row.getEmail()))) {
             return "Excel文件内邮箱重复";
         }
-
         if (!departmentMap.containsKey(normalizeKey(row.getDepartmentName()))) {
             return "所属部门不存在";
         }
         if (!roleMap.containsKey(normalizeKey(row.getRoleName()))) {
             return "角色不存在";
         }
-
-        if (userMapper.selectByUsername(row.getUsername().trim()) != null) {
-            return "用户名已存在";
-        }
-        if (userMapper.selectByUserNo(row.getUserNo().trim()) != null) {
+        if (userMapper.selectByUserNo(userNo) != null) {
             return "学号/工号已存在";
         }
         if (userMapper.selectByPhone(row.getPhone().trim()) != null) {
@@ -462,7 +459,6 @@ public class UserServiceImpl implements UserService {
         if (userMapper.selectByEmail(row.getEmail().trim()) != null) {
             return "邮箱已存在";
         }
-
         return null;
     }
 
@@ -490,11 +486,13 @@ public class UserServiceImpl implements UserService {
         return text == null ? "" : text.trim().toLowerCase(Locale.ROOT);
     }
 
+    private String normalizeUserNo(String userNo) {
+        return userNo == null ? null : userNo.trim();
+    }
+
     private String resolveDuplicateReason(UserImportRowDto row) {
-        if (userMapper.selectByUsername(row.getUsername().trim()) != null) {
-            return "用户名已存在";
-        }
-        if (userMapper.selectByUserNo(row.getUserNo().trim()) != null) {
+        String userNo = normalizeUserNo(row.getUserNo());
+        if (userMapper.selectByUserNo(userNo) != null) {
             return "学号/工号已存在";
         }
         if (userMapper.selectByPhone(row.getPhone().trim()) != null) {

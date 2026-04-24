@@ -10,15 +10,13 @@ public class UserCreateRequest {
     private Long departmentId;
 
     @NotBlank
-    private String username;
+    private String userNo;
 
     @NotBlank
     private String password;
 
     @NotBlank
     private String realName;
-
-    private String userNo;
 
     private Integer gender;
 

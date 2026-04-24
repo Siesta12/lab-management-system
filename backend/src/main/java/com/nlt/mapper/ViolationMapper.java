@@ -66,6 +66,8 @@ public interface ViolationMapper {
     boolean existsByReservationAndType(@Param("reservationId") Long reservationId,
         @Param("violationType") Integer violationType);
 
+    boolean existsByReservationId(@Param("reservationId") Long reservationId);
+
     /**
      * 删除违规记录
      * @param id 主键ID

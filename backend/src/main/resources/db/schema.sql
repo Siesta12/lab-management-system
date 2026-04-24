@@ -23,315 +23,403 @@ DROP TABLE IF EXISTS `sys_role`;
 DROP TABLE IF EXISTS `sys_user`;
 DROP TABLE IF EXISTS `department`;
 
-CREATE TABLE `department` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-    `department_name` VARCHAR(100) NOT NULL COMMENT 'Department name',
-    `department_code` VARCHAR(50) NOT NULL COMMENT 'Department code',
-    `leader_name` VARCHAR(50) NOT NULL COMMENT 'Leader name',
-    `phone` VARCHAR(20) NOT NULL COMMENT 'Phone',
-    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 enabled, 0 disabled',
-    `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '0 active, 1 deleted',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated time',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_department_code_deleted` (`department_code`, `deleted`),
-    UNIQUE KEY `uk_department_name_deleted` (`department_name`, `deleted`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Department table';
+create table class_period
+(
+  id          bigint auto_increment comment 'Primary key'
+        primary key,
+  period_no   int                                not null comment 'Unique period number',
+  period_name varchar(50)                        not null comment 'Period name',
+  start_time  time                               not null comment 'Start time',
+  end_time    time                               not null comment 'End time',
+  sort_order  int      default 0                 not null comment 'Sort order',
+  status      tinyint  default 1                 not null comment '1 enabled, 0 disabled',
+  created_at  datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  updated_at  datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment 'Updated time',
+  constraint uk_class_period_period_no
+    unique (period_no)
+) comment 'Class period table';
 
-CREATE TABLE `sys_user` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-    `department_id` BIGINT DEFAULT NULL COMMENT 'Department id',
-    `username` VARCHAR(50) NOT NULL COMMENT 'Login username',
-    `password` VARCHAR(255) NOT NULL COMMENT 'Login password',
-    `real_name` VARCHAR(50) NOT NULL COMMENT 'Real name',
-    `user_no` VARCHAR(50) NOT NULL COMMENT 'Student or job number',
-    `gender` TINYINT NOT NULL DEFAULT 0 COMMENT '0 unknown, 1 male, 2 female',
-    `phone` VARCHAR(20) NOT NULL COMMENT 'Phone',
-    `email` VARCHAR(100) NOT NULL COMMENT 'Email',
-    `credit_score` INT NOT NULL DEFAULT 100 COMMENT 'Credit score',
-    `violation_count` INT NOT NULL DEFAULT 0 COMMENT 'Violation count',
-    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 enabled, 0 disabled',
-    `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '0 active, 1 deleted',
-    `last_login_at` DATETIME DEFAULT NULL COMMENT 'Last login time',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated time',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_sys_user_username_deleted` (`username`, `deleted`),
-    UNIQUE KEY `uk_sys_user_user_no_deleted` (`user_no`, `deleted`),
-    UNIQUE KEY `uk_sys_user_phone_deleted` (`phone`, `deleted`),
-    UNIQUE KEY `uk_sys_user_email_deleted` (`email`, `deleted`),
-    KEY `idx_sys_user_department_id` (`department_id`),
-    KEY `idx_sys_user_status_deleted` (`status`, `deleted`),
-    CONSTRAINT `fk_sys_user_department`
-        FOREIGN KEY (`department_id`) REFERENCES `department` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='System user table';
+create index idx_class_period_status_sort
+  on class_period (status, sort_order);
 
-CREATE TABLE `sys_role` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-    `role_name` VARCHAR(50) NOT NULL COMMENT 'Role name',
-    `role_code` VARCHAR(50) NOT NULL COMMENT 'Role code',
-    `description` VARCHAR(255) DEFAULT NULL COMMENT 'Description',
-    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 enabled, 0 disabled',
-    `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '0 active, 1 deleted',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated time',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_sys_role_role_code_deleted` (`role_code`, `deleted`),
-    UNIQUE KEY `uk_sys_role_role_name_deleted` (`role_name`, `deleted`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='System role table';
+create table department
+(
+  id              bigint auto_increment comment 'Primary key'
+        primary key,
+  department_name varchar(100)                       not null comment 'Department name',
+  department_code varchar(50)                        not null comment 'Department code',
+  leader_name     varchar(50)                        not null comment 'Leader name',
+  phone           varchar(20)                        not null comment 'Phone',
+  status          tinyint  default 1                 not null comment '1 enabled, 0 disabled',
+  deleted         tinyint  default 0                 not null comment '0 active, 1 deleted',
+  created_at      datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  updated_at      datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment 'Updated time',
+  constraint uk_department_code_deleted
+    unique (department_code, deleted),
+  constraint uk_department_name_deleted
+    unique (department_name, deleted)
+) comment 'Department table';
 
-CREATE TABLE `sys_user_role` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-    `user_id` BIGINT NOT NULL COMMENT 'User id',
-    `role_id` BIGINT NOT NULL COMMENT 'Role id',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_sys_user_role_user_id_role_id` (`user_id`, `role_id`),
-    KEY `idx_sys_user_role_role_id` (`role_id`),
-    CONSTRAINT `fk_sys_user_role_user`
-        FOREIGN KEY (`user_id`) REFERENCES `sys_user` (`id`),
-    CONSTRAINT `fk_sys_user_role_role`
-        FOREIGN KEY (`role_id`) REFERENCES `sys_role` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='User role mapping table';
+create table sys_role
+(
+  id          bigint auto_increment comment 'Primary key'
+        primary key,
+  role_name   varchar(50)                        not null comment 'Role name',
+  role_code   varchar(50)                        not null comment 'Role code',
+  description varchar(255) null comment 'Description',
+  status      tinyint  default 1                 not null comment '1 enabled, 0 disabled',
+  deleted     tinyint  default 0                 not null comment '0 active, 1 deleted',
+  created_at  datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  updated_at  datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment 'Updated time',
+  constraint uk_sys_role_role_code_deleted
+    unique (role_code, deleted),
+  constraint uk_sys_role_role_name_deleted
+    unique (role_name, deleted)
+) comment 'System role table';
 
-CREATE TABLE `lab` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-    `department_id` BIGINT DEFAULT NULL COMMENT 'Department id',
-    `lab_code` VARCHAR(50) NOT NULL COMMENT 'Lab code',
-    `lab_name` VARCHAR(100) NOT NULL COMMENT 'Lab name',
-    `lab_type` VARCHAR(50) NOT NULL COMMENT 'Lab type',
-    `building_name` VARCHAR(100) NOT NULL COMMENT 'Building name',
-    `room_no` VARCHAR(50) NOT NULL COMMENT 'Room number',
-    `capacity` INT NOT NULL DEFAULT 0 COMMENT 'Capacity',
-    `manager_user_id` BIGINT DEFAULT NULL COMMENT 'Manager user id',
-    `open_status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 open, 0 closed',
-    `lab_status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 normal, 2 maintenance, 0 disabled',
-    `description` VARCHAR(500) DEFAULT NULL COMMENT 'Description',
-    `usage_rule` VARCHAR(500) DEFAULT NULL COMMENT 'Usage rule',
-    `latitude` DOUBLE DEFAULT NULL COMMENT '实验室纬度',
-    `longitude` DOUBLE DEFAULT NULL COMMENT '实验室经度',
-    `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '0 active, 1 deleted',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated time',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_lab_lab_code_deleted` (`lab_code`, `deleted`),
-    UNIQUE KEY `uk_lab_name_room_deleted` (`lab_name`, `building_name`, `room_no`, `deleted`),
-    KEY `idx_lab_department_id` (`department_id`),
-    KEY `idx_lab_manager_user_id` (`manager_user_id`),
-    KEY `idx_lab_open_status_deleted` (`open_status`, `deleted`),
-    CONSTRAINT `fk_lab_department`
-        FOREIGN KEY (`department_id`) REFERENCES `department` (`id`),
-    CONSTRAINT `fk_lab_manager_user`
-        FOREIGN KEY (`manager_user_id`) REFERENCES `sys_user` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Lab table';
+create table sys_user
+(
+  id              bigint auto_increment comment 'Primary key'
+        primary key,
+  department_id   bigint null comment 'Department id',
+  user_no         varchar(50)                        not null comment 'Student or job number',
+  password        varchar(255)                       not null comment 'Login password',
+  real_name       varchar(50)                        not null comment 'Real name',
+  gender          tinyint  default 0                 not null comment '0 unknown, 1 male, 2 female',
+  phone           varchar(20)                        not null comment 'Phone',
+  email           varchar(100)                       not null comment 'Email',
+  credit_score    int      default 100               not null comment 'Credit score',
+  violation_count int      default 0                 not null comment 'Violation count',
+  normal_reservation_streak int default 0            not null comment 'Consecutive normal reservations',
+  status          tinyint  default 1                 not null comment '1 enabled, 0 disabled',
+  deleted         tinyint  default 0                 not null comment '0 active, 1 deleted',
+  last_login_at   datetime null comment 'Last login time',
+  created_at      datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  updated_at      datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment 'Updated time',
+  constraint uk_sys_user_email_deleted
+    unique (email, deleted),
+  constraint uk_sys_user_phone_deleted
+    unique (phone, deleted),
+  constraint uk_sys_user_user_no_deleted
+    unique (user_no, deleted),
+  constraint fk_sys_user_department
+    foreign key (department_id) references department (id)
+) comment 'System user table';
 
-CREATE TABLE `class_period` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-    `period_no` INT NOT NULL COMMENT 'Unique period number',
-    `period_name` VARCHAR(50) NOT NULL COMMENT 'Period name',
-    `start_time` TIME NOT NULL COMMENT 'Start time',
-    `end_time` TIME NOT NULL COMMENT 'End time',
-    `sort_order` INT NOT NULL DEFAULT 0 COMMENT 'Sort order',
-    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 enabled, 0 disabled',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated time',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_class_period_period_no` (`period_no`),
-    KEY `idx_class_period_status_sort` (`status`, `sort_order`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Class period table';
+create table lab
+(
+  id              bigint auto_increment comment 'Primary key'
+        primary key,
+  department_id   bigint null comment 'Department id',
+  lab_code        varchar(50)                        not null comment 'Lab code',
+  lab_name        varchar(100)                       not null comment 'Lab name',
+  lab_type        varchar(50)                        not null comment 'Lab type',
+  building_name   varchar(100)                       not null comment 'Building name',
+  room_no         varchar(50)                        not null comment 'Room number',
+  capacity        int      default 0                 not null comment 'Capacity',
+  manager_user_id bigint null comment 'Manager user id',
+  open_status     tinyint  default 1                 not null comment '1 open, 0 closed',
+  lab_status      tinyint  default 1                 not null comment '1 normal, 2 maintenance, 0 disabled',
+  description     varchar(500) null comment 'Description',
+  usage_rule      varchar(500) null comment 'Usage rule',
+  latitude double null comment '实验室纬度',
+  longitude double null comment '实验室经度',
+  deleted         tinyint  default 0                 not null comment '0 active, 1 deleted',
+  created_at      datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  updated_at      datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment 'Updated time',
+  constraint uk_lab_lab_code_deleted
+    unique (lab_code, deleted),
+  constraint uk_lab_name_room_deleted
+    unique (lab_name, building_name, room_no, deleted),
+  constraint fk_lab_department
+    foreign key (department_id) references department (id),
+  constraint fk_lab_manager_user
+    foreign key (manager_user_id) references sys_user (id)
+) comment 'Lab table';
 
-CREATE TABLE `lab_open_slot` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-    `lab_id` BIGINT NOT NULL COMMENT 'Lab id',
-    `weekday` TINYINT NOT NULL COMMENT '1 Monday to 7 Sunday',
-    `period_id` BIGINT NOT NULL COMMENT 'Period id',
-    `allow_student` TINYINT NOT NULL DEFAULT 1 COMMENT 'Student can reserve',
-    `allow_teacher` TINYINT NOT NULL DEFAULT 1 COMMENT 'Teacher can reserve',
-    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 enabled, 0 disabled',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated time',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_lab_open_slot_lab_weekday_period` (`lab_id`, `weekday`, `period_id`),
-    KEY `idx_lab_open_slot_lab_weekday` (`lab_id`, `weekday`),
-    KEY `idx_lab_open_slot_period_id` (`period_id`),
-    CONSTRAINT `fk_lab_open_slot_lab`
-        FOREIGN KEY (`lab_id`) REFERENCES `lab` (`id`),
-    CONSTRAINT `fk_lab_open_slot_period`
-        FOREIGN KEY (`period_id`) REFERENCES `class_period` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Lab open slot table';
+create index idx_lab_department_id
+  on lab (department_id);
 
-CREATE TABLE `lab_device` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-    `lab_id` BIGINT NOT NULL COMMENT 'Lab id',
-    `device_name` VARCHAR(100) NOT NULL COMMENT 'Device name',
-    `device_code` VARCHAR(50) NOT NULL COMMENT 'Device code',
-    `brand` VARCHAR(100) NOT NULL COMMENT 'Brand',
-    `model_no` VARCHAR(100) NOT NULL COMMENT 'Model',
-    `quantity` INT NOT NULL DEFAULT 1 COMMENT 'Quantity',
-    `available_quantity` INT NOT NULL DEFAULT 1 COMMENT 'Available quantity',
-    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 normal, 2 maintenance, 3 disabled',
-    `purchase_date` DATE NOT NULL COMMENT 'Purchase date',
-    `remark` VARCHAR(255) DEFAULT NULL COMMENT 'Remark',
-    `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '0 active, 1 deleted',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated time',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_lab_device_device_code_deleted` (`device_code`, `deleted`),
-    UNIQUE KEY `uk_lab_device_lab_name_deleted` (`lab_id`, `device_name`, `model_no`, `deleted`),
-    KEY `idx_lab_device_lab_id` (`lab_id`),
-    CONSTRAINT `fk_lab_device_lab`
-        FOREIGN KEY (`lab_id`) REFERENCES `lab` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Lab device table';
+create index idx_lab_manager_user_id
+  on lab (manager_user_id);
 
-CREATE TABLE `lab_consumable` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-    `lab_id` BIGINT NOT NULL COMMENT 'Lab id',
-    `consumable_name` VARCHAR(100) NOT NULL COMMENT 'Consumable name',
-    `consumable_code` VARCHAR(50) NOT NULL COMMENT 'Consumable code',
-    `unit` VARCHAR(20) NOT NULL COMMENT 'Unit',
-    `stock_quantity` INT NOT NULL DEFAULT 0 COMMENT 'Stock quantity',
-    `warning_threshold` INT NOT NULL DEFAULT 0 COMMENT 'Warning threshold',
-    `remark` VARCHAR(255) DEFAULT NULL COMMENT 'Remark',
-    `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '0 active, 1 deleted',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated time',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_lab_consumable_code_deleted` (`consumable_code`, `deleted`),
-    UNIQUE KEY `uk_lab_consumable_lab_name_deleted` (`lab_id`, `consumable_name`, `deleted`),
-    KEY `idx_lab_consumable_lab_id` (`lab_id`),
-    CONSTRAINT `fk_lab_consumable_lab`
-        FOREIGN KEY (`lab_id`) REFERENCES `lab` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Lab consumable table';
+create index idx_lab_open_status_deleted
+  on lab (open_status, deleted);
 
-CREATE TABLE `consumable_stock_log` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-    `consumable_id` BIGINT NOT NULL COMMENT 'Consumable id',
-    `change_type` VARCHAR(20) NOT NULL COMMENT 'IN, OUT, ADJUST',
-    `change_amount` INT NOT NULL COMMENT 'Changed amount',
-    `before_stock` INT NOT NULL COMMENT 'Stock before change',
-    `after_stock` INT NOT NULL COMMENT 'Stock after change',
-    `operator_user_id` BIGINT DEFAULT NULL COMMENT 'Operator user id',
-    `remark` VARCHAR(255) DEFAULT NULL COMMENT 'Remark',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
-    PRIMARY KEY (`id`),
-    KEY `idx_consumable_stock_log_consumable_id` (`consumable_id`),
-    KEY `idx_consumable_stock_log_operator_user_id` (`operator_user_id`),
-    KEY `idx_consumable_stock_log_created_at` (`created_at`),
-    CONSTRAINT `fk_consumable_stock_log_consumable`
-        FOREIGN KEY (`consumable_id`) REFERENCES `lab_consumable` (`id`),
-    CONSTRAINT `fk_consumable_stock_log_operator_user`
-        FOREIGN KEY (`operator_user_id`) REFERENCES `sys_user` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Consumable stock log table';
+create table lab_consumable
+(
+  id                bigint auto_increment comment 'Primary key'
+        primary key,
+  lab_id            bigint                             not null comment 'Lab id',
+  consumable_name   varchar(100)                       not null comment 'Consumable name',
+  consumable_code   varchar(50)                        not null comment 'Consumable code',
+  unit              varchar(20)                        not null comment 'Unit',
+  stock_quantity    int      default 0                 not null comment 'Stock quantity',
+  warning_threshold int      default 0                 not null comment 'Warning threshold',
+  remark            varchar(255) null comment 'Remark',
+  deleted           tinyint  default 0                 not null comment '0 active, 1 deleted',
+  created_at        datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  updated_at        datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment 'Updated time',
+  constraint uk_lab_consumable_code_deleted
+    unique (consumable_code, deleted),
+  constraint uk_lab_consumable_lab_name_deleted
+    unique (lab_id, consumable_name, deleted),
+  constraint fk_lab_consumable_lab
+    foreign key (lab_id) references lab (id)
+) comment 'Lab consumable table';
 
-CREATE TABLE `lab_reservation` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-    `reservation_no` VARCHAR(50) NOT NULL COMMENT 'Reservation number',
-    `lab_id` BIGINT NOT NULL COMMENT 'Lab id',
-    `applicant_user_id` BIGINT NOT NULL COMMENT 'Applicant user id',
-    `approver_user_id` BIGINT DEFAULT NULL COMMENT 'Approver user id',
-    `reservation_type` TINYINT NOT NULL DEFAULT 3 COMMENT '1 course, 2 research, 3 personal',
-    `priority_level` TINYINT NOT NULL DEFAULT 3 COMMENT '1 high, 2 medium, 3 low',
-    `usage_purpose` VARCHAR(255) NOT NULL COMMENT 'Usage purpose',
-    `course_or_project_name` VARCHAR(100) NOT NULL COMMENT 'Course or project name',
-    `participant_count` INT NOT NULL DEFAULT 1 COMMENT 'Participant count',
-    `contact_phone` VARCHAR(20) NOT NULL COMMENT 'Contact phone',
-    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 pending, 2 approved, 3 rejected, 4 canceled, 5 completed',
-    `reject_reason` VARCHAR(255) DEFAULT NULL COMMENT 'Reject reason',
-    `check_in_time` DATETIME DEFAULT NULL COMMENT 'Check in time',
-    `check_out_time` DATETIME DEFAULT NULL COMMENT 'Check out time',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated time',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_lab_reservation_reservation_no` (`reservation_no`),
-    KEY `idx_lab_reservation_lab_id` (`lab_id`),
-    KEY `idx_lab_reservation_applicant_user_id` (`applicant_user_id`),
-    KEY `idx_lab_reservation_approver_user_id` (`approver_user_id`),
-    KEY `idx_lab_reservation_status_created_at` (`status`, `created_at`),
-    CONSTRAINT `fk_lab_reservation_lab`
-        FOREIGN KEY (`lab_id`) REFERENCES `lab` (`id`),
-    CONSTRAINT `fk_lab_reservation_applicant_user`
-        FOREIGN KEY (`applicant_user_id`) REFERENCES `sys_user` (`id`),
-    CONSTRAINT `fk_lab_reservation_approver_user`
-        FOREIGN KEY (`approver_user_id`) REFERENCES `sys_user` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Lab reservation table';
+create table consumable_stock_log
+(
+  id               bigint auto_increment comment 'Primary key'
+        primary key,
+  consumable_id    bigint                             not null comment 'Consumable id',
+  change_type      varchar(20)                        not null comment 'IN, OUT, ADJUST',
+  change_amount    int                                not null comment 'Changed amount',
+  before_stock     int                                not null comment 'Stock before change',
+  after_stock      int                                not null comment 'Stock after change',
+  operator_user_id bigint null comment 'Operator user id',
+  remark           varchar(255) null comment 'Remark',
+  created_at       datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  constraint fk_consumable_stock_log_consumable
+    foreign key (consumable_id) references lab_consumable (id),
+  constraint fk_consumable_stock_log_operator_user
+    foreign key (operator_user_id) references sys_user (id)
+) comment 'Consumable stock log table';
 
-CREATE TABLE `lab_reservation_slot` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-    `reservation_id` BIGINT NOT NULL COMMENT 'Reservation id',
-    `lab_id` BIGINT NOT NULL COMMENT 'Lab id',
-    `reservation_date` DATE NOT NULL COMMENT 'Reservation date',
-    `weekday` TINYINT NOT NULL COMMENT '1 Monday to 7 Sunday',
-    `period_id` BIGINT NOT NULL COMMENT 'Period id',
-    `slot_status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 occupied, 2 canceled',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated time',
-    PRIMARY KEY (`id`),
-    KEY `idx_lab_reservation_slot_lab_date_period_status` (`lab_id`, `reservation_date`, `period_id`, `slot_status`),
-    KEY `idx_lab_reservation_slot_reservation_id` (`reservation_id`),
-    KEY `idx_lab_reservation_slot_lab_date` (`lab_id`, `reservation_date`),
-    KEY `idx_lab_reservation_slot_period_id` (`period_id`),
-    CONSTRAINT `fk_lab_reservation_slot_reservation`
-        FOREIGN KEY (`reservation_id`) REFERENCES `lab_reservation` (`id`),
-    CONSTRAINT `fk_lab_reservation_slot_lab`
-        FOREIGN KEY (`lab_id`) REFERENCES `lab` (`id`),
-    CONSTRAINT `fk_lab_reservation_slot_period`
-        FOREIGN KEY (`period_id`) REFERENCES `class_period` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Lab reservation slot table';
+create index idx_consumable_stock_log_consumable_id
+  on consumable_stock_log (consumable_id);
 
-CREATE TABLE `lab_maintenance` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-    `lab_id` BIGINT NOT NULL COMMENT 'Lab id',
-    `maintenance_date` DATE NOT NULL COMMENT 'Maintenance date',
-    `period_id` BIGINT NOT NULL COMMENT 'Period id',
-    `reason` VARCHAR(255) NOT NULL COMMENT 'Reason',
-    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1 active, 2 canceled',
-    `operator_user_id` BIGINT NOT NULL COMMENT 'Operator user id',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated time',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_lab_maintenance_lab_date_period` (`lab_id`, `maintenance_date`, `period_id`),
-    KEY `idx_lab_maintenance_lab_date_status` (`lab_id`, `maintenance_date`, `status`),
-    KEY `idx_lab_maintenance_period_id` (`period_id`),
-    KEY `idx_lab_maintenance_operator_user_id` (`operator_user_id`),
-    CONSTRAINT `fk_lab_maintenance_lab`
-        FOREIGN KEY (`lab_id`) REFERENCES `lab` (`id`),
-    CONSTRAINT `fk_lab_maintenance_period`
-        FOREIGN KEY (`period_id`) REFERENCES `class_period` (`id`),
-    CONSTRAINT `fk_lab_maintenance_operator_user`
-        FOREIGN KEY (`operator_user_id`) REFERENCES `sys_user` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Lab maintenance table';
+create index idx_consumable_stock_log_created_at
+  on consumable_stock_log (created_at);
 
-CREATE TABLE `reservation_audit_log` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-    `reservation_id` BIGINT NOT NULL COMMENT 'Reservation id',
-    `audit_user_id` BIGINT NOT NULL COMMENT 'Audit user id',
-    `audit_action` TINYINT NOT NULL COMMENT '1 submit, 2 approve, 3 reject, 4 cancel, 5 check in, 6 check out',
-    `audit_comment` VARCHAR(255) DEFAULT NULL COMMENT 'Audit comment',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
-    PRIMARY KEY (`id`),
-    KEY `idx_reservation_audit_log_reservation_id` (`reservation_id`),
-    KEY `idx_reservation_audit_log_audit_user_id` (`audit_user_id`),
-    CONSTRAINT `fk_reservation_audit_log_reservation`
-        FOREIGN KEY (`reservation_id`) REFERENCES `lab_reservation` (`id`),
-    CONSTRAINT `fk_reservation_audit_log_audit_user`
-        FOREIGN KEY (`audit_user_id`) REFERENCES `sys_user` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Reservation audit log table';
+create index idx_consumable_stock_log_operator_user_id
+  on consumable_stock_log (operator_user_id);
 
-CREATE TABLE `user_violation_record` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Primary key',
-    `user_id` BIGINT NOT NULL COMMENT 'User id',
-    `reservation_id` BIGINT DEFAULT NULL COMMENT 'Reservation id',
-    `violation_type` TINYINT NOT NULL COMMENT '1 no show, 2 late, 3 misuse, 4 other',
-    `score_change` INT NOT NULL DEFAULT 0 COMMENT 'Score change',
-    `remark` VARCHAR(255) DEFAULT NULL COMMENT 'Remark',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created time',
-    PRIMARY KEY (`id`),
-    KEY `idx_user_violation_record_user_id` (`user_id`),
-    KEY `idx_user_violation_record_reservation_id` (`reservation_id`),
-    CONSTRAINT `fk_user_violation_record_user`
-        FOREIGN KEY (`user_id`) REFERENCES `sys_user` (`id`),
-    CONSTRAINT `fk_user_violation_record_reservation`
-        FOREIGN KEY (`reservation_id`) REFERENCES `lab_reservation` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='User violation record table';
+create index idx_lab_consumable_lab_id
+  on lab_consumable (lab_id);
 
-SET FOREIGN_KEY_CHECKS = 1;
+create table lab_device
+(
+  id                 bigint auto_increment comment 'Primary key'
+        primary key,
+  lab_id             bigint                             not null comment 'Lab id',
+  device_name        varchar(100)                       not null comment 'Device name',
+  device_code        varchar(50)                        not null comment 'Device code',
+  brand              varchar(100)                       not null comment 'Brand',
+  model_no           varchar(100)                       not null comment 'Model',
+  quantity           int      default 1                 not null comment 'Quantity',
+  available_quantity int      default 1                 not null comment 'Available quantity',
+  status             tinyint  default 1                 not null comment '1 normal, 2 maintenance, 3 disabled',
+  purchase_date      date                               not null comment 'Purchase date',
+  remark             varchar(255) null comment 'Remark',
+  deleted            tinyint  default 0                 not null comment '0 active, 1 deleted',
+  created_at         datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  updated_at         datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment 'Updated time',
+  constraint uk_lab_device_device_code_deleted
+    unique (device_code, deleted),
+  constraint uk_lab_device_lab_name_deleted
+    unique (lab_id, device_name, model_no, deleted),
+  constraint fk_lab_device_lab
+    foreign key (lab_id) references lab (id)
+) comment 'Lab device table';
+
+create index idx_lab_device_lab_id
+  on lab_device (lab_id);
+
+create table lab_maintenance
+(
+  id               bigint auto_increment comment 'Primary key'
+        primary key,
+  lab_id           bigint                             not null comment 'Lab id',
+  maintenance_date date                               not null comment 'Maintenance date',
+  period_id        bigint                             not null comment 'Period id',
+  reason           varchar(255)                       not null comment 'Reason',
+  status           tinyint  default 1                 not null comment '1 active, 2 canceled',
+  operator_user_id bigint                             not null comment 'Operator user id',
+  created_at       datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  updated_at       datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment 'Updated time',
+  constraint uk_lab_maintenance_lab_date_period
+    unique (lab_id, maintenance_date, period_id),
+  constraint fk_lab_maintenance_lab
+    foreign key (lab_id) references lab (id),
+  constraint fk_lab_maintenance_operator_user
+    foreign key (operator_user_id) references sys_user (id),
+  constraint fk_lab_maintenance_period
+    foreign key (period_id) references class_period (id)
+) comment 'Lab maintenance table';
+
+create index idx_lab_maintenance_lab_date_status
+  on lab_maintenance (lab_id, maintenance_date, status);
+
+create index idx_lab_maintenance_operator_user_id
+  on lab_maintenance (operator_user_id);
+
+create index idx_lab_maintenance_period_id
+  on lab_maintenance (period_id);
+
+create table lab_open_slot
+(
+  id            bigint auto_increment comment 'Primary key'
+        primary key,
+  lab_id        bigint                             not null comment 'Lab id',
+  weekday       tinyint                            not null comment '1 Monday to 7 Sunday',
+  period_id     bigint                             not null comment 'Period id',
+  allow_student tinyint  default 1                 not null comment 'Student can reserve',
+  allow_teacher tinyint  default 1                 not null comment 'Teacher can reserve',
+  status        tinyint  default 1                 not null comment '1 enabled, 0 disabled',
+  created_at    datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  updated_at    datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment 'Updated time',
+  constraint uk_lab_open_slot_lab_weekday_period
+    unique (lab_id, weekday, period_id),
+  constraint fk_lab_open_slot_lab
+    foreign key (lab_id) references lab (id),
+  constraint fk_lab_open_slot_period
+    foreign key (period_id) references class_period (id)
+) comment 'Lab open slot table';
+
+create index idx_lab_open_slot_lab_weekday
+  on lab_open_slot (lab_id, weekday);
+
+create index idx_lab_open_slot_period_id
+  on lab_open_slot (period_id);
+
+create table lab_reservation
+(
+  id                     bigint auto_increment comment 'Primary key'
+        primary key,
+  reservation_no         varchar(50)                        not null comment 'Reservation number',
+  lab_id                 bigint                             not null comment 'Lab id',
+  applicant_user_id      bigint                             not null comment 'Applicant user id',
+  approver_user_id       bigint null comment 'Approver user id',
+  reservation_type       tinyint  default 3                 not null comment '1 course, 2 research, 3 personal',
+  priority_level         tinyint  default 3                 not null comment '1 high, 2 medium, 3 low',
+  usage_purpose          varchar(255)                       not null comment 'Usage purpose',
+  course_or_project_name varchar(100)                       not null comment 'Course or project name',
+  participant_count      int      default 1                 not null comment 'Participant count',
+  contact_phone          varchar(20)                        not null comment 'Contact phone',
+  status                 tinyint  default 1                 not null comment '1 pending, 2 approved, 3 rejected, 4 canceled, 5 completed',
+  reject_reason          varchar(255) null comment 'Reject reason',
+  check_in_time          datetime null comment 'Check in time',
+  check_out_time         datetime null comment 'Check out time',
+  created_at             datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  updated_at             datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment 'Updated time',
+  constraint uk_lab_reservation_reservation_no
+    unique (reservation_no),
+  constraint fk_lab_reservation_applicant_user
+    foreign key (applicant_user_id) references sys_user (id),
+  constraint fk_lab_reservation_approver_user
+    foreign key (approver_user_id) references sys_user (id),
+  constraint fk_lab_reservation_lab
+    foreign key (lab_id) references lab (id)
+) comment 'Lab reservation table';
+
+create index idx_lab_reservation_applicant_user_id
+  on lab_reservation (applicant_user_id);
+
+create index idx_lab_reservation_approver_user_id
+  on lab_reservation (approver_user_id);
+
+create index idx_lab_reservation_lab_id
+  on lab_reservation (lab_id);
+
+create index idx_lab_reservation_status_created_at
+  on lab_reservation (status, created_at);
+
+create table lab_reservation_slot
+(
+  id               bigint auto_increment comment 'Primary key'
+        primary key,
+  reservation_id   bigint                             not null comment 'Reservation id',
+  lab_id           bigint                             not null comment 'Lab id',
+  reservation_date date                               not null comment 'Reservation date',
+  weekday          tinyint                            not null comment '1 Monday to 7 Sunday',
+  period_id        bigint                             not null comment 'Period id',
+  slot_status      tinyint  default 1                 not null comment '1 occupied, 2 canceled',
+  created_at       datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  updated_at       datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment 'Updated time',
+  constraint fk_lab_reservation_slot_lab
+    foreign key (lab_id) references lab (id),
+  constraint fk_lab_reservation_slot_period
+    foreign key (period_id) references class_period (id),
+  constraint fk_lab_reservation_slot_reservation
+    foreign key (reservation_id) references lab_reservation (id)
+) comment 'Lab reservation slot table';
+
+create index idx_lab_reservation_slot_lab_date
+  on lab_reservation_slot (lab_id, reservation_date);
+
+create index idx_lab_reservation_slot_lab_date_period_status
+  on lab_reservation_slot (lab_id, reservation_date, period_id, slot_status);
+
+create index idx_lab_reservation_slot_period_id
+  on lab_reservation_slot (period_id);
+
+create index idx_lab_reservation_slot_reservation_id
+  on lab_reservation_slot (reservation_id);
+
+create table reservation_audit_log
+(
+  id             bigint auto_increment comment 'Primary key'
+        primary key,
+  reservation_id bigint                             not null comment 'Reservation id',
+  audit_user_id  bigint                             not null comment 'Audit user id',
+  audit_action   tinyint                            not null comment '1 submit, 2 approve, 3 reject, 4 cancel, 5 check in, 6 check out',
+  audit_comment  varchar(255) null comment 'Audit comment',
+  created_at     datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  constraint fk_reservation_audit_log_audit_user
+    foreign key (audit_user_id) references sys_user (id),
+  constraint fk_reservation_audit_log_reservation
+    foreign key (reservation_id) references lab_reservation (id)
+) comment 'Reservation audit log table';
+
+create index idx_reservation_audit_log_audit_user_id
+  on reservation_audit_log (audit_user_id);
+
+create index idx_reservation_audit_log_reservation_id
+  on reservation_audit_log (reservation_id);
+
+create index idx_sys_user_department_id
+  on sys_user (department_id);
+
+create index idx_sys_user_status_deleted
+  on sys_user (status, deleted);
+
+create table sys_user_role
+(
+  id         bigint auto_increment comment 'Primary key'
+        primary key,
+  user_id    bigint                             not null comment 'User id',
+  role_id    bigint                             not null comment 'Role id',
+  created_at datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  constraint uk_sys_user_role_user_id_role_id
+    unique (user_id, role_id),
+  constraint fk_sys_user_role_role
+    foreign key (role_id) references sys_role (id),
+  constraint fk_sys_user_role_user
+    foreign key (user_id) references sys_user (id)
+) comment 'User role mapping table';
+
+create index idx_sys_user_role_role_id
+  on sys_user_role (role_id);
+
+create table user_violation_record
+(
+  id             bigint auto_increment comment 'Primary key'
+        primary key,
+  user_id        bigint                             not null comment 'User id',
+  reservation_id bigint null comment 'Reservation id',
+  violation_type tinyint                            not null comment '1 no show, 2 late, 3 misuse, 4 other',
+  score_change   int      default 0                 not null comment 'Score change',
+  remark         varchar(255) null comment 'Remark',
+  created_at     datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  constraint fk_user_violation_record_reservation
+    foreign key (reservation_id) references lab_reservation (id),
+  constraint fk_user_violation_record_user
+    foreign key (user_id) references sys_user (id)
+) comment 'User violation record table';
+
+create index idx_user_violation_record_reservation_id
+  on user_violation_record (reservation_id);
+
+create index idx_user_violation_record_user_id
+  on user_violation_record (user_id);

@@ -118,10 +118,10 @@ export const dashboardData: DashboardData = {
 };
 
 export const users: UserItem[] = [
-  { id: 1, username: 'admin', realName: '系统管理员', role: '管理员', department: '实验中心', status: '正常', creditScore: 100 },
-  { id: 2, username: 'teacher_zhang', realName: '张老师', role: '教师', department: '计算机学院', status: '正常', creditScore: 98 },
-  { id: 3, username: 'student_li', realName: '李同学', role: '学生', department: '软件工程', status: '正常', creditScore: 86 },
-  { id: 4, username: 'student_wang', realName: '王同学', role: '学生', department: '网络工程', status: '禁用', creditScore: 62 },
+  { id: 1, userNo: 'A0001', realName: '系统管理员', role: '管理员', department: '实验中心', status: '正常', creditScore: 100 },
+  { id: 2, userNo: 'T1001', realName: '张老师', role: '教师', department: '计算机学院', status: '正常', creditScore: 98 },
+  { id: 3, userNo: 'S2001', realName: '李同学', role: '学生', department: '软件工程', status: '正常', creditScore: 86 },
+  { id: 4, userNo: 'S2002', realName: '王同学', role: '学生', department: '网络工程', status: '禁用', creditScore: 62 },
 ];
 
 export const labs: LabItem[] = [

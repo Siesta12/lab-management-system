@@ -1,11 +1,7 @@
 ﻿<template>
   <section class="content-grid users-page">    <BasePanel title="用户管理" panel-class="users-panel">
       <div class="toolbar">
-        <input v-model="keyword" class="toolbar-input" placeholder="搜索用户名或姓名" />
-        <select v-model="filters.departmentId" class="toolbar-select">
-          <option :value="null">全部部门</option>
-          <option v-for="dept in departmentOptions" :key="dept.value" :value="dept.value">{{ dept.label }}</option>
-        </select>
+        <input v-model="keyword" class="toolbar-input" placeholder="搜索学号/工号或姓名" />
         <select v-model="filters.roleCode" class="toolbar-select">
           <option :value="null">全部角色</option>
           <option value="TEACHER">教师</option>
@@ -25,7 +21,7 @@
 
       <BaseTable
         class="users-table"
-        :headers="['用户名', '姓名', '部门', '角色', '账号状态', '性别', '手机号', '信用分', '违纪次数', '操作']"
+        :headers="['学号/工号', '姓名', '部门', '角色', '账号状态', '性别', '手机号', '信用分', '违纪次数', '操作']"
       >
         <tr v-if="loading">
           <td :colspan="10" class="table-empty">数据加载中...</td>
@@ -39,7 +35,7 @@
           class="user-row"
           @click="openEditDialog(user)"
         >
-          <td><span class="cell-text cell-text-wide">{{ user.username }}</span></td>
+          <td><span class="cell-text cell-text-wide">{{ user.userNo }}</span></td>
           <td><span class="cell-text">{{ user.realName }}</span></td>
           <td><span class="cell-text">{{ departmentLabel(user.departmentId) }}</span></td>
           <td><span class="cell-text">{{ roleLabel(user.roleIds) }}</span></td>
@@ -120,8 +116,8 @@
 
           <form class="user-form" @submit.prevent="handleSubmit">
             <label>
-              <span>用户名</span>
-              <input v-model.trim="userForm.username" :disabled="dialogMode === 'edit'" placeholder="请输入用户名" />
+              <span>学号 / 工号</span>
+              <input v-model.trim="userForm.userNo" :disabled="dialogMode === 'edit'" placeholder="请输入学号或工号" />
             </label>
             <label v-if="dialogMode === 'create'">
               <span>初始密码</span>
@@ -130,10 +126,6 @@
             <label>
               <span>真实姓名</span>
               <input v-model.trim="userForm.realName" placeholder="请输入真实姓名" />
-            </label>
-            <label>
-              <span>学号 / 工号</span>
-              <input v-model.trim="userForm.userNo" placeholder="请输入学号或工号" />
             </label>
             <label>
               <span>所属部门</span>
@@ -295,20 +287,17 @@ const departmentOptions = ref<OptionItem[]>([]);
 const roleOptions = ref<OptionItem[]>([]);
 const keyword = ref('');
 const filters = reactive<{
-  departmentId: number | null;
   roleCode: string | null;
   status: number | null;
 }>({
-  departmentId: null,
   roleCode: null,
   status: null,
 });
 const userForm = reactive<{
   id: number | null;
-  username: string;
+  userNo: string;
   password: string;
   realName: string;
-  userNo: string;
   departmentId: number | null;
   roleIds: number[];
   gender: number | null;
@@ -319,10 +308,9 @@ const userForm = reactive<{
   violationCount: number;
 }>({
   id: null,
-  username: '',
+  userNo: '',
   password: '',
   realName: '',
-  userNo: '',
   departmentId: null,
   roleIds: [],
   gender: null,
@@ -334,7 +322,7 @@ const userForm = reactive<{
 });
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
-const previewInitial = computed(() => (userForm.realName.trim().slice(0, 1) || userForm.username.trim().slice(0, 1) || 'U'));
+const previewInitial = computed(() => (userForm.realName.trim().slice(0, 1) || userForm.userNo.trim().slice(0, 1) || 'U'));
 const selectedRoleId = computed<number | null>({
   get: () => userForm.roleIds[0] ?? null,
   set: (value) => {
@@ -385,10 +373,9 @@ function getStatusBadgeClass(status: number): string {
 
 function resetForm(): void {
   userForm.id = null;
-  userForm.username = '';
+  userForm.userNo = '';
   userForm.password = '';
   userForm.realName = '';
-  userForm.userNo = '';
   userForm.departmentId = null;
   userForm.roleIds = [];
   userForm.gender = null;
@@ -424,9 +411,8 @@ async function loadUsers(): Promise<void> {
       {
         pageNum: pageNum.value,
         pageSize: pageSize.value,
-        username: keyword.value || undefined,
+        userNo: keyword.value || undefined,
         realName: keyword.value || undefined,
-        departmentId: filters.departmentId ?? undefined,
         roleCode: filters.roleCode ?? undefined,
         status: filters.status ?? undefined,
       },
@@ -453,7 +439,6 @@ function scheduleReload(): void {
 
 function handleReset(): void {
   keyword.value = '';
-  filters.departmentId = null;
   filters.roleCode = null;
   filters.status = null;
   pageNum.value = 1;
@@ -487,10 +472,9 @@ function closeImportDialog(): void {
 function openEditDialog(user: UserVO): void {
   dialogMode.value = 'edit';
   userForm.id = user.id;
-  userForm.username = user.username;
+  userForm.userNo = user.userNo;
   userForm.password = '';
   userForm.realName = user.realName ?? '';
-  userForm.userNo = user.userNo ?? '';
   userForm.departmentId = user.departmentId ?? null;
   userForm.roleIds = [...(user.roleIds ?? [])];
   userForm.gender = user.gender ?? null;
@@ -566,8 +550,8 @@ async function handleImportSubmit(): Promise<void> {
 }
 
 async function handleSubmit(): Promise<void> {
-  if (!userForm.username.trim() && dialogMode.value === 'create') {
-    showToast('error', '请先填写用户名。', 2400);
+  if (!userForm.userNo.trim() && dialogMode.value === 'create') {
+    showToast('error', '请先填写学号/工号。', 2400);
     return;
   }
   if (!userForm.password.trim() && dialogMode.value === 'create') {
@@ -589,10 +573,9 @@ async function handleSubmit(): Promise<void> {
       await createUser(
         {
           departmentId: userForm.departmentId ?? undefined,
-          username: userForm.username.trim(),
+          userNo: userForm.userNo.trim(),
           password: userForm.password.trim(),
           realName: userForm.realName.trim(),
-          userNo: userForm.userNo.trim() || undefined,
           gender: userForm.gender ?? undefined,
           phone: userForm.phone.trim() || undefined,
           email: userForm.email.trim() || undefined,
@@ -644,9 +627,8 @@ function handleDeleteCurrent(): Promise<void> {
   }
   return handleDelete({
     id: userForm.id,
-    username: userForm.username,
-    realName: userForm.realName,
     userNo: userForm.userNo,
+    realName: userForm.realName,
     departmentId: userForm.departmentId,
     roleIds: [...userForm.roleIds],
     gender: userForm.gender,
@@ -677,7 +659,7 @@ async function handleDelete(user: UserVO): Promise<void> {
   }
 }
 
-watch([keyword, () => filters.departmentId, () => filters.roleCode, () => filters.status], () => {
+watch([keyword, () => filters.roleCode, () => filters.status], () => {
   scheduleReload();
 });
 
