@@ -151,6 +151,13 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public List<OptionItem> teacherOptions(Long departmentId) {
+        return userMapper.selectTeacherOptions(departmentId).stream()
+            .map(item -> new OptionItem(item.getRealName(), item.getId()))
+            .toList();
+    }
+
+    @Override
     public void delete(Long id) {
         getById(id);
         userMapper.softDelete(id);

@@ -6,6 +6,7 @@ import type {
   UserProfileUpdatePayload,
   UserUpdatePayload,
   UserVO,
+  OptionItem,
   ViolationRecordDto,
 } from '../types';
 import { ApiError, del, get, getApiBaseUrl, patch, post, put } from './http';
@@ -72,6 +73,10 @@ export function updateMyPassword(payload: PasswordUpdatePayload, token: string):
 
 export function fetchUserViolations(id: number, token: string, pageNum = 1, pageSize = 20): Promise<PageData<ViolationRecordDto>> {
   return get<PageData<ViolationRecordDto>>(`/users/${id}/violations?pageNum=${pageNum}&pageSize=${pageSize}`, token);
+}
+
+export function fetchTeacherOptions(token: string): Promise<OptionItem[]> {
+  return get<OptionItem[]>('/users/teacher-options', token);
 }
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {

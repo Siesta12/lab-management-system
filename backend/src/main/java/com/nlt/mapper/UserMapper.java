@@ -25,6 +25,8 @@ public interface UserMapper {
 
     List<UserEntity> selectOptions(@Param("status") Integer status);
 
+    List<UserEntity> selectTeacherOptions(@Param("departmentId") Long departmentId);
+
     int insert(UserEntity entity);
 
     int update(UserEntity entity);

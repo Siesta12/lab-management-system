@@ -457,3 +457,70 @@ create index idx_user_violation_record_reservation_id
 
 create index idx_user_violation_record_user_id
   on user_violation_record (user_id);
+
+create table lab_experiment_report
+(
+  id              bigint auto_increment comment 'Primary key'
+        primary key,
+  report_no       varchar(50)                        not null comment 'Report number',
+  student_id      bigint                             not null comment 'Student user id',
+  teacher_id      bigint                             not null comment 'Teacher user id',
+  department_id   bigint                             not null comment 'Department id',
+  lab_id          bigint                             not null comment 'Lab id',
+  reservation_id  bigint null comment 'Reservation id',
+  title           varchar(100)                       not null comment 'Report title',
+  experiment_name varchar(100)                       not null comment 'Experiment name',
+  experiment_date date                               not null comment 'Experiment date',
+  purpose         text null comment 'Purpose',
+  principle       text null comment 'Principle',
+  steps           text null comment 'Steps',
+  result_data     text null comment 'Result data',
+  analysis        text null comment 'Analysis',
+  conclusion      text null comment 'Conclusion',
+  status          tinyint  default 1                 not null comment '1 draft, 2 pending, 3 approved, 4 returned',
+  teacher_comment varchar(500) null comment 'Teacher comment',
+  submitted_at    datetime null comment 'Submitted time',
+  reviewed_at     datetime null comment 'Reviewed time',
+  deleted         tinyint  default 0                 not null comment '0 active, 1 deleted',
+  created_at      datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  updated_at      datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment 'Updated time',
+  constraint uk_lab_experiment_report_no
+    unique (report_no),
+  constraint fk_lab_experiment_report_student
+    foreign key (student_id) references sys_user (id),
+  constraint fk_lab_experiment_report_teacher
+    foreign key (teacher_id) references sys_user (id),
+  constraint fk_lab_experiment_report_department
+    foreign key (department_id) references department (id),
+  constraint fk_lab_experiment_report_lab
+    foreign key (lab_id) references lab (id),
+  constraint fk_lab_experiment_report_reservation
+    foreign key (reservation_id) references lab_reservation (id)
+) comment 'Experiment report table';
+
+create index idx_lab_experiment_report_student_status
+  on lab_experiment_report (student_id, status);
+
+create index idx_lab_experiment_report_teacher_status
+  on lab_experiment_report (teacher_id, status);
+
+create index idx_lab_experiment_report_department_status
+  on lab_experiment_report (department_id, status);
+
+create table lab_experiment_report_consumable
+(
+  id              bigint auto_increment comment 'Primary key'
+        primary key,
+  report_id       bigint                             not null comment 'Report id',
+  consumable_name varchar(100)                       not null comment 'Consumable name',
+  specification   varchar(100) null comment 'Specification',
+  quantity        int      default 0                 not null comment 'Quantity',
+  unit            varchar(20) null comment 'Unit',
+  remark          varchar(255) null comment 'Remark',
+  created_at      datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  constraint fk_lab_experiment_report_consumable_report
+    foreign key (report_id) references lab_experiment_report (id)
+) comment 'Experiment report consumable record table';
+
+create index idx_lab_experiment_report_consumable_report_id
+  on lab_experiment_report_consumable (report_id);

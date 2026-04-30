@@ -4,6 +4,7 @@
   | 'labs'
   | 'my-reservations'
   | 'devices'
+  | 'experiment-reports'
   | 'consumables'
   | 'statistics'
   | 'my-credit'
@@ -478,6 +479,68 @@ export interface DeviceRepairStatusUpdatePayload {
   status: number;
   handlingResult?: string;
   deviceStatus?: number | null;
+}
+
+export interface ExperimentReportConsumableDto {
+  id?: number;
+  reportId?: number;
+  consumableName: string;
+  specification?: string;
+  quantity?: number;
+  unit?: string;
+  remark?: string;
+}
+
+export interface ExperimentReportDto {
+  id: number;
+  reportNo: string;
+  studentId: number;
+  teacherId: number;
+  departmentId: number;
+  labId: number;
+  reservationId?: number | null;
+  title: string;
+  experimentName: string;
+  experimentDate: string;
+  purpose?: string;
+  principle?: string;
+  steps?: string;
+  resultData?: string;
+  analysis?: string;
+  conclusion?: string;
+  status: number;
+  teacherComment?: string;
+  submittedAt?: string;
+  reviewedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  studentName?: string;
+  studentNo?: string;
+  teacherName?: string;
+  labName?: string;
+  departmentName?: string;
+  consumables?: ExperimentReportConsumableDto[];
+}
+
+export interface ExperimentReportSavePayload {
+  teacherId: number;
+  labId: number;
+  reservationId?: number | null;
+  title: string;
+  experimentName: string;
+  experimentDate: string;
+  purpose?: string;
+  principle?: string;
+  steps?: string;
+  resultData?: string;
+  analysis?: string;
+  conclusion?: string;
+  consumables: ExperimentReportConsumableDto[];
+}
+
+export interface ExperimentReportReviewPayload {
+  status: number;
+  teacherComment?: string;
 }
 
 export interface ConsumableDto {

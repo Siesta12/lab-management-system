@@ -24,6 +24,8 @@ public interface UserService {
 
     List<OptionItem> options(Integer status);
 
+    List<OptionItem> teacherOptions(Long departmentId);
+
     void delete(Long id);
 
     void resetPassword(Long id, PasswordResetRequest request);

@@ -3,6 +3,7 @@ import { getFirstAccessiblePath, hasRouteAccess, type AppRole } from '../access'
 import AdminLayout from '../layouts/AdminLayout.vue';
 import ConsumablesView from '../views/ConsumablesView.vue';
 import DevicesView from '../views/DevicesView.vue';
+import ExperimentReportsView from '../views/ExperimentReportsView.vue';
 import LabsView from '../views/LabsView.vue';
 import LoginView from '../views/LoginView.vue';
 import MyCreditView from '../views/MyCreditView.vue';
@@ -118,6 +119,15 @@ const router = createRouter({
           component: DevicesView,
           meta: {
             title: '设备管理',
+            roles: ['ADMIN', 'TEACHER', 'STUDENT'] satisfies AppRole[],
+          },
+        },
+        {
+          path: 'experiment-reports',
+          name: 'experiment-reports',
+          component: ExperimentReportsView,
+          meta: {
+            title: '实验报告',
             roles: ['ADMIN', 'TEACHER', 'STUDENT'] satisfies AppRole[],
           },
         },

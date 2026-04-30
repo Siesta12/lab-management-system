@@ -99,6 +99,22 @@
         order by id asc
     </select>
 
+    <select id="selectTeacherOptions" resultType="com.nlt.domain.entity.UserEntity">
+        select u.*
+        from sys_user u
+        join sys_user_role ur on ur.user_id = u.id
+        join sys_role r on r.id = ur.role_id
+        where u.deleted = 0
+          and u.status = 1
+          and r.deleted = 0
+          and r.status = 1
+          and r.role_code = 'TEACHER'
+        <if test="departmentId != null">
+          and u.department_id = #{departmentId}
+        </if>
+        order by u.id asc
+    </select>
+
     <insert id="insert"
                     parameterType="com.nlt.domain.entity.UserEntity"
                     useGeneratedKeys="true"

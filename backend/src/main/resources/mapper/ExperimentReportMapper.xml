@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nlt.mapper.ExperimentReportMapper">
+    <sql id="ReportSelectColumns">
+        r.*,
+        stu.real_name as studentName,
+        stu.user_no as studentNo,
+        tea.real_name as teacherName,
+        l.lab_name as labName,
+        d.department_name as departmentName
+    </sql>
+
+    <select id="selectPage" resultType="com.nlt.domain.entity.ExperimentReportEntity">
+        select <include refid="ReportSelectColumns"/>
+        from lab_experiment_report r
+        join sys_user stu on stu.id = r.student_id
+        join sys_user tea on tea.id = r.teacher_id
+        join department d on d.id = r.department_id
+        left join lab l on l.id = r.lab_id
+        where r.deleted = 0
+        <if test="departmentId != null">
+            and r.department_id = #{departmentId}
+        </if>
+        <if test="studentId != null">
+            and r.student_id = #{studentId}
+        </if>
+        <if test="teacherId != null">
+            and r.teacher_id = #{teacherId}
+        </if>
+        <if test="status != null">
+            and r.status = #{status}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            and (
+                r.title like concat('%', #{keyword}, '%')
+                or r.experiment_name like concat('%', #{keyword}, '%')
+                or r.report_no like concat('%', #{keyword}, '%')
+                or stu.real_name like concat('%', #{keyword}, '%')
+            )
+        </if>
+        order by r.updated_at desc, r.id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(*)
+        from lab_experiment_report r
+        join sys_user stu on stu.id = r.student_id
+        where r.deleted = 0
+        <if test="departmentId != null">
+            and r.department_id = #{departmentId}
+        </if>
+        <if test="studentId != null">
+            and r.student_id = #{studentId}
+        </if>
+        <if test="teacherId != null">
+            and r.teacher_id = #{teacherId}
+        </if>
+        <if test="status != null">
+            and r.status = #{status}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            and (
+                r.title like concat('%', #{keyword}, '%')
+                or r.experiment_name like concat('%', #{keyword}, '%')
+                or r.report_no like concat('%', #{keyword}, '%')
+                or stu.real_name like concat('%', #{keyword}, '%')
+            )
+        </if>
+    </select>
+
+    <select id="selectById" resultType="com.nlt.domain.entity.ExperimentReportEntity">
+        select <include refid="ReportSelectColumns"/>
+        from lab_experiment_report r
+        join sys_user stu on stu.id = r.student_id
+        join sys_user tea on tea.id = r.teacher_id
+        join department d on d.id = r.department_id
+        left join lab l on l.id = r.lab_id
+        where r.id = #{id}
+          and r.deleted = 0
+    </select>
+
+    <select id="selectConsumables" resultType="com.nlt.domain.entity.ExperimentReportConsumableEntity">
+        select *
+        from lab_experiment_report_consumable
+        where report_id = #{reportId}
+        order by id asc
+    </select>
+
+    <insert id="insert" parameterType="com.nlt.domain.entity.ExperimentReportEntity" useGeneratedKeys="true" keyProperty="id">
+        insert into lab_experiment_report(
+            report_no, student_id, teacher_id, department_id, lab_id, reservation_id,
+            title, experiment_name, experiment_date, purpose, principle, steps,
+            result_data, analysis, conclusion, status, teacher_comment, deleted
+        )
+        values(
+            #{reportNo}, #{studentId}, #{teacherId}, #{departmentId}, #{labId}, #{reservationId},
+            #{title}, #{experimentName}, #{experimentDate}, #{purpose}, #{principle}, #{steps},
+            #{resultData}, #{analysis}, #{conclusion}, #{status}, #{teacherComment}, 0
+        )
+    </insert>
+
+    <update id="updateDraft" parameterType="com.nlt.domain.entity.ExperimentReportEntity">
+        update lab_experiment_report
+        set teacher_id = #{teacherId},
+            lab_id = #{labId},
+            reservation_id = #{reservationId},
+            title = #{title},
+            experiment_name = #{experimentName},
+            experiment_date = #{experimentDate},
+            purpose = #{purpose},
+            principle = #{principle},
+            steps = #{steps},
+            result_data = #{resultData},
+            analysis = #{analysis},
+            conclusion = #{conclusion},
+            status = #{status},
+            teacher_comment = #{teacherComment},
+            submitted_at = #{submittedAt},
+            reviewed_at = #{reviewedAt}
+        where id = #{id}
+          and deleted = 0
+    </update>
+
+    <update id="submit">
+        update lab_experiment_report
+        set status = 2,
+            submitted_at = now(),
+            reviewed_at = null
+        where id = #{id}
+          and deleted = 0
+    </update>
+
+    <update id="review">
+        update lab_experiment_report
+        set status = #{status},
+            teacher_comment = #{teacherComment},
+            reviewed_at = now()
+        where id = #{id}
+          and teacher_id = #{teacherId}
+          and deleted = 0
+    </update>
+
+    <delete id="deleteConsumables">
+        delete from lab_experiment_report_consumable
+        where report_id = #{reportId}
+    </delete>
+
+    <insert id="insertConsumable" parameterType="com.nlt.domain.entity.ExperimentReportConsumableEntity" useGeneratedKeys="true" keyProperty="id">
+        insert into lab_experiment_report_consumable(
+            report_id, consumable_name, specification, quantity, unit, remark
+        )
+        values(
+            #{reportId}, #{consumableName}, #{specification}, #{quantity}, #{unit}, #{remark}
+        )
+    </insert>
+</mapper>

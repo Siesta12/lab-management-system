@@ -17,6 +17,7 @@ import com.nlt.service.UserService;
 import com.nlt.service.ViolationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.Collections;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -62,6 +63,19 @@ public class UserController {
     @GetMapping("/options")
     public ApiResponse<List<OptionItem>> options(@RequestParam(required = false) Integer status) {
         return ApiResponse.success(userService.options(status));
+    }
+
+    @GetMapping("/teacher-options")
+    public ApiResponse<List<OptionItem>> teacherOptions(HttpServletRequest request) {
+        Long currentUserId = tokenService.getCurrentUserId(request);
+        if (currentUserId == null) {
+            return ApiResponse.success(Collections.emptyList());
+        }
+        Long departmentId = userService.currentUser(currentUserId).getDepartmentId();
+        if (departmentId == null) {
+            return ApiResponse.success(Collections.emptyList());
+        }
+        return ApiResponse.success(userService.teacherOptions(departmentId));
     }
 
     @GetMapping("/profile")
