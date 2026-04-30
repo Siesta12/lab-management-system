@@ -29,6 +29,10 @@
           <strong>实验室查询</strong>
           <span>查看实验室详情、设备与耗材信息。</span>
         </RouterLink>
+        <RouterLink to="/admin/devices" class="quick-card">
+          <strong>设备查询</strong>
+          <span>查看设备台账、可用数量和状态。</span>
+        </RouterLink>
         <RouterLink to="/labs" class="quick-card">
           <strong>课表式预约</strong>
           <span>在实验室详情页的“未来三周课表”中按节次选择空闲格子提交预约。</span>
@@ -87,5 +91,3 @@ onMounted(async () => {
   reservations.value = reservationData.list;
 });
 </script>
-
-

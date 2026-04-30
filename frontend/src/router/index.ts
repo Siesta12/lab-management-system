@@ -118,7 +118,7 @@ const router = createRouter({
           component: DevicesView,
           meta: {
             title: '设备管理',
-            roles: ['ADMIN'] satisfies AppRole[],
+            roles: ['ADMIN', 'TEACHER', 'STUDENT'] satisfies AppRole[],
           },
         },
         {

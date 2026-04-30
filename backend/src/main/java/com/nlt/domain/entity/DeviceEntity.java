@@ -11,6 +11,10 @@ public class DeviceEntity {
 
     private Long labId;
 
+    private Long departmentId;
+
+    private String labName;
+
     private String deviceName;
 
     private String deviceCode;

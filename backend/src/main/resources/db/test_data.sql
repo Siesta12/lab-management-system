@@ -21,6 +21,8 @@ FROM `lab_consumable`;
 DELETE
 FROM `lab_device`;
 DELETE
+FROM `lab_device_repair`;
+DELETE
 FROM `lab_open_slot`;
 DELETE
 FROM `lab`;
@@ -50,6 +52,8 @@ ALTER TABLE `class_period`
 ALTER TABLE `lab_open_slot`
   AUTO_INCREMENT = 1;
 ALTER TABLE `lab_device`
+  AUTO_INCREMENT = 1;
+ALTER TABLE `lab_device_repair`
   AUTO_INCREMENT = 1;
 ALTER TABLE `lab_consumable`
   AUTO_INCREMENT = 1;
@@ -9040,6 +9044,12 @@ VALUES (1, 7, 12, 2, -5, '迟到使用实验室'),
        (27, 198, 327, 1, -10, '未按规定签到'),
        (28, 203, 291, 2, -5, '迟到使用实验室'),
        (29, 209, 293, 1, -10, '未按规定签到');
+
+INSERT INTO `lab_device_repair` (`id`, `device_id`, `lab_id`, `applicant_user_id`, `issue_description`, `urgency_level`,
+                                 `status`, `handler_user_id`, `handling_result`, `handled_at`, `created_at`, `updated_at`)
+VALUES (1, 1, 1, 2, '开机偶发黑屏，显示器闪烁', 3, 1, NULL, NULL, NULL, '2026-04-24 09:20:00', '2026-04-24 09:20:00'),
+       (2, 2, 1, 2, '投影画面亮度不足，建议检修灯泡', 2, 2, 1, '已登记，等待检修', NULL, '2026-04-24 10:05:00', '2026-04-24 10:25:00'),
+       (3, 3, 1, 3, '交换机端口接触不稳定', 2, 3, 1, '已更换端口并恢复正常', '2026-04-24 11:10:00', '2026-04-24 10:45:00', '2026-04-24 11:10:00');
 
 SET
   FOREIGN_KEY_CHECKS = 1;

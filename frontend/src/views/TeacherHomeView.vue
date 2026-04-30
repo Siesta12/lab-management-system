@@ -13,6 +13,11 @@
           <strong>{{ card.value }}</strong>
           <small>{{ card.note }}</small>
         </RouterLink>
+        <RouterLink to="/admin/devices" class="teacher-summary-card brand">
+          <span>设备查询</span>
+          <strong>报修</strong>
+          <small>查看本学院设备并提交报修单</small>
+        </RouterLink>
       </div>
     </BasePanel>
 
@@ -104,7 +109,7 @@ onMounted(async () => {
 
 .teacher-summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
 }
 

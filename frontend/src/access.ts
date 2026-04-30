@@ -18,7 +18,7 @@ const adminNavigation: NavigationItem[] = [
   { to: '/admin/users', label: '用户管理', desc: '账号、角色、状态与信用分', roles: ['ADMIN'] },
   { to: '/admin/labs', label: '实验室管理', desc: '信息、设备预约与管理', roles: ['ADMIN'] },
   { to: '/admin/reservations', label: '预约管理', desc: '分页查看与审核单', roles: ['ADMIN'] },
-  { to: '/admin/devices', label: '设备管理', desc: '设备库存与状态', roles: ['ADMIN'] },
+  { to: '/admin/devices', label: '设备管理', desc: '设备台账、状态与报修', roles: ['ADMIN'] },
   { to: '/admin/consumables', label: '耗材管理', desc: '库存管理与统计', roles: ['ADMIN'] },
   { to: '/admin/statistics', label: '统计分析', desc: '使用情况与统计', roles: ['ADMIN'] },
   { to: '/admin/profile', label: '个人资料', desc: '个人资料与密码', roles: ['ADMIN'] },
@@ -27,6 +27,7 @@ const adminNavigation: NavigationItem[] = [
 const teacherNavigation: NavigationItem[] = [
   { to: '/admin/teacher-home', label: '首页', desc: '今日预约与提示', roles: ['TEACHER'] },
   { to: '/admin/labs', label: '实验室预约', desc: '选择实验室并提交预约', roles: ['TEACHER'] },
+  { to: '/admin/devices', label: '设备查询', desc: '查看本学院设备并提交报修', roles: ['TEACHER'] },
   { to: '/admin/my-reservations', label: '我的预约', desc: '预约详情与记录', roles: ['TEACHER'] },
   { to: '/admin/profile', label: '个人信息', desc: '个人资料与密码', roles: ['TEACHER'] },
 ];
@@ -34,6 +35,7 @@ const teacherNavigation: NavigationItem[] = [
 const studentNavigation: NavigationItem[] = [
   { to: '/admin/home', label: '首页', desc: '预约推荐与快速入口', roles: ['STUDENT'] },
   { to: '/admin/labs', label: '实验室查询', desc: '申请预约查询', roles: ['STUDENT'] },
+  { to: '/admin/devices', label: '设备查询', desc: '查看设备基础信息与状态', roles: ['STUDENT'] },
   { to: '/admin/my-reservations', label: '我的预约', desc: '预约详情与记录', roles: ['STUDENT'] },
   { to: '/admin/my-credit', label: '我的信用', desc: '信用记录与违纪记录', roles: ['STUDENT'] },
   { to: '/admin/profile', label: '个人资料', desc: '个人资料与密码', roles: ['STUDENT'] },

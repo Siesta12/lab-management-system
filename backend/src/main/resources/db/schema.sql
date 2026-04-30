@@ -223,8 +223,42 @@ create table lab_device
     foreign key (lab_id) references lab (id)
 ) comment 'Lab device table';
 
-create index idx_lab_device_lab_id
-  on lab_device (lab_id);
+  create index idx_lab_device_lab_id
+    on lab_device (lab_id);
+
+create table lab_device_repair
+(
+  id                 bigint auto_increment comment 'Primary key'
+        primary key,
+  device_id          bigint                             not null comment 'Device id',
+  lab_id             bigint                             not null comment 'Lab id',
+  applicant_user_id   bigint                             not null comment 'Applicant user id',
+  issue_description  varchar(500)                       not null comment 'Issue description',
+  urgency_level      tinyint  default 2                 not null comment '1 low, 2 medium, 3 high',
+  status             tinyint  default 1                 not null comment '1 pending, 2 processing, 3 completed, 4 rejected',
+  handler_user_id    bigint null comment 'Handler user id',
+  handling_result    varchar(500) null comment 'Handling result',
+  handled_at         datetime null comment 'Handled time',
+  created_at         datetime default CURRENT_TIMESTAMP not null comment 'Created time',
+  updated_at         datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment 'Updated time',
+  constraint fk_lab_device_repair_device
+    foreign key (device_id) references lab_device (id),
+  constraint fk_lab_device_repair_lab
+    foreign key (lab_id) references lab (id),
+  constraint fk_lab_device_repair_applicant_user
+    foreign key (applicant_user_id) references sys_user (id),
+  constraint fk_lab_device_repair_handler_user
+    foreign key (handler_user_id) references sys_user (id)
+) comment 'Lab device repair table';
+
+create index idx_lab_device_repair_lab_id_status
+  on lab_device_repair (lab_id, status);
+
+create index idx_lab_device_repair_device_id
+  on lab_device_repair (device_id);
+
+create index idx_lab_device_repair_applicant_user_id
+  on lab_device_repair (applicant_user_id);
 
 create table lab_maintenance
 (

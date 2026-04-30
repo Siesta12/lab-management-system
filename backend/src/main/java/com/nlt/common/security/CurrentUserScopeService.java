@@ -48,6 +48,28 @@ public class CurrentUserScopeService {
         return hasRole("ADMIN");
     }
 
+    public boolean isTeacher() {
+        return hasRole("TEACHER");
+    }
+
+    public boolean isStudent() {
+        return hasRole("STUDENT");
+    }
+
+    public boolean hasRole(String roleCode) {
+        return currentRoleCodes().stream().anyMatch(code ->
+            roleCode.equalsIgnoreCase(code) || ("ROLE_" + roleCode).equalsIgnoreCase(code)
+        );
+    }
+
+    public Long requireCurrentDepartmentId() {
+        UserEntity user = currentUser();
+        if (user == null || user.getDepartmentId() == null) {
+            throw new BusinessException(403, "当前账号未绑定所属学院");
+        }
+        return user.getDepartmentId();
+    }
+
     public Long resolveAdminDepartmentId() {
         if (!isAdmin()) {
             return null;
@@ -78,10 +100,11 @@ public class CurrentUserScopeService {
         }
     }
 
-    private boolean hasRole(String roleCode) {
-        return currentRoleCodes().stream().anyMatch(code ->
-            roleCode.equalsIgnoreCase(code) || ("ROLE_" + roleCode).equalsIgnoreCase(code)
-        );
+    public void ensureCurrentDepartmentAccessible(Long departmentId, String notFoundMessage) {
+        Long currentDepartmentId = requireCurrentDepartmentId();
+        if (!Objects.equals(currentDepartmentId, departmentId)) {
+            throw new BusinessException(404, notFoundMessage);
+        }
     }
 
     private UserEntity currentUser() {

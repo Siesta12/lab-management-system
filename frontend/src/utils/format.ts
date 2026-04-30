@@ -3,11 +3,11 @@
 }
 
 export function getBadgeClass(status: string): string {
-  if (['开放', '正常', '已通过', '启用', '充足'].includes(status)) {
+  if (['开放', '正常', '已通过', '启用', '充足', '已完成'].includes(status)) {
     return 'badge success';
   }
 
-  if (['维护', '待审核', '预警'].includes(status)) {
+  if (['维护', '待审核', '预警', '待处理', '处理中', '维修中'].includes(status)) {
     return 'badge warning';
   }
 

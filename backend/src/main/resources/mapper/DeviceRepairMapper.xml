@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nlt.mapper.DeviceRepairMapper">
+    <select id="selectPage" resultType="com.nlt.domain.entity.DeviceRepairEntity">
+        select r.*,
+               d.device_name as deviceName,
+               d.device_code as deviceCode,
+               l.lab_name as labName,
+               u.real_name as applicantName,
+               h.real_name as handlerName
+        from lab_device_repair r
+        join lab_device d on d.id = r.device_id and d.deleted = 0
+        join lab l on l.id = r.lab_id and l.deleted = 0
+        left join sys_user u on u.id = r.applicant_user_id
+        left join sys_user h on h.id = r.handler_user_id
+        where l.department_id = #{departmentId}
+        <if test="labId != null">
+            and r.lab_id = #{labId}
+        </if>
+        <if test="deviceId != null">
+            and r.device_id = #{deviceId}
+        </if>
+        <if test="status != null">
+            and r.status = #{status}
+        </if>
+        <if test="applicantUserId != null">
+            and r.applicant_user_id = #{applicantUserId}
+        </if>
+        order by r.id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(*)
+        from lab_device_repair r
+        join lab_device d on d.id = r.device_id and d.deleted = 0
+        join lab l on l.id = r.lab_id and l.deleted = 0
+        where l.department_id = #{departmentId}
+        <if test="labId != null">
+            and r.lab_id = #{labId}
+        </if>
+        <if test="deviceId != null">
+            and r.device_id = #{deviceId}
+        </if>
+        <if test="status != null">
+            and r.status = #{status}
+        </if>
+        <if test="applicantUserId != null">
+            and r.applicant_user_id = #{applicantUserId}
+        </if>
+    </select>
+
+    <select id="selectById" resultType="com.nlt.domain.entity.DeviceRepairEntity">
+        select r.*,
+               d.device_name as deviceName,
+               d.device_code as deviceCode,
+               l.lab_name as labName,
+               u.real_name as applicantName,
+               h.real_name as handlerName
+        from lab_device_repair r
+        join lab_device d on d.id = r.device_id and d.deleted = 0
+        join lab l on l.id = r.lab_id and l.deleted = 0
+        left join sys_user u on u.id = r.applicant_user_id
+        left join sys_user h on h.id = r.handler_user_id
+        where r.id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.nlt.domain.entity.DeviceRepairEntity" useGeneratedKeys="true" keyProperty="id">
+        insert into lab_device_repair(
+            device_id,
+            lab_id,
+            applicant_user_id,
+            issue_description,
+            urgency_level,
+            status,
+            handler_user_id,
+            handling_result,
+            handled_at
+        )
+        values (
+            #{deviceId},
+            #{labId},
+            #{applicantUserId},
+            #{issueDescription},
+            #{urgencyLevel},
+            #{status},
+            #{handlerUserId},
+            #{handlingResult},
+            #{handledAt}
+        )
+    </insert>
+
+    <update id="updateStatus" parameterType="com.nlt.domain.entity.DeviceRepairEntity">
+        update lab_device_repair
+        set status = #{status},
+            handler_user_id = #{handlerUserId},
+            handling_result = #{handlingResult},
+            handled_at = #{handledAt}
+        where id = #{id}
+    </update>
+</mapper>

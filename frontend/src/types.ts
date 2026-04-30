@@ -422,6 +422,8 @@ export interface LabMaintenanceDto {
 export interface DeviceDto {
   id: number;
   labId: number;
+  departmentId?: number;
+  labName?: string;
   deviceName: string;
   deviceCode: string;
   brand?: string;
@@ -431,6 +433,51 @@ export interface DeviceDto {
   status: number;
   purchaseDate?: string;
   remark?: string;
+}
+
+export interface DeviceSavePayload {
+  labId: number;
+  deviceName: string;
+  deviceCode: string;
+  brand?: string;
+  modelNo?: string;
+  quantity?: number;
+  availableQuantity?: number;
+  status?: number;
+  purchaseDate?: string;
+  remark?: string;
+}
+
+export interface DeviceRepairDto {
+  id: number;
+  deviceId: number;
+  labId: number;
+  applicantUserId: number;
+  deviceName?: string;
+  deviceCode?: string;
+  labName?: string;
+  applicantName?: string;
+  issueDescription: string;
+  urgencyLevel: number;
+  status: number;
+  handlerUserId?: number;
+  handlerName?: string;
+  handlingResult?: string;
+  handledAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface DeviceRepairCreatePayload {
+  deviceId: number;
+  issueDescription: string;
+  urgencyLevel?: number;
+}
+
+export interface DeviceRepairStatusUpdatePayload {
+  status: number;
+  handlingResult?: string;
+  deviceStatus?: number | null;
 }
 
 export interface ConsumableDto {

@@ -27,7 +27,7 @@ public class DeviceServiceImpl implements DeviceService {
     @Override
     public PageData<DeviceEntity> page(int pageNum, int pageSize, Long labId, String deviceName, String deviceCode, Integer status) {
         int offset = (pageNum - 1) * pageSize;
-        Long departmentId = currentUserScopeService.resolveAdminDepartmentId();
+        Long departmentId = currentUserScopeService.requireCurrentDepartmentId();
         return new PageData<>(
             deviceMapper.selectPage(offset, pageSize, labId, deviceName, deviceCode, status, departmentId),
             deviceMapper.countPage(labId, deviceName, deviceCode, status, departmentId),
@@ -38,6 +38,7 @@ public class DeviceServiceImpl implements DeviceService {
 
     @Override
     public DeviceEntity create(DeviceSaveRequest request) {
+        ensureAdmin();
         ensureLabAccessible(request.getLabId());
         DeviceEntity entity = toEntity(request);
         deviceMapper.insert(entity);
@@ -46,7 +47,7 @@ public class DeviceServiceImpl implements DeviceService {
 
     @Override
     public List<OptionItem> options(Long labId) {
-        Long departmentId = currentUserScopeService.resolveAdminDepartmentId();
+        Long departmentId = currentUserScopeService.requireCurrentDepartmentId();
         return deviceMapper.selectOptions(labId, departmentId).stream()
             .map(item -> new OptionItem(item.getDeviceName(), item.getId()))
             .toList();
@@ -64,22 +65,28 @@ public class DeviceServiceImpl implements DeviceService {
 
     @Override
     public DeviceEntity update(Long id, DeviceSaveRequest request) {
-        getById(id);
+        ensureAdmin();
+        DeviceEntity current = getById(id);
         ensureLabAccessible(request.getLabId());
         DeviceEntity entity = toEntity(request);
         entity.setId(id);
+        if (request.getAvailableQuantity() == null) {
+            entity.setAvailableQuantity(current.getAvailableQuantity());
+        }
         deviceMapper.update(entity);
         return getById(id);
     }
 
     @Override
     public void delete(Long id) {
+        ensureAdmin();
         getById(id);
         deviceMapper.softDelete(id);
     }
 
     @Override
     public void updateStatus(Long id, Integer status) {
+        ensureAdmin();
         getById(id);
         deviceMapper.updateStatus(id, status);
     }
@@ -93,8 +100,17 @@ public class DeviceServiceImpl implements DeviceService {
         if (entity.getQuantity() == null) {
             entity.setQuantity(1);
         }
+        if (entity.getQuantity() <= 0) {
+            entity.setQuantity(1);
+        }
         if (entity.getAvailableQuantity() == null) {
             entity.setAvailableQuantity(entity.getQuantity());
+        }
+        if (entity.getAvailableQuantity() > entity.getQuantity()) {
+            entity.setAvailableQuantity(entity.getQuantity());
+        }
+        if (entity.getAvailableQuantity() < 0) {
+            entity.setAvailableQuantity(0);
         }
         if (entity.getStatus() == null) {
             entity.setStatus(1);
@@ -110,6 +126,12 @@ public class DeviceServiceImpl implements DeviceService {
         if (lab == null || (lab.getDeleted() != null && lab.getDeleted() == 1)) {
             throw new BusinessException(404, "实验室不存在");
         }
-        currentUserScopeService.ensureDepartmentAccessible(lab.getDepartmentId(), "实验室不存在");
+        currentUserScopeService.ensureCurrentDepartmentAccessible(lab.getDepartmentId(), "实验室不存在");
+    }
+
+    private void ensureAdmin() {
+        if (!currentUserScopeService.isAdmin()) {
+            throw new BusinessException(403, "无权修改设备信息");
+        }
     }
 }
