@@ -14,11 +14,15 @@ public class ConsumableEntity {
 
     private String consumableCode;
 
+    private String specification;
+
     private String unit;
 
     private Integer stockQuantity;
 
     private Integer warningThreshold;
+
+    private Integer status;
 
     private String remark;
 

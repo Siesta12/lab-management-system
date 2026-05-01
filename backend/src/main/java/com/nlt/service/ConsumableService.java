@@ -4,6 +4,8 @@ import com.nlt.common.api.PageData;
 import com.nlt.domain.dto.consumable.ConsumableSaveRequest;
 import com.nlt.domain.dto.consumable.ConsumableStockUpdateRequest;
 import com.nlt.domain.entity.ConsumableEntity;
+import com.nlt.domain.entity.ExperimentReportConsumableEntity;
+import java.util.List;
 
 public interface ConsumableService {
 
@@ -16,7 +18,10 @@ public interface ConsumableService {
      * @param consumableCode 参数
      * @return 分页数据
      */
-    PageData<ConsumableEntity> page(int pageNum, int pageSize, Long labId, String consumableName, String consumableCode);
+    PageData<ConsumableEntity> page(int pageNum, int pageSize, Long labId, String consumableName, String consumableCode,
+        Integer status);
+
+    List<ConsumableEntity> availableOptions(Long labId);
 
     /**
      * 新增耗材信息
@@ -62,6 +67,9 @@ public interface ConsumableService {
      * @return 处理结果
      */
     ConsumableEntity updateStock(Long id, ConsumableStockUpdateRequest request, Long operatorUserId);
+
+    PageData<ExperimentReportConsumableEntity> usagePage(int pageNum, int pageSize, Integer status, Long labId,
+        String keyword);
 
 }
 

@@ -20,9 +20,12 @@ public class ConsumableStockLogEntity {
 
     private Long operatorUserId;
 
+    private String sourceType;
+
+    private Long sourceId;
+
     private String remark;
 
     private LocalDateTime createdAt;
 
 }
-

@@ -484,10 +484,16 @@ export interface DeviceRepairStatusUpdatePayload {
 export interface ExperimentReportConsumableDto {
   id?: number;
   reportId?: number;
+  consumableId: number;
+  labId?: number;
   consumableName: string;
   specification?: string;
   quantity?: number;
   unit?: string;
+  status?: number;
+  statusText?: string;
+  rejectReason?: string;
+  confirmedAt?: string;
   remark?: string;
 }
 
@@ -546,12 +552,71 @@ export interface ExperimentReportReviewPayload {
 export interface ConsumableDto {
   id: number;
   labId: number;
+  labName?: string;
   consumableName: string;
   consumableCode: string;
+  specification?: string;
   unit: string;
   stockQuantity: number;
   warningThreshold: number;
+  status?: number;
   remark?: string;
+}
+
+export interface ConsumableSavePayload {
+  labId: number;
+  consumableName: string;
+  consumableCode: string;
+  specification?: string;
+  unit: string;
+  stockQuantity?: number;
+  warningThreshold?: number;
+  status?: number;
+  remark?: string;
+}
+
+export interface ConsumableStockUpdatePayload {
+  stockQuantity: number;
+  changeType?: string;
+  remark?: string;
+}
+
+export interface ConsumableUsageDto {
+  id: number;
+  reportId: number;
+  consumableId: number;
+  labId: number;
+  consumableName: string;
+  specification?: string;
+  quantity: number;
+  unit?: string;
+  status: number;
+  confirmUserId?: number;
+  confirmedAt?: string;
+  rejectReason?: string;
+  stockLogId?: number;
+  remark?: string;
+  createdAt?: string;
+  reportNo?: string;
+  experimentName?: string;
+  reportStatus?: number;
+  submittedAt?: string;
+  studentName?: string;
+  teacherName?: string;
+  labName?: string;
+  confirmUserName?: string;
+}
+
+export interface ConsumableUsageQuery {
+  pageNum?: number;
+  pageSize?: number;
+  status?: number;
+  labId?: number;
+  keyword?: string;
+}
+
+export interface ConsumableUsageRejectPayload {
+  rejectReason: string;
 }
 
 export interface ReservationDto {

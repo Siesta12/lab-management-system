@@ -87,6 +87,100 @@
         order by id asc
     </select>
 
+    <select id="selectConsumableById" resultType="com.nlt.domain.entity.ExperimentReportConsumableEntity">
+        select *
+        from lab_experiment_report_consumable
+        where id = #{id}
+    </select>
+
+    <sql id="UsageSelectColumns">
+        rc.*,
+        r.report_no as reportNo,
+        r.experiment_name as experimentName,
+        r.status as reportStatus,
+        r.submitted_at as submittedAt,
+        stu.real_name as studentName,
+        tea.real_name as teacherName,
+        l.lab_name as labName,
+        confirmer.real_name as confirmUserName
+    </sql>
+
+    <select id="selectUsageDetailById" resultType="com.nlt.domain.entity.ExperimentReportConsumableEntity">
+        select <include refid="UsageSelectColumns"/>
+        from lab_experiment_report_consumable rc
+        join lab_experiment_report r on r.id = rc.report_id
+        join sys_user stu on stu.id = r.student_id
+        join sys_user tea on tea.id = r.teacher_id
+        join lab l on l.id = rc.lab_id
+        left join sys_user confirmer on confirmer.id = rc.confirm_user_id
+        where rc.id = #{id}
+          and r.deleted = 0
+    </select>
+
+    <select id="selectUsagePage" resultType="com.nlt.domain.entity.ExperimentReportConsumableEntity">
+        select <include refid="UsageSelectColumns"/>
+        from lab_experiment_report_consumable rc
+        join lab_experiment_report r on r.id = rc.report_id
+        join sys_user stu on stu.id = r.student_id
+        join sys_user tea on tea.id = r.teacher_id
+        join lab l on l.id = rc.lab_id
+        left join sys_user confirmer on confirmer.id = rc.confirm_user_id
+        where r.deleted = 0
+          and r.status != 1
+        <if test="departmentId != null">
+            and r.department_id = #{departmentId}
+        </if>
+        <if test="status != null">
+            and rc.status = #{status}
+        </if>
+        <if test="labId != null">
+            and rc.lab_id = #{labId}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            and (
+                r.report_no like concat('%', #{keyword}, '%')
+                or r.experiment_name like concat('%', #{keyword}, '%')
+                or rc.consumable_name like concat('%', #{keyword}, '%')
+                or stu.real_name like concat('%', #{keyword}, '%')
+            )
+        </if>
+        order by rc.status asc, r.submitted_at desc, rc.id desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="countUsagePage" resultType="long">
+        select count(*)
+        from lab_experiment_report_consumable rc
+        join lab_experiment_report r on r.id = rc.report_id
+        join sys_user stu on stu.id = r.student_id
+        where r.deleted = 0
+          and r.status != 1
+        <if test="departmentId != null">
+            and r.department_id = #{departmentId}
+        </if>
+        <if test="status != null">
+            and rc.status = #{status}
+        </if>
+        <if test="labId != null">
+            and rc.lab_id = #{labId}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            and (
+                r.report_no like concat('%', #{keyword}, '%')
+                or r.experiment_name like concat('%', #{keyword}, '%')
+                or rc.consumable_name like concat('%', #{keyword}, '%')
+                or stu.real_name like concat('%', #{keyword}, '%')
+            )
+        </if>
+    </select>
+
+    <select id="countConfirmedConsumables" resultType="long">
+        select count(*)
+        from lab_experiment_report_consumable
+        where report_id = #{reportId}
+          and status = 2
+    </select>
+
     <insert id="insert" parameterType="com.nlt.domain.entity.ExperimentReportEntity" useGeneratedKeys="true" keyProperty="id">
         insert into lab_experiment_report(
             report_no, student_id, teacher_id, department_id, lab_id, reservation_id,
@@ -148,10 +242,31 @@
 
     <insert id="insertConsumable" parameterType="com.nlt.domain.entity.ExperimentReportConsumableEntity" useGeneratedKeys="true" keyProperty="id">
         insert into lab_experiment_report_consumable(
-            report_id, consumable_name, specification, quantity, unit, remark
+            report_id, consumable_id, lab_id, consumable_name, specification, quantity, unit, status, remark
         )
         values(
-            #{reportId}, #{consumableName}, #{specification}, #{quantity}, #{unit}, #{remark}
+            #{reportId}, #{consumableId}, #{labId}, #{consumableName}, #{specification}, #{quantity}, #{unit}, #{status}, #{remark}
         )
     </insert>
+
+    <update id="confirmConsumable">
+        update lab_experiment_report_consumable
+        set status = 2,
+            confirm_user_id = #{confirmUserId},
+            confirmed_at = now(),
+            stock_log_id = #{stockLogId},
+            reject_reason = null
+        where id = #{id}
+          and status = 1
+    </update>
+
+    <update id="rejectConsumable">
+        update lab_experiment_report_consumable
+        set status = 3,
+            confirm_user_id = #{confirmUserId},
+            confirmed_at = now(),
+            reject_reason = #{rejectReason}
+        where id = #{id}
+          and status = 1
+    </update>
 </mapper>

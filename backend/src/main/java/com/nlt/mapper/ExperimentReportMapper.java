@@ -27,6 +27,24 @@ public interface ExperimentReportMapper {
 
     List<ExperimentReportConsumableEntity> selectConsumables(@Param("reportId") Long reportId);
 
+    ExperimentReportConsumableEntity selectConsumableById(@Param("id") Long id);
+
+    ExperimentReportConsumableEntity selectUsageDetailById(@Param("id") Long id);
+
+    List<ExperimentReportConsumableEntity> selectUsagePage(@Param("offset") int offset,
+        @Param("pageSize") int pageSize,
+        @Param("departmentId") Long departmentId,
+        @Param("status") Integer status,
+        @Param("labId") Long labId,
+        @Param("keyword") String keyword);
+
+    long countUsagePage(@Param("departmentId") Long departmentId,
+        @Param("status") Integer status,
+        @Param("labId") Long labId,
+        @Param("keyword") String keyword);
+
+    long countConfirmedConsumables(@Param("reportId") Long reportId);
+
     int insert(ExperimentReportEntity entity);
 
     int updateDraft(ExperimentReportEntity entity);
@@ -40,4 +58,10 @@ public interface ExperimentReportMapper {
     int deleteConsumables(@Param("reportId") Long reportId);
 
     int insertConsumable(ExperimentReportConsumableEntity entity);
+
+    int confirmConsumable(@Param("id") Long id, @Param("confirmUserId") Long confirmUserId,
+        @Param("stockLogId") Long stockLogId);
+
+    int rejectConsumable(@Param("id") Long id, @Param("confirmUserId") Long confirmUserId,
+        @Param("rejectReason") String rejectReason);
 }

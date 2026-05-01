@@ -90,7 +90,7 @@
             <p>{{ section.value || '无' }}</p>
           </article>
           <article class="full-span">
-            <h4>耗材记录</h4>
+            <h4>耗材使用</h4>
             <p v-if="!selectedReport.consumables?.length">无</p>
             <table v-else class="mini-table">
               <thead>
@@ -99,6 +99,7 @@
                   <th>规格</th>
                   <th>数量</th>
                   <th>单位</th>
+                  <th>状态</th>
                   <th>备注</th>
                 </tr>
               </thead>
@@ -108,14 +109,15 @@
                   <td>{{ item.specification || '--' }}</td>
                   <td>{{ item.quantity ?? 0 }}</td>
                   <td>{{ item.unit || '--' }}</td>
+                  <td>{{ consumableUsageStatusText(item.status) }}</td>
                   <td>{{ item.remark || '--' }}</td>
                 </tr>
               </tbody>
             </table>
           </article>
           <article class="full-span">
-            <h4>审核意见</h4>
-            <p>{{ selectedReport.teacherComment || '暂无审核意见' }}</p>
+            <h4>教师评语</h4>
+            <p>{{ selectedReport.teacherComment || '暂无教师评语' }}</p>
           </article>
         </div>
         <div class="dialog-actions detail-actions">
@@ -165,7 +167,7 @@
           <label><span>实验日期</span><input v-model="form.experimentDate" type="date" /></label>
           <label>
             <span>实验室</span>
-            <select v-model.number="form.labId">
+            <select v-model.number="form.labId" @change="handleLabChange">
               <option v-for="lab in labOptions" :key="lab.value" :value="lab.value">{{ lab.label }}</option>
             </select>
           </label>
@@ -181,20 +183,29 @@
           <label class="full-width"><span>实验原理</span><textarea v-model.trim="form.principle" rows="3" /></label>
           <label class="full-width"><span>实验步骤</span><textarea v-model.trim="form.steps" rows="4" /></label>
           <label class="full-width"><span>实验数据/现象</span><textarea v-model.trim="form.resultData" rows="4" /></label>
-          <label class="full-width"><span>结果分析</span><textarea v-model.trim="form.analysis" rows="4" /></label>
           <label class="full-width"><span>实验结论</span><textarea v-model.trim="form.conclusion" rows="3" /></label>
         </div>
 
         <div class="consumable-editor">
           <div class="section-head">
-            <h4>耗材记录</h4>
+            <h4>耗材使用</h4>
             <button type="button" class="ghost-btn small-btn" @click="addConsumable">添加耗材</button>
           </div>
           <div v-for="(item, index) in form.consumables" :key="index" class="consumable-row">
-            <input v-model.trim="item.consumableName" placeholder="名称" />
-            <input v-model.trim="item.specification" placeholder="规格" />
-            <input v-model.number="item.quantity" type="number" min="0" placeholder="数量" />
-            <input v-model.trim="item.unit" placeholder="单位" />
+            <select v-model.number="item.consumableId" @change="syncConsumableRow(item)">
+              <option :value="0">请选择耗材</option>
+              <option v-for="option in consumableOptions" :key="option.id" :value="option.id">
+                {{ option.consumableName }} / {{ option.specification || '无规格' }} / 库存 {{ option.stockQuantity }}{{ option.unit }}
+              </option>
+            </select>
+            <input
+              v-model.number="item.quantity"
+              type="number"
+              min="1"
+              :max="consumableStock(item.consumableId)"
+              placeholder="数量"
+            />
+            <input :value="consumableUnit(item.consumableId)" placeholder="单位" disabled />
             <input v-model.trim="item.remark" placeholder="备注" />
             <button type="button" class="ghost-btn small-btn" @click="removeConsumable(index)">删除</button>
           </div>
@@ -219,7 +230,7 @@
           <button type="button" class="ghost-btn small-btn" @click="closeReview">关闭</button>
         </div>
         <label class="review-field">
-          <span>审核意见</span>
+          <span>教师评语</span>
           <textarea v-model.trim="reviewComment" rows="5" placeholder="填写通过意见或退回原因" />
         </label>
         <div class="dialog-actions">
@@ -232,7 +243,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { getPrimaryRole } from '../access';
 import {
   createExperimentReportDraft,
@@ -243,6 +254,7 @@ import {
   submitExperimentReport,
   updateExperimentReportDraft,
 } from '../api/experimentReports';
+import { fetchConsumableOptions } from '../api/consumables';
 import { fetchLabOptions } from '../api/labs';
 import { fetchTeacherOptions } from '../api/users';
 import BasePanel from '../components/BasePanel.vue';
@@ -254,6 +266,7 @@ import type {
   ExperimentReportConsumableDto,
   ExperimentReportDto,
   ExperimentReportSavePayload,
+  ConsumableDto,
   OptionItem,
   PageData,
 } from '../types';
@@ -274,6 +287,7 @@ const headers = computed(() =>
 const reportState = ref<PageData<ExperimentReportDto>>({ list: [], total: 0, pageNum: 1, pageSize: 10 });
 const labOptions = ref<OptionItem[]>([]);
 const teacherOptions = ref<OptionItem[]>([]);
+const consumableOptions = ref<ConsumableDto[]>([]);
 const loading = ref(false);
 const saving = ref(false);
 const message = ref('');
@@ -308,13 +322,21 @@ const detailSections = computed(() => [
   { label: '实验原理', value: selectedReport.value?.principle },
   { label: '实验步骤', value: selectedReport.value?.steps },
   { label: '实验数据/现象', value: selectedReport.value?.resultData },
-  { label: '结果分析', value: selectedReport.value?.analysis },
   { label: '实验结论', value: selectedReport.value?.conclusion },
 ]);
 
 onMounted(async () => {
   await Promise.all([loadOptions(), loadReports(1)]);
 });
+
+watch(
+  () => form.labId,
+  async (labId) => {
+    if (editorVisible.value && labId) {
+      await loadConsumableOptions(labId);
+    }
+  },
+);
 
 async function loadOptions(): Promise<void> {
   const token = auth.token.value;
@@ -325,6 +347,10 @@ async function loadOptions(): Promise<void> {
   ]);
   labOptions.value = labs;
   teacherOptions.value = teachers;
+}
+
+async function loadConsumableOptions(labId: number): Promise<void> {
+  consumableOptions.value = labId ? await fetchConsumableOptions(labId, auth.token.value) : [];
 }
 
 async function loadReports(pageNum = 1): Promise<void> {
@@ -358,6 +384,12 @@ function statusText(status: number): string {
   if (status === 3) return '已通过';
   if (status === 4) return '已退回';
   return '草稿';
+}
+
+function consumableUsageStatusText(status?: number): string {
+  if (status === 2) return '已出库';
+  if (status === 3) return '异常';
+  return '待提交';
 }
 
 function canEdit(report: ExperimentReportDto): boolean {
@@ -394,7 +426,17 @@ async function openEditor(report?: ExperimentReportDto): Promise<void> {
   form.resultData = data?.resultData ?? '';
   form.analysis = data?.analysis ?? '';
   form.conclusion = data?.conclusion ?? '';
-  form.consumables = data?.consumables?.length ? data.consumables.map((item) => ({ ...item })) : [];
+  await loadConsumableOptions(form.labId);
+  form.consumables = data?.consumables?.length
+    ? data.consumables.map((item) => ({
+        consumableId: item.consumableId,
+        consumableName: item.consumableName,
+        specification: item.specification,
+        quantity: item.quantity ?? 1,
+        unit: item.unit,
+        remark: item.remark,
+      }))
+    : [];
   editorVisible.value = true;
 }
 
@@ -403,16 +445,71 @@ function closeEditor(): void {
 }
 
 function addConsumable(): void {
-  form.consumables.push({ consumableName: '', specification: '', quantity: 0, unit: '', remark: '' });
+  form.consumables.push({ consumableId: 0, consumableName: '', specification: '', quantity: 1, unit: '', remark: '' });
 }
 
 function removeConsumable(index: number): void {
   form.consumables.splice(index, 1);
 }
 
+function handleLabChange(): void {
+  form.consumables = [];
+  void loadConsumableOptions(form.labId);
+}
+
+function findConsumableOption(consumableId?: number): ConsumableDto | undefined {
+  return consumableOptions.value.find((item) => item.id === consumableId);
+}
+
+function syncConsumableRow(item: ExperimentReportConsumableDto): void {
+  const option = findConsumableOption(item.consumableId);
+  item.consumableName = option?.consumableName ?? '';
+  item.specification = option?.specification;
+  item.unit = option?.unit;
+  if (!item.quantity || item.quantity < 1) {
+    item.quantity = 1;
+  }
+}
+
+function consumableStock(consumableId?: number): number {
+  return findConsumableOption(consumableId)?.stockQuantity ?? 0;
+}
+
+function consumableUnit(consumableId?: number): string {
+  return findConsumableOption(consumableId)?.unit ?? '';
+}
+
+function validateConsumables(): boolean {
+  const selected = new Set<number>();
+  for (const item of form.consumables) {
+    if (!item.consumableId) {
+      showToast('error', '请选择耗材');
+      return false;
+    }
+    if (selected.has(item.consumableId)) {
+      showToast('error', '同一耗材不能重复选择');
+      return false;
+    }
+    selected.add(item.consumableId);
+    const stock = consumableStock(item.consumableId);
+    if (!item.quantity || item.quantity <= 0) {
+      showToast('error', '耗材使用数量必须大于 0');
+      return false;
+    }
+    if (item.quantity > stock) {
+      showToast('error', '耗材使用数量不能超过当前库存');
+      return false;
+    }
+  }
+  return true;
+}
+
 async function handleSaveDraft(): Promise<void> {
   if (!form.title || !form.experimentName || !form.teacherId || !form.labId || !form.experimentDate) {
     showToast('error', '请填写标题、实验名称、实验室、指导教师和实验日期');
+    return;
+  }
+  if (!validateConsumables()) {
     return;
   }
   saving.value = true;
@@ -436,7 +533,7 @@ async function handleSubmit(report: ExperimentReportDto): Promise<void> {
   saving.value = true;
   try {
     selectedReport.value = await submitExperimentReport(report.id, auth.token.value);
-    showToast('success', '报告已提交审核');
+    showToast('success', '报告已提交，耗材已自动出库');
     await loadReports(reportState.value.pageNum);
   } catch (error) {
     showToast('error', error instanceof Error ? error.message : '提交报告失败');
@@ -491,12 +588,13 @@ async function handleDownload(report: ExperimentReportDto): Promise<void> {
 
 function normalizedPayload(): ExperimentReportSavePayload {
   const consumables: ExperimentReportConsumableDto[] = form.consumables
-    .filter((item) => item.consumableName?.trim())
+    .filter((item) => item.consumableId)
     .map((item) => ({
-      consumableName: item.consumableName.trim(),
-      specification: item.specification?.trim() || undefined,
+      consumableId: item.consumableId,
+      consumableName: item.consumableName || findConsumableOption(item.consumableId)?.consumableName || '',
+      specification: item.specification || findConsumableOption(item.consumableId)?.specification || undefined,
       quantity: item.quantity ?? 0,
-      unit: item.unit?.trim() || undefined,
+      unit: item.unit || findConsumableOption(item.consumableId)?.unit || undefined,
       remark: item.remark?.trim() || undefined,
     }));
   return {
@@ -535,6 +633,7 @@ function normalizedPayload(): ExperimentReportSavePayload {
 .form-grid select,
 .form-grid textarea,
 .review-field textarea,
+.consumable-row select,
 .consumable-row input {
   border: 1px solid #dbe4ee;
   border-radius: 14px;
@@ -744,7 +843,7 @@ function normalizedPayload(): ExperimentReportSavePayload {
 
 .consumable-row {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 90px 90px 1.2fr auto;
+  grid-template-columns: minmax(220px, 1.5fr) 110px 90px minmax(160px, 1fr) auto;
   gap: 10px;
 }
 

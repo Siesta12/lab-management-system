@@ -6,10 +6,14 @@ import com.nlt.common.security.CurrentUserScopeService;
 import com.nlt.domain.dto.experiment.ExperimentReportConsumableRequest;
 import com.nlt.domain.dto.experiment.ExperimentReportReviewRequest;
 import com.nlt.domain.dto.experiment.ExperimentReportSaveRequest;
+import com.nlt.domain.entity.ConsumableEntity;
+import com.nlt.domain.entity.ConsumableStockLogEntity;
 import com.nlt.domain.entity.ExperimentReportConsumableEntity;
 import com.nlt.domain.entity.ExperimentReportEntity;
 import com.nlt.domain.entity.LabEntity;
 import com.nlt.domain.entity.UserEntity;
+import com.nlt.mapper.ConsumableMapper;
+import com.nlt.mapper.ConsumableStockLogMapper;
 import com.nlt.mapper.ExperimentReportMapper;
 import com.nlt.mapper.LabMapper;
 import com.nlt.mapper.UserMapper;
@@ -20,7 +24,9 @@ import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.xwpf.usermodel.BreakType;
 import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
@@ -55,11 +61,16 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
     private static final int STATUS_PENDING = 2;
     private static final int STATUS_APPROVED = 3;
     private static final int STATUS_RETURNED = 4;
+    private static final int USAGE_PENDING = 1;
+    private static final int USAGE_CONFIRMED = 2;
+    private static final String SOURCE_REPORT_CONSUMABLE = "EXPERIMENT_REPORT_CONSUMABLE";
 
     private final ExperimentReportMapper experimentReportMapper;
     private final CurrentUserScopeService currentUserScopeService;
     private final UserMapper userMapper;
     private final LabMapper labMapper;
+    private final ConsumableMapper consumableMapper;
+    private final ConsumableStockLogMapper consumableStockLogMapper;
 
     @Override
     public PageData<ExperimentReportEntity> page(int pageNum, int pageSize, Integer status, String keyword) {
@@ -74,7 +85,7 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
         } else if (currentUserScopeService.isAdmin()) {
             departmentId = currentUserScopeService.requireCurrentDepartmentId();
         } else {
-            throw new BusinessException(403, "无权访问实验报告");
+            throw new BusinessException(403, "无权限访问实验报告");
         }
         return new PageData<>(
             experimentReportMapper.selectPage(offset, pageSize, departmentId, studentId, teacherId, status, trimToNull(keyword)),
@@ -113,15 +124,18 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
         ExperimentReportEntity entity = requireReport(id);
         ensureStudentOwner(entity);
         if (entity.getStatus() != STATUS_DRAFT && entity.getStatus() != STATUS_RETURNED) {
-            throw new BusinessException(400, "当前状态不允许编辑");
+            throw new BusinessException(400, "当前报告状态不可编辑");
         }
+        boolean hasConfirmedConsumables = experimentReportMapper.countConfirmedConsumables(id) > 0;
         buildReport(entity, request);
         entity.setStatus(STATUS_DRAFT);
         entity.setTeacherComment(null);
         entity.setSubmittedAt(null);
         entity.setReviewedAt(null);
         experimentReportMapper.updateDraft(entity);
-        replaceConsumables(entity.getId(), request.getConsumables());
+        if (!hasConfirmedConsumables) {
+            replaceConsumables(entity.getId(), request.getConsumables());
+        }
         return getById(id);
     }
 
@@ -132,11 +146,13 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
         ExperimentReportEntity entity = requireReport(id);
         ensureStudentOwner(entity);
         if (entity.getStatus() != STATUS_DRAFT && entity.getStatus() != STATUS_RETURNED) {
-            throw new BusinessException(400, "当前状态不允许提交");
+            throw new BusinessException(400, "当前报告状态不可提交");
         }
         if (entity.getTeacherId() == null) {
             throw new BusinessException(400, "请选择指导教师");
         }
+        validateExistingConsumables(entity);
+        deductPendingConsumables(entity, currentUserScopeService.currentUserIdOrNull());
         experimentReportMapper.submit(id);
         return getById(id);
     }
@@ -146,14 +162,14 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
     public ExperimentReportEntity review(Long id, ExperimentReportReviewRequest request) {
         ensureTeacher();
         if (request.getStatus() == null || (request.getStatus() != STATUS_APPROVED && request.getStatus() != STATUS_RETURNED)) {
-            throw new BusinessException(400, "审核状态不合法");
+            throw new BusinessException(400, "无效的审核状态");
         }
         ExperimentReportEntity entity = requireReport(id);
         if (!currentUserScopeService.currentUserIdOrNull().equals(entity.getTeacherId())) {
-            throw new BusinessException(403, "无权审核该报告");
+            throw new BusinessException(403, "无权审核此报告");
         }
         if (entity.getStatus() != STATUS_PENDING) {
-            throw new BusinessException(400, "仅待审核报告可审核");
+            throw new BusinessException(400, "仅待审核的报告可以进行审核");
         }
         experimentReportMapper.review(id, request.getStatus(), trimToNull(request.getTeacherComment()),
             currentUserScopeService.currentUserIdOrNull());
@@ -170,7 +186,7 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
             document.write(output);
             return output.toByteArray();
         } catch (IOException ex) {
-            throw new BusinessException(500, "Word生成失败");
+            throw new BusinessException(500, "Word导出失败");
         }
     }
 
@@ -209,18 +225,95 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
         if (consumables == null) {
             return;
         }
+        ExperimentReportEntity report = requireReport(reportId);
+        Set<Long> selectedConsumableIds = new HashSet<>();
         for (ExperimentReportConsumableRequest item : consumables) {
-            if (item == null || !StringUtils.hasText(item.getConsumableName())) {
+            if (item == null || item.getConsumableId() == null) {
                 continue;
             }
+            if (!selectedConsumableIds.add(item.getConsumableId())) {
+                throw new BusinessException(400, "不允许重复的耗材");
+            }
+            ConsumableEntity consumable = requireReportConsumable(report.getLabId(), item.getConsumableId(), item.getQuantity());
             ExperimentReportConsumableEntity entity = new ExperimentReportConsumableEntity();
             entity.setReportId(reportId);
-            entity.setConsumableName(item.getConsumableName().trim());
-            entity.setSpecification(trimToNull(item.getSpecification()));
-            entity.setQuantity(item.getQuantity() == null ? 0 : item.getQuantity());
-            entity.setUnit(trimToNull(item.getUnit()));
+            entity.setConsumableId(consumable.getId());
+            entity.setLabId(report.getLabId());
+            entity.setConsumableName(consumable.getConsumableName());
+            entity.setSpecification(trimToNull(consumable.getSpecification()));
+            entity.setQuantity(item.getQuantity());
+            entity.setUnit(trimToNull(consumable.getUnit()));
+            entity.setStatus(USAGE_PENDING);
             entity.setRemark(trimToNull(item.getRemark()));
             experimentReportMapper.insertConsumable(entity);
+        }
+    }
+
+    private ConsumableEntity requireReportConsumable(Long labId, Long consumableId, Integer quantity) {
+        if (quantity == null || quantity <= 0) {
+            throw new BusinessException(400, "耗材数量必须大于0");
+        }
+        ConsumableEntity consumable = consumableMapper.selectById(consumableId);
+        if (consumable == null || !labId.equals(consumable.getLabId())) {
+            throw new BusinessException(404, "当前实验室中未找到该耗材");
+        }
+        if (consumable.getStatus() == null || consumable.getStatus() != 1) {
+            throw new BusinessException(400, "耗材已禁用");
+        }
+        if (consumable.getStockQuantity() == null || consumable.getStockQuantity() < quantity) {
+            throw new BusinessException(400, "耗材数量超过当前库存");
+        }
+        return consumable;
+    }
+
+    private void validateExistingConsumables(ExperimentReportEntity report) {
+        List<ExperimentReportConsumableEntity> consumables = experimentReportMapper.selectConsumables(report.getId());
+        Set<Long> selectedConsumableIds = new HashSet<>();
+        for (ExperimentReportConsumableEntity item : consumables) {
+            if (item.getStatus() != null && item.getStatus() != USAGE_PENDING) {
+                continue;
+            }
+            if (!selectedConsumableIds.add(item.getConsumableId())) {
+                throw new BusinessException(400, "不允许重复的耗材");
+            }
+            requireReportConsumable(report.getLabId(), item.getConsumableId(), item.getQuantity());
+        }
+    }
+
+    private void deductPendingConsumables(ExperimentReportEntity report, Long operatorUserId) {
+        List<ExperimentReportConsumableEntity> consumables = experimentReportMapper.selectConsumables(report.getId());
+        for (ExperimentReportConsumableEntity item : consumables) {
+            if (item.getStatus() != null && item.getStatus() != USAGE_PENDING) {
+                continue;
+            }
+            ConsumableEntity consumable = consumableMapper.selectByIdForUpdate(item.getConsumableId());
+            if (consumable == null || !report.getLabId().equals(consumable.getLabId())) {
+                throw new BusinessException(404, "当前实验室中未找到该耗材");
+            }
+            if (consumable.getStockQuantity() == null || consumable.getStockQuantity() < item.getQuantity()) {
+                throw new BusinessException(400, "耗材数量超过当前库存");
+            }
+            int beforeStock = consumable.getStockQuantity();
+            int updated = consumableMapper.decreaseStock(consumable.getId(), item.getQuantity());
+            if (updated == 0) {
+                throw new BusinessException(400, "耗材数量超过当前库存");
+            }
+            ConsumableStockLogEntity log = new ConsumableStockLogEntity();
+            log.setConsumableId(consumable.getId());
+            log.setChangeType("OUT");
+            log.setChangeAmount(-item.getQuantity());
+            log.setBeforeStock(beforeStock);
+            log.setAfterStock(beforeStock - item.getQuantity());
+            log.setOperatorUserId(operatorUserId);
+            log.setSourceType(SOURCE_REPORT_CONSUMABLE);
+            log.setSourceId(item.getId());
+            log.setRemark("实验报告提交出库: " + report.getReportNo() + " " + report.getExperimentName());
+            consumableStockLogMapper.insert(log);
+            int confirmed = experimentReportMapper.confirmConsumable(item.getId(), operatorUserId, log.getId());
+            if (confirmed == 0) {
+                throw new BusinessException(400, "耗材使用记录已处理");
+            }
+            item.setStatus(USAGE_CONFIRMED);
         }
     }
 
@@ -244,12 +337,12 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
             currentUserScopeService.ensureCurrentDepartmentAccessible(report.getDepartmentId(), "实验报告不存在");
             return;
         }
-        throw new BusinessException(403, "无权访问实验报告");
+        throw new BusinessException(403, "无权限访问实验报告");
     }
 
     private void ensureStudentOwner(ExperimentReportEntity report) {
         if (!currentUserScopeService.currentUserIdOrNull().equals(report.getStudentId())) {
-            throw new BusinessException(403, "无权操作该报告");
+            throw new BusinessException(403, "无权限操作此报告");
         }
     }
 
@@ -259,13 +352,13 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
 
     private void ensureStudent() {
         if (!currentUserScopeService.isStudent()) {
-            throw new BusinessException(403, "仅学生可操作报告");
+            throw new BusinessException(403, "只有学生可以编辑报告");
         }
     }
 
     private void ensureTeacher() {
         if (!currentUserScopeService.isTeacher()) {
-            throw new BusinessException(403, "仅教师可审核报告");
+            throw new BusinessException(403, "只有教师可以审核报告");
         }
     }
 
@@ -290,13 +383,9 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
     }
 
     private void addCoverPage(XWPFDocument document, ExperimentReportEntity report) {
-        addBlankParagraph(document, 6);
-        addCenteredText(document, "实验报告", 26, true, 0, 1600);
+        addBlankParagraph(document, 4);
+        addCenteredText(document, "实验报告", 26, true, 0, 1200);
         addCoverInfoTable(document, report);
-        addBlankParagraph(document, 5);
-        addCenteredText(document, "XXXX大学", 14, false, 0, 160);
-        addCenteredText(document, defaultText(report.getDepartmentName()), 14, false, 0, 0);
-
         XWPFParagraph breakParagraph = document.createParagraph();
         breakParagraph.createRun().addBreak(BreakType.PAGE);
     }
@@ -305,12 +394,11 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
         XWPFTable table = document.createTable(5, 4);
         table.setTableAlignment(TableRowAlign.CENTER);
         setTableWidth(table, 7800);
-
         writeCoverRow(table.getRow(0), "实验名称", report.getExperimentName(), "", "");
         mergeCells(table.getRow(0), 1, 3);
-        writeCoverRow(table.getRow(1), "实验教室", report.getLabName(), "实验日期", formatChineseDate(report.getExperimentDate()));
-        writeCoverRow(table.getRow(2), "学    号", report.getStudentNo(), "姓    名", report.getStudentName());
-        writeCoverRow(table.getRow(3), "所属学院", report.getDepartmentName(), "", "");
+        writeCoverRow(table.getRow(1), "实验室", report.getLabName(), "日期", formatDate(report.getExperimentDate()));
+        writeCoverRow(table.getRow(2), "学号", report.getStudentNo(), "学生姓名", report.getStudentName());
+        writeCoverRow(table.getRow(3), "所属院系", report.getDepartmentName(), "", "");
         mergeCells(table.getRow(3), 1, 3);
         writeCoverRow(table.getRow(4), "指导教师", report.getTeacherName(), "", "");
         mergeCells(table.getRow(4), 1, 3);
@@ -324,19 +412,19 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
     }
 
     private void addContentPage(XWPFDocument document, ExperimentReportEntity report) {
-        XWPFTable table = document.createTable(6, 1);
+        XWPFTable table = document.createTable(7, 1);
         table.setTableAlignment(TableRowAlign.CENTER);
         setTableWidth(table, 8600);
-
-        writeSectionCell(table.getRow(0).getCell(0), "一、 实验目的", numberedLines(report.getPurpose()));
-        writeSectionCell(table.getRow(1).getCell(0), "二、 实验原理", defaultText(report.getPrinciple()));
-        writeSectionCell(table.getRow(2).getCell(0), "三、 实验内容及结果", combineText(report.getSteps(), report.getResultData()));
-        writeSectionCell(table.getRow(3).getCell(0), "四、 实验过程分析与讨论", defaultText(report.getAnalysis()));
-        writeSectionCell(table.getRow(4).getCell(0), "五、 实验结论", defaultText(report.getConclusion()));
-        writeSectionCell(table.getRow(5).getCell(0), "六、 指导教师意见",
-            defaultText(report.getTeacherComment()) + "\n\n审核状态：" + statusText(report.getStatus())
-                + "\n\n指导教师签字： " + defaultText(report.getTeacherName())
-                + "        日期： " + formatChineseDate(resolveReviewDate(report)));
+        writeSectionCell(table.getRow(0).getCell(0), "1. 实验目的", numberedLines(report.getPurpose()));
+        writeSectionCell(table.getRow(1).getCell(0), "2. 实验原理", defaultText(report.getPrinciple()));
+        writeSectionCell(table.getRow(2).getCell(0), "3. 实验步骤", defaultText(report.getSteps()));
+        writeSectionCell(table.getRow(3).getCell(0), "4. 实验数据/现象", defaultText(report.getResultData()));
+        writeSectionCell(table.getRow(4).getCell(0), "5. 实验结论", defaultText(report.getConclusion()));
+        writeSectionCell(table.getRow(5).getCell(0), "6. 耗材使用", consumablesText(report.getConsumables()));
+        writeSectionCell(table.getRow(6).getCell(0), "7. 教师评语",
+            defaultText(report.getTeacherComment())
+                + "\n                                                                                    教师: " + defaultText(report.getTeacherName())
+                + "\n                                                                                    日期: " + formatDate(resolveReviewDate(report)));
     }
 
     private void writeSectionCell(XWPFTableCell cell, String title, String content) {
@@ -346,7 +434,6 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
         setParagraphSpacing(heading, 80, 120, ParagraphAlignment.LEFT);
         XWPFRun headingRun = heading.createRun();
         styleRun(headingRun, title, true, 14);
-
         for (String line : defaultText(content).split("\\R", -1)) {
             XWPFParagraph paragraph = cell.addParagraph();
             paragraph.setAlignment(ParagraphAlignment.LEFT);
@@ -404,7 +491,7 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
     private void styleRun(XWPFRun run, String text, boolean bold, int fontSize) {
         run.setText(text);
         run.setBold(bold);
-        run.setFontFamily("宋体");
+        run.setFontFamily("Arial");
         run.setFontSize(fontSize);
         run.setColor("000000");
     }
@@ -452,7 +539,7 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
             if (i > 0) {
                 builder.append('\n');
             }
-            builder.append(i + 1).append("：").append(lines[i].trim());
+            builder.append(i + 1).append(". ").append(lines[i].trim());
         }
         return builder.toString();
     }
@@ -467,12 +554,12 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
             if (i > 0) {
                 builder.append('\n');
             }
-            builder.append(i + 1).append("：")
+            builder.append(i + 1).append(". ")
                 .append(defaultText(item.getConsumableName()))
-                .append("，规格：").append(defaultText(item.getSpecification()))
-                .append("，数量：").append(item.getQuantity() == null ? 0 : item.getQuantity())
+                .append(", 规格: ").append(defaultText(item.getSpecification()))
+                .append(", 数量: ").append(item.getQuantity() == null ? 0 : item.getQuantity())
                 .append(defaultText(item.getUnit()))
-                .append(StringUtils.hasText(item.getRemark()) ? "，备注：" + item.getRemark() : "");
+                .append(StringUtils.hasText(item.getRemark()) ? ", 备注: " + item.getRemark() : "");
         }
         return builder.toString();
     }
@@ -491,11 +578,8 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
         return report.getExperimentDate();
     }
 
-    private String formatChineseDate(LocalDate date) {
-        if (date == null) {
-            return "无";
-        }
-        return date.format(DateTimeFormatter.ofPattern("yyyy 年 MM 月 dd 日"));
+    private String formatDate(LocalDate date) {
+        return date == null ? "无" : date.format(DateTimeFormatter.ISO_LOCAL_DATE);
     }
 
     private String statusText(Integer status) {
@@ -510,4 +594,5 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
         }
         return "草稿";
     }
+
 }

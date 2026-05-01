@@ -9072,11 +9072,11 @@ VALUES (1, 'ER202604240001', 8, 2, 1, 1, NULL, '网络连通性测试实验报�
         '增加索引后查询耗时下降。', '缺少部分 SQL 截图和数据说明。', '需补充实验数据。', 4, '请补充关键 SQL 与截图说明。',
         '2026-04-22 14:30:00', '2026-04-22 15:20:00', 0, '2026-04-22 14:00:00', '2026-04-22 15:20:00');
 
-INSERT INTO `lab_experiment_report_consumable` (`id`, `report_id`, `consumable_name`, `specification`, `quantity`, `unit`, `remark`)
-VALUES (1, 1, '网线', '六类 1m', 2, '根', '实验连接使用'),
-       (2, 2, '标签纸', '普通标签', 5, '张', '端口标记'),
-       (3, 3, '记录纸', 'A4', 2, '张', '记录部署参数'),
-       (4, 4, '记录纸', 'A4', 1, '张', '记录 SQL 结果');
+INSERT INTO `lab_experiment_report_consumable` (`id`, `report_id`, `consumable_id`, `lab_id`, `consumable_name`, `specification`, `quantity`, `unit`, `status`, `remark`)
+VALUES (1, 1, 3, 1, '网线', '六类 1m', 2, '根', 1, '实验连接使用'),
+       (2, 2, 4, 1, '标签纸', '普通标签', 5, '张', 1, '端口标记'),
+       (3, 3, 1, 1, '记录纸', 'A4', 2, '张', 1, '记录部署参数'),
+       (4, 4, 5, 2, '记录纸', 'A4', 1, '张', 1, '记录 SQL 结果');
 
 SET
   FOREIGN_KEY_CHECKS = 1;

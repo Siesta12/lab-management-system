@@ -49,16 +49,16 @@ public class CheckinServiceImpl implements CheckinService {
     public CheckinResultVo submit(CheckinSubmitRequest request, LabEntity lab, Long currentUserId) {
         requireLogin(currentUserId);
         if (request == null) {
-            throw new BusinessException(400, "\u7B7E\u5230\u8BF7\u6C42\u4E0D\u80FD\u4E3A\u7A7A");
+            throw new BusinessException(400, "签到请求不能为空");
         }
         if (lab == null) {
-            throw new BusinessException(404, "\u672A\u627E\u5230\u5B9E\u9A8C\u5BA4\u4FE1\u606F");
+            throw new BusinessException(404, "未找到实验室信息");
         }
         if (request.getLatitude() == null || request.getLongitude() == null) {
-            throw new BusinessException(400, "\u5F53\u524D\u4F4D\u7F6E\u7F3A\u5C11\u7ECF\u7EAC\u5EA6\u4FE1\u606F\uFF0C\u65E0\u6CD5\u7B7E\u5230");
+            throw new BusinessException(400, "当前位置缺少经纬度信息，无法签到");
         }
         if (lab.getLatitude() == null || lab.getLongitude() == null) {
-            throw new BusinessException(400, "\u5B9E\u9A8C\u5BA4\u672A\u914D\u7F6E\u5B9A\u4F4D\u4FE1\u606F\uFF0C\u6682\u65E0\u6CD5\u7B7E\u5230");
+            throw new BusinessException(400, "实验室未配置定位信息，暂无法签到");
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -71,7 +71,7 @@ public class CheckinServiceImpl implements CheckinService {
             lab.getLongitude()
         );
         if (distanceMeters > ReservationCheckConstants.MAX_CHECK_IN_DISTANCE_METERS) {
-            throw new BusinessException(400, "\u5F53\u524D\u4F4D\u7F6E\u4E0D\u5728\u5B9E\u9A8C\u5BA4\u9644\u8FD1\uFF0C\u7B7E\u5230\u5931\u8D25");
+            throw new BusinessException(400, "当前位置不在实验室附近，签到失败");
         }
 
         LocalDateTime startDateTime = buildStartDateTime(candidate);
@@ -79,17 +79,17 @@ public class CheckinServiceImpl implements CheckinService {
         reservationMapper.checkInAt(candidate.getReservationId(), now);
 
         int scoreChange = 0;
-        String auditComment = "\u6B63\u5E38\u7B7E\u5230";
+        String auditComment = "正常签到";
         Long actualUserId = candidate.getApplicantUserId();
         if (late) {
             scoreChange = ReservationCheckConstants.LATE_SCORE_DEDUCTION;
-            auditComment = "\u8FDF\u5230\u7B7E\u5230";
+            auditComment = "迟到签到";
             applyViolationPenalty(
                 actualUserId,
                 candidate.getReservationId(),
                 ReservationCheckConstants.VIOLATION_TYPE_LATE,
                 scoreChange,
-                "\u9884\u7EA6\u7B7E\u5230\u8FDF\u5230"
+                "预约签到迟到"
             );
         }
 
@@ -106,7 +106,7 @@ public class CheckinServiceImpl implements CheckinService {
             late,
             scoreChange,
             Math.round(distanceMeters),
-            late ? "\u8FDF\u5230\u7B7E\u5230\u6210\u529F" : "\u7B7E\u5230\u6210\u529F"
+            late ? "迟到签到成功" : "签到成功"
         );
     }
 
@@ -136,13 +136,13 @@ public class CheckinServiceImpl implements CheckinService {
                 candidate.getReservationId(),
                 ReservationCheckConstants.VIOLATION_TYPE_NO_SHOW,
                 ReservationCheckConstants.NO_SHOW_SCORE_DEDUCTION,
-                "\u8D85\u8FC7\u7B7E\u5230\u7A97\u53E3\u672A\u7B7E\u5230\uFF0C\u8BB0\u4E3A\u7CDE\u7EA6"
+                "超过签到窗口未签到，记为爽约"
             );
             insertAuditLog(
                 candidate.getReservationId(),
                 candidate.getApplicantUserId(),
                 ReservationCheckConstants.AUDIT_ACTION_CHECK_OUT,
-                "\u8D85\u8FC7\u7B7E\u5230\u7A97\u53E3\u672A\u7B7E\u5230\uFF0C\u8BB0\u4E3A\u7CDE\u7EA6"
+                "超过签到窗口未签到，记为爽约"
             );
             handledCount++;
         }
@@ -163,7 +163,7 @@ public class CheckinServiceImpl implements CheckinService {
                 candidate.getReservationId(),
                 candidate.getApplicantUserId(),
                 ReservationCheckConstants.AUDIT_ACTION_CHECK_OUT,
-                "\u5B9E\u9A8C\u5DF2\u5B8C\u6210"
+                "实验已完成"
             );
             applyNormalCompletionReward(candidate);
             handledCount++;
@@ -179,7 +179,7 @@ public class CheckinServiceImpl implements CheckinService {
         List<ReservationCheckCandidateVo> reservations =
             reservationMapper.selectCheckInCandidatesByLab(labId, now.toLocalDate());
         if (reservations == null || reservations.isEmpty()) {
-            throw new BusinessException(404, "\u5F53\u524D\u4E0D\u5B58\u5728\u53EF\u7B7E\u5230\u9884\u7EA6");
+            throw new BusinessException(404, "当前不存在可签到预约");
         }
 
         Map<Long, Boolean> teacherRoleCache = new HashMap<>();
@@ -194,9 +194,9 @@ public class CheckinServiceImpl implements CheckinService {
         }
         if (studentReservations.isEmpty()) {
             if (hasTeacherReservation) {
-                throw new BusinessException(400, "\u6559\u5E08\u9884\u7EA6\u65E0\u9700\u7B7E\u5230");
+                throw new BusinessException(400, "教师预约无需签到");
             }
-            throw new BusinessException(404, "\u5F53\u524D\u4E0D\u5B58\u5728\u53EF\u7B7E\u5230\u9884\u7EA6");
+            throw new BusinessException(404, "当前不存在可签到预约");
         }
 
         List<ReservationCheckCandidateVo> withinWindow = new ArrayList<>();
@@ -224,22 +224,22 @@ public class CheckinServiceImpl implements CheckinService {
         }
 
         if (withinWindow.size() > 1) {
-            throw new BusinessException(400, "\u5F53\u524D\u5B58\u5728\u591A\u6761\u53EF\u7B7E\u5230\u9884\u7EA6\uFF0C\u8BF7\u8054\u7CFB\u7BA1\u7406\u5458");
+            throw new BusinessException(400, "当前存在多条可签到预约，请联系管理员");
         }
         if (withinWindow.size() == 1) {
             ReservationCheckCandidateVo candidate = withinWindow.get(0);
             if (candidate.getCheckInTime() != null) {
-                throw new BusinessException(400, "\u5DF2\u7B7E\u5230\uFF0C\u8BF7\u52FF\u91CD\u590D\u64CD\u4F5C");
+                throw new BusinessException(400, "已签到，请勿重复操作");
             }
             return candidate;
         }
         if (nearestFuture != null) {
-            throw new BusinessException(400, "\u672A\u5230\u7B7E\u5230\u65F6\u95F4");
+            throw new BusinessException(400, "未到签到时间");
         }
         if (nearestExpired != null) {
-            throw new BusinessException(400, "\u5DF2\u8D85\u8FC7\u7B7E\u5230\u65F6\u95F4\uFF0C\u65E0\u6CD5\u7B7E\u5230");
+            throw new BusinessException(400, "已超过签到时间，无法签到");
         }
-        throw new BusinessException(404, "\u5F53\u524D\u4E0D\u5B58\u5728\u53EF\u7B7E\u5230\u9884\u7EA6");
+        throw new BusinessException(404, "当前不存在可签到预约");
     }
 
     private boolean isTeacherApplicant(Long userId, Map<Long, Boolean> teacherRoleCache) {
@@ -317,7 +317,7 @@ public class CheckinServiceImpl implements CheckinService {
 
     private void requireLogin(Long currentUserId) {
         if (currentUserId == null) {
-            throw new BusinessException(401, "\u8BF7\u5148\u767B\u5F55\u7CFB\u7EDF\u540E\u518D\u7B7E\u5230");
+            throw new BusinessException(401, "请先登录系统后再签到");
         }
     }
 

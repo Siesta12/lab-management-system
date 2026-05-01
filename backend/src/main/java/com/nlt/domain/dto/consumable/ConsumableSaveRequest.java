@@ -16,12 +16,16 @@ public class ConsumableSaveRequest {
     @NotBlank
     private String consumableCode;
 
+    private String specification;
+
     @NotBlank
     private String unit;
 
     private Integer stockQuantity;
 
     private Integer warningThreshold;
+
+    private Integer status;
 
     private String remark;
 

@@ -6,9 +6,11 @@ import com.nlt.common.security.TokenService;
 import com.nlt.domain.dto.consumable.ConsumableSaveRequest;
 import com.nlt.domain.dto.consumable.ConsumableStockUpdateRequest;
 import com.nlt.domain.entity.ConsumableEntity;
+import com.nlt.domain.entity.ExperimentReportConsumableEntity;
 import com.nlt.service.ConsumableService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,8 +36,23 @@ public class ConsumableController {
         @RequestParam(defaultValue = "10") int pageSize,
         @RequestParam(required = false) Long labId,
         @RequestParam(required = false) String consumableName,
-        @RequestParam(required = false) String consumableCode) {
-        return ApiResponse.success(consumableService.page(pageNum, pageSize, labId, consumableName, consumableCode));
+        @RequestParam(required = false) String consumableCode,
+        @RequestParam(required = false) Integer status) {
+        return ApiResponse.success(consumableService.page(pageNum, pageSize, labId, consumableName, consumableCode, status));
+    }
+
+    @GetMapping("/options")
+    public ApiResponse<List<ConsumableEntity>> options(@RequestParam Long labId) {
+        return ApiResponse.success(consumableService.availableOptions(labId));
+    }
+
+    @GetMapping("/usages")
+    public ApiResponse<PageData<ExperimentReportConsumableEntity>> usagePage(@RequestParam(defaultValue = "1") int pageNum,
+        @RequestParam(defaultValue = "10") int pageSize,
+        @RequestParam(required = false) Integer status,
+        @RequestParam(required = false) Long labId,
+        @RequestParam(required = false) String keyword) {
+        return ApiResponse.success(consumableService.usagePage(pageNum, pageSize, status, labId, keyword));
     }
 
     /**

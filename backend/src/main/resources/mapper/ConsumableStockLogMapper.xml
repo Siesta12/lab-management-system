@@ -12,6 +12,8 @@
             before_stock,
             after_stock,
             operator_user_id,
+            source_type,
+            source_id,
             remark
         )
         values(
@@ -21,7 +23,15 @@
             #{beforeStock},
             #{afterStock},
             #{operatorUserId},
+            #{sourceType},
+            #{sourceId},
             #{remark}
         )
     </insert>
+
+    <select id="selectById" resultType="com.nlt.domain.entity.ConsumableStockLogEntity">
+        select *
+        from consumable_stock_log
+        where id = #{id}
+    </select>
 </mapper>

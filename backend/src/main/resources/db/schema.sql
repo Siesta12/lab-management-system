@@ -8,6 +8,8 @@ SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
 DROP TABLE IF EXISTS `consumable_stock_log`;
+DROP TABLE IF EXISTS `lab_experiment_report_consumable`;
+DROP TABLE IF EXISTS `lab_experiment_report`;
 DROP TABLE IF EXISTS `user_violation_record`;
 DROP TABLE IF EXISTS `reservation_audit_log`;
 DROP TABLE IF EXISTS `lab_maintenance`;
@@ -153,9 +155,11 @@ create table lab_consumable
   lab_id            bigint                             not null comment 'Lab id',
   consumable_name   varchar(100)                       not null comment 'Consumable name',
   consumable_code   varchar(50)                        not null comment 'Consumable code',
+  specification     varchar(100) null comment 'Specification',
   unit              varchar(20)                        not null comment 'Unit',
   stock_quantity    int      default 0                 not null comment 'Stock quantity',
   warning_threshold int      default 0                 not null comment 'Warning threshold',
+  status            tinyint  default 1                 not null comment '1 enabled, 0 disabled',
   remark            varchar(255) null comment 'Remark',
   deleted           tinyint  default 0                 not null comment '0 active, 1 deleted',
   created_at        datetime default CURRENT_TIMESTAMP not null comment 'Created time',
@@ -178,6 +182,8 @@ create table consumable_stock_log
   before_stock     int                                not null comment 'Stock before change',
   after_stock      int                                not null comment 'Stock after change',
   operator_user_id bigint null comment 'Operator user id',
+  source_type      varchar(30) null comment 'Source type',
+  source_id        bigint null comment 'Source id',
   remark           varchar(255) null comment 'Remark',
   created_at       datetime default CURRENT_TIMESTAMP not null comment 'Created time',
   constraint fk_consumable_stock_log_consumable
@@ -194,6 +200,9 @@ create index idx_consumable_stock_log_created_at
 
 create index idx_consumable_stock_log_operator_user_id
   on consumable_stock_log (operator_user_id);
+
+create index idx_consumable_stock_log_source
+  on consumable_stock_log (source_type, source_id);
 
 create index idx_lab_consumable_lab_id
   on lab_consumable (lab_id);
@@ -512,15 +521,39 @@ create table lab_experiment_report_consumable
   id              bigint auto_increment comment 'Primary key'
         primary key,
   report_id       bigint                             not null comment 'Report id',
+  consumable_id   bigint                             not null comment 'Consumable id',
+  lab_id          bigint                             not null comment 'Lab id',
   consumable_name varchar(100)                       not null comment 'Consumable name',
   specification   varchar(100) null comment 'Specification',
   quantity        int      default 0                 not null comment 'Quantity',
   unit            varchar(20) null comment 'Unit',
+  status          tinyint  default 1                 not null comment '1 pending, 2 confirmed, 3 rejected',
+  confirm_user_id bigint null comment 'Confirm admin user id',
+  confirmed_at    datetime null comment 'Confirmed time',
+  reject_reason   varchar(255) null comment 'Reject reason',
+  stock_log_id    bigint null comment 'Stock log id',
   remark          varchar(255) null comment 'Remark',
   created_at      datetime default CURRENT_TIMESTAMP not null comment 'Created time',
   constraint fk_lab_experiment_report_consumable_report
-    foreign key (report_id) references lab_experiment_report (id)
+    foreign key (report_id) references lab_experiment_report (id),
+  constraint fk_lab_experiment_report_consumable_consumable
+    foreign key (consumable_id) references lab_consumable (id),
+  constraint fk_lab_experiment_report_consumable_lab
+    foreign key (lab_id) references lab (id),
+  constraint fk_lab_experiment_report_consumable_confirm_user
+    foreign key (confirm_user_id) references sys_user (id),
+  constraint fk_lab_experiment_report_consumable_stock_log
+    foreign key (stock_log_id) references consumable_stock_log (id)
 ) comment 'Experiment report consumable record table';
 
 create index idx_lab_experiment_report_consumable_report_id
   on lab_experiment_report_consumable (report_id);
+
+create index idx_lab_experiment_report_consumable_consumable_id
+  on lab_experiment_report_consumable (consumable_id);
+
+create index idx_lab_experiment_report_consumable_lab_status
+  on lab_experiment_report_consumable (lab_id, status);
+
+create index idx_lab_experiment_report_consumable_status_created_at
+  on lab_experiment_report_consumable (status, created_at);

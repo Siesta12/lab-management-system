@@ -19,6 +19,9 @@
         <if test="departmentId != null">
             and l.department_id = #{departmentId}
         </if>
+        <if test="status != null">
+            and c.status = #{status}
+        </if>
         order by c.id desc
         limit #{offset}, #{pageSize}
     </select>
@@ -41,6 +44,9 @@
         <if test="departmentId != null">
             and l.department_id = #{departmentId}
         </if>
+        <if test="status != null">
+            and c.status = #{status}
+        </if>
     </select>
 
     <select id="selectById" resultType="com.nlt.domain.entity.ConsumableEntity">
@@ -48,6 +54,24 @@
         from lab_consumable
         where id = #{id}
             and deleted = 0
+    </select>
+
+    <select id="selectByIdForUpdate" resultType="com.nlt.domain.entity.ConsumableEntity">
+        select *
+        from lab_consumable
+        where id = #{id}
+            and deleted = 0
+        for update
+    </select>
+
+    <select id="selectAvailableOptions" resultType="com.nlt.domain.entity.ConsumableEntity">
+        select *
+        from lab_consumable
+        where lab_id = #{labId}
+            and deleted = 0
+            and status = 1
+            and stock_quantity &gt; 0
+        order by consumable_name asc, id asc
     </select>
 
     <select id="selectWarningList" resultType="com.nlt.domain.entity.ConsumableEntity">
@@ -71,9 +95,11 @@
             lab_id,
             consumable_name,
             consumable_code,
+            specification,
             unit,
             stock_quantity,
             warning_threshold,
+            status,
             remark,
             deleted
         )
@@ -81,9 +107,11 @@
             #{labId},
             #{consumableName},
             #{consumableCode},
+            #{specification},
             #{unit},
             #{stockQuantity},
             #{warningThreshold},
+            #{status},
             #{remark},
             0
         )
@@ -94,9 +122,11 @@
         set lab_id = #{labId},
                 consumable_name = #{consumableName},
                 consumable_code = #{consumableCode},
+                specification = #{specification},
                 unit = #{unit},
                 stock_quantity = #{stockQuantity},
                 warning_threshold = #{warningThreshold},
+                status = #{status},
                 remark = #{remark}
         where id = #{id}
             and deleted = 0
@@ -107,6 +137,14 @@
         set stock_quantity = #{stockQuantity}
         where id = #{id}
             and deleted = 0
+    </update>
+
+    <update id="decreaseStock">
+        update lab_consumable
+        set stock_quantity = stock_quantity - #{quantity}
+        where id = #{id}
+            and deleted = 0
+            and stock_quantity &gt;= #{quantity}
     </update>
 
     <update id="softDelete">

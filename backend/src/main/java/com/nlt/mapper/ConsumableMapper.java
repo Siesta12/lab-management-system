@@ -20,7 +20,8 @@ public interface ConsumableMapper {
     List<ConsumableEntity> selectPage(@Param("offset") int offset, @Param("pageSize") int pageSize,
                                       @Param("labId") Long labId, @Param("consumableName") String consumableName,
                                       @Param("consumableCode") String consumableCode,
-                                      @Param("departmentId") Long departmentId);
+                                      @Param("departmentId") Long departmentId,
+                                      @Param("status") Integer status);
 
     /**
      * 统计耗材信息数量
@@ -31,7 +32,8 @@ public interface ConsumableMapper {
      */
     long countPage(@Param("labId") Long labId, @Param("consumableName") String consumableName,
                    @Param("consumableCode") String consumableCode,
-                   @Param("departmentId") Long departmentId);
+                   @Param("departmentId") Long departmentId,
+                   @Param("status") Integer status);
 
     /**
      * 根据ID查询耗材信息
@@ -39,6 +41,10 @@ public interface ConsumableMapper {
      * @return 耗材实体
      */
     ConsumableEntity selectById(@Param("id") Long id);
+
+    ConsumableEntity selectByIdForUpdate(@Param("id") Long id);
+
+    List<ConsumableEntity> selectAvailableOptions(@Param("labId") Long labId);
 
     /**
      * 查询库存预警耗材列表
@@ -67,6 +73,8 @@ public interface ConsumableMapper {
      * @return 影响行数
      */
     int updateStock(@Param("id") Long id, @Param("stockQuantity") Integer stockQuantity);
+
+    int decreaseStock(@Param("id") Long id, @Param("quantity") Integer quantity);
 
     /**
      * 逻辑删除耗材信息
