@@ -10,6 +10,7 @@ import { del, get, patch, post, put } from './http';
 
 export interface ConsumableQuery {
   labId?: number;
+  labType?: string;
   pageNum?: number;
   pageSize?: number;
   consumableName?: string;
@@ -22,6 +23,7 @@ function buildConsumableQuery(query: ConsumableQuery): string {
   params.set('pageNum', String(query.pageNum ?? 1));
   params.set('pageSize', String(query.pageSize ?? 20));
   if (query.labId) params.set('labId', String(query.labId));
+  if (query.labType) params.set('labType', query.labType);
   if (query.consumableName) params.set('consumableName', query.consumableName);
   if (query.consumableCode) params.set('consumableCode', query.consumableCode);
   if (query.status !== undefined && query.status !== null) params.set('status', String(query.status));

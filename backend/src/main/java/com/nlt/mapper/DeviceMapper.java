@@ -19,8 +19,8 @@ public interface DeviceMapper {
      * @return 数据列表
      */
     List<DeviceEntity> selectPage(@Param("offset") int offset, @Param("pageSize") int pageSize,
-                                  @Param("labId") Long labId, @Param("deviceName") String deviceName,
-                                  @Param("deviceCode") String deviceCode, @Param("status") Integer status,
+                                  @Param("labId") Long labId, @Param("labType") String labType,
+                                  @Param("deviceName") String deviceName, @Param("deviceCode") String deviceCode, @Param("status") Integer status,
                                   @Param("departmentId") Long departmentId);
 
     /**
@@ -31,7 +31,7 @@ public interface DeviceMapper {
      * @param status 状态值
      * @return 总数
      */
-    long countPage(@Param("labId") Long labId, @Param("deviceName") String deviceName,
+    long countPage(@Param("labId") Long labId, @Param("labType") String labType, @Param("deviceName") String deviceName,
                    @Param("deviceCode") String deviceCode, @Param("status") Integer status,
                    @Param("departmentId") Long departmentId);
 

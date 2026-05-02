@@ -27,14 +27,14 @@ public class DeviceRepairServiceImpl implements DeviceRepairService {
     private final CurrentUserScopeService currentUserScopeService;
 
     @Override
-    public PageData<DeviceRepairEntity> page(int pageNum, int pageSize, Long labId, Long deviceId, Integer status) {
+    public PageData<DeviceRepairEntity> page(int pageNum, int pageSize, Long labId, String labType, Long deviceId, Integer status) {
         ensureTeacherOrAdmin();
         int offset = (pageNum - 1) * pageSize;
         Long departmentId = currentUserScopeService.requireCurrentDepartmentId();
         Long applicantUserId = currentUserScopeService.isAdmin() ? null : currentUserScopeService.currentUserIdOrNull();
         return new PageData<>(
-            deviceRepairMapper.selectPage(offset, pageSize, labId, deviceId, status, departmentId, applicantUserId),
-            deviceRepairMapper.countPage(labId, deviceId, status, departmentId, applicantUserId),
+            deviceRepairMapper.selectPage(offset, pageSize, labId, trimToNull(labType), deviceId, status, departmentId, applicantUserId),
+            deviceRepairMapper.countPage(labId, trimToNull(labType), deviceId, status, departmentId, applicantUserId),
             pageNum,
             pageSize
         );
@@ -135,5 +135,9 @@ public class DeviceRepairServiceImpl implements DeviceRepairService {
         if (!currentUserScopeService.isAdmin()) {
             throw new BusinessException(403, "无权处理报修");
         }
+    }
+
+    private String trimToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

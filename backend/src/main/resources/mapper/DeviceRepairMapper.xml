@@ -17,6 +17,9 @@
         <if test="labId != null">
             and r.lab_id = #{labId}
         </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
         <if test="deviceId != null">
             and r.device_id = #{deviceId}
         </if>
@@ -38,6 +41,9 @@
         where l.department_id = #{departmentId}
         <if test="labId != null">
             and r.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
         </if>
         <if test="deviceId != null">
             and r.device_id = #{deviceId}

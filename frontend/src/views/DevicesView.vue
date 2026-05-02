@@ -1,31 +1,8 @@
 ﻿<template>
   <section class="device-page">
-    <section class="card-grid metrics-grid">
-      <article class="metric-card brand">
-        <span>设备总数</span>
-        <strong>{{ deviceState.total }}</strong>
-        <small>当前学院可见设备台账</small>
-      </article>
-      <article class="metric-card warning">
-        <span>维修中</span>
-        <strong>{{ repairingCount }}</strong>
-        <small>状态为维修中的设备</small>
-      </article>
-      <article class="metric-card success">
-        <span>待处理报修</span>
-        <strong>{{ pendingRepairCount }}</strong>
-        <small>未受理的报修单</small>
-      </article>
-      <article class="metric-card accent">
-        <span>已完成报修</span>
-        <strong>{{ completedRepairCount }}</strong>
-        <small>已处理完成的报修单</small>
-      </article>
-    </section>
-
     <BasePanel :title="panelTitle" panel-class="device-panel">
-      <div class="toolbar">
-        <div class="toolbar-left">
+      <div class="toolbar device-toolbar">
+        <div class="toolbar-top">
           <div class="tab-strip">
             <button type="button" class="tab-btn" :class="{ active: activeTab === 'inventory' }" @click="activeTab = 'inventory'">
               设备台账
@@ -40,16 +17,23 @@
               设备报修
             </button>
           </div>
+          <button v-if="isAdmin && activeTab === 'inventory'" type="button" class="primary-btn add-device-btn" @click="openDeviceDialog()">
+            新增设备
+          </button>
         </div>
 
-        <div class="toolbar-right">
+        <div class="toolbar-filters">
           <template v-if="activeTab === 'inventory'">
             <input v-model.trim="deviceKeyword" class="toolbar-input" placeholder="搜索设备名称或编号" @keyup.enter="loadDevices(1)" />
-            <select v-model="deviceFilters.labId" class="toolbar-select">
-              <option :value="null">全部实验室</option>
-              <option v-for="lab in labOptions" :key="lab.value" :value="lab.value">{{ lab.label }}</option>
+            <select v-model="deviceFilters.labType" class="toolbar-select" @change="handleDeviceLabTypeChange">
+              <option value="">全部类型</option>
+              <option v-for="type in labTypeOptions" :key="type" :value="type">{{ type }}</option>
             </select>
-            <select v-model="deviceFilters.status" class="toolbar-select">
+            <select v-model="deviceFilters.labId" class="toolbar-select" @change="loadDevices(1)">
+              <option :value="null">全部实验室</option>
+              <option v-for="lab in filteredDeviceLabOptions" :key="lab.value" :value="lab.value">{{ lab.label }}</option>
+            </select>
+            <select v-model="deviceFilters.status" class="toolbar-select" @change="loadDevices(1)">
               <option :value="null">全部状态</option>
               <option :value="1">正常</option>
               <option :value="2">维修中</option>
@@ -57,18 +41,19 @@
             </select>
             <button type="button" class="ghost-btn" @click="loadDevices(1)">查询</button>
             <button type="button" class="ghost-btn" @click="resetDeviceFilters">重置</button>
-            <button v-if="isAdmin" type="button" class="primary-btn add-device-btn" @click="openDeviceDialog()">
-              新增设备
-            </button>
           </template>
 
           <template v-else>
             <input v-model.trim="repairKeyword" class="toolbar-input" placeholder="搜索报修说明" @keyup.enter="loadRepairs(1)" />
-            <select v-model="repairFilters.labId" class="toolbar-select">
-              <option :value="null">全部实验室</option>
-              <option v-for="lab in labOptions" :key="lab.value" :value="lab.value">{{ lab.label }}</option>
+            <select v-model="repairFilters.labType" class="toolbar-select" @change="handleRepairLabTypeChange">
+              <option value="">全部类型</option>
+              <option v-for="type in labTypeOptions" :key="type" :value="type">{{ type }}</option>
             </select>
-            <select v-model="repairFilters.status" class="toolbar-select">
+            <select v-model="repairFilters.labId" class="toolbar-select" @change="loadRepairs(1)">
+              <option :value="null">全部实验室</option>
+              <option v-for="lab in filteredRepairLabOptions" :key="lab.value" :value="lab.value">{{ lab.label }}</option>
+            </select>
+            <select v-model="repairFilters.status" class="toolbar-select" @change="loadRepairs(1)">
               <option :value="null">全部状态</option>
               <option :value="1">待处理</option>
               <option :value="2">处理中</option>
@@ -428,8 +413,8 @@ import {
   type DeviceQuery,
   type DeviceRepairQuery,
 } from '../api/devices';
-import { fetchLabOptions } from '../api/labs';
-import type { DeviceDto, DeviceRepairDto, DeviceRepairCreatePayload, DeviceSavePayload, OptionItem, PageData } from '../types';
+import { fetchLabs } from '../api/labs';
+import type { DeviceDto, DeviceRepairDto, DeviceRepairCreatePayload, DeviceSavePayload, LabDto, OptionItem, PageData } from '../types';
 
 type TabKey = 'inventory' | 'repair';
 type DeviceDialogMode = 'create' | 'edit';
@@ -460,11 +445,12 @@ const deviceSaving = ref(false);
 const repairSaving = ref(false);
 
 const labOptions = ref<OptionItem[]>([]);
+const labCatalog = ref<LabDto[]>([]);
 
 const deviceKeyword = ref('');
 const repairKeyword = ref('');
-const deviceFilters = reactive<{ labId: number | null; status: number | null }>({ labId: null, status: null });
-const repairFilters = reactive<{ labId: number | null; status: number | null }>({ labId: null, status: null });
+const deviceFilters = reactive<{ labType: string; labId: number | null; status: number | null }>({ labType: '', labId: null, status: null });
+const repairFilters = reactive<{ labType: string; labId: number | null; status: number | null }>({ labType: '', labId: null, status: null });
 
 const selectedDevice = ref<DeviceDto | null>(null);
 const selectedRepair = ref<DeviceRepairDto | null>(null);
@@ -513,9 +499,9 @@ const repairCreateContext = reactive({
 
 const deviceTotalPages = computed(() => Math.max(1, Math.ceil(deviceState.value.total / deviceState.value.pageSize)));
 const repairTotalPages = computed(() => Math.max(1, Math.ceil(repairState.value.total / repairState.value.pageSize)));
-const repairingCount = computed(() => deviceState.value.list.filter((item) => item.status === 2).length);
-const pendingRepairCount = computed(() => repairState.value.list.filter((item) => item.status === 1).length);
-const completedRepairCount = computed(() => repairState.value.list.filter((item) => item.status === 3).length);
+const labTypeOptions = computed(() => Array.from(new Set(labCatalog.value.map((lab) => lab.labType).filter(Boolean) as string[])));
+const filteredDeviceLabOptions = computed(() => filteredLabsByType(deviceFilters.labType));
+const filteredRepairLabOptions = computed(() => filteredLabsByType(repairFilters.labType));
 
 onMounted(async () => {
   await loadLabOptions();
@@ -548,13 +534,29 @@ function urgencyText(level: number): string {
 async function loadLabOptions(): Promise<void> {
   try {
     const departmentId = auth.currentUser.value?.departmentId ?? undefined;
-    labOptions.value = await fetchLabOptions(
-      departmentId ? { departmentId } : {},
-      auth.token.value || undefined,
-    );
+    const data = await fetchLabs({ pageNum: 1, pageSize: 1000, departmentId }, auth.token.value || undefined);
+    labCatalog.value = data.list;
+    labOptions.value = data.list.map((lab) => ({ label: lab.labName, value: lab.id }));
   } catch {
+    labCatalog.value = [];
     labOptions.value = [];
   }
+}
+
+function filteredLabsByType(labType: string): OptionItem[] {
+  return labCatalog.value
+    .filter((lab) => !labType || lab.labType === labType)
+    .map((lab) => ({ label: lab.labName, value: lab.id }));
+}
+
+function handleDeviceLabTypeChange(): void {
+  deviceFilters.labId = null;
+  void loadDevices(1);
+}
+
+function handleRepairLabTypeChange(): void {
+  repairFilters.labId = null;
+  void loadRepairs(1);
 }
 
 async function loadDevices(pageNum = 1): Promise<void> {
@@ -566,6 +568,7 @@ async function loadDevices(pageNum = 1): Promise<void> {
       pageNum,
       pageSize: deviceState.value.pageSize,
       labId: deviceFilters.labId ?? undefined,
+      labType: deviceFilters.labType || undefined,
       status: deviceFilters.status ?? undefined,
       deviceName: deviceKeyword.value || undefined,
       deviceCode: deviceKeyword.value || undefined,
@@ -591,6 +594,7 @@ async function loadRepairs(pageNum = 1): Promise<void> {
       pageNum,
       pageSize: repairState.value.pageSize,
       labId: repairFilters.labId ?? undefined,
+      labType: repairFilters.labType || undefined,
       status: repairFilters.status ?? undefined,
     };
     const data = await fetchDeviceRepairs(query, auth.token.value);
@@ -616,6 +620,7 @@ async function loadRepairs(pageNum = 1): Promise<void> {
 
 function resetDeviceFilters(): void {
   deviceKeyword.value = '';
+  deviceFilters.labType = '';
   deviceFilters.labId = null;
   deviceFilters.status = null;
   void loadDevices(1);
@@ -623,6 +628,7 @@ function resetDeviceFilters(): void {
 
 function resetRepairFilters(): void {
   repairKeyword.value = '';
+  repairFilters.labType = '';
   repairFilters.labId = null;
   repairFilters.status = null;
   void loadRepairs(1);
@@ -842,40 +848,27 @@ async function handleUpdateRepairStatus(): Promise<void> {
 }
 
 .toolbar {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.toolbar-top {
   display: flex;
-  flex-wrap: nowrap;
-  gap: 12px;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  gap: 16px;
 }
 
-.toolbar-left,
-.toolbar-right {
-  display: flex;
+.toolbar-filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) repeat(3, minmax(160px, 0.8fr)) auto auto;
+  gap: 14px;
   align-items: center;
 }
 
-.toolbar-left {
-  flex: 0 0 auto;
-  flex-wrap: nowrap;
-  gap: 18px;
-}
-
-.toolbar-right {
-  flex: 1 1 auto;
-  min-width: 0;
-  flex-wrap: nowrap;
-  gap: 12px;
-  justify-content: flex-end;
-}
-
-.tab-strip,
-.toolbar-right > .toolbar-input,
-.toolbar-right > .toolbar-select,
-.toolbar-right > .ghost-btn,
-.toolbar-left > .primary-btn {
-  flex-shrink: 0;
+.toolbar-filters > .ghost-btn {
+  min-width: 86px;
 }
 
 .tab-strip {
@@ -919,15 +912,13 @@ async function handleUpdateRepairStatus(): Promise<void> {
 }
 
 .toolbar-input {
-  flex: 0 1 220px;
-  min-width: 160px;
-  max-width: 220px;
+  width: 100%;
+  min-width: 0;
 }
 
 .toolbar-select {
-  flex: 0 1 165px;
-  min-width: 130px;
-  max-width: 165px;
+  width: 100%;
+  min-width: 0;
 }
 
 .ghost-btn,
@@ -1163,24 +1154,25 @@ async function handleUpdateRepairStatus(): Promise<void> {
     grid-template-columns: 1fr;
   }
 
-  .toolbar {
-    flex-wrap: wrap;
+  .toolbar-top {
     align-items: stretch;
+    flex-direction: column;
   }
 
-  .toolbar-left,
-  .toolbar-right {
-    flex: 1 1 100%;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-  }
-
-  .toolbar-input,
-  .toolbar-select {
-    flex: 1 1 100%;
-    min-width: 0;
-    max-width: none;
+  .tab-strip {
     width: 100%;
+  }
+
+  .tab-btn {
+    flex: 1 1 0;
+  }
+
+  .add-device-btn {
+    width: 100%;
+  }
+
+  .toolbar-filters {
+    grid-template-columns: 1fr;
   }
 
   .dialog-card {

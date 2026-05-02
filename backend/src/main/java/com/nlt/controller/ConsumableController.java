@@ -35,10 +35,11 @@ public class ConsumableController {
     public ApiResponse<PageData<ConsumableEntity>> page(@RequestParam(defaultValue = "1") int pageNum,
         @RequestParam(defaultValue = "10") int pageSize,
         @RequestParam(required = false) Long labId,
+        @RequestParam(required = false) String labType,
         @RequestParam(required = false) String consumableName,
         @RequestParam(required = false) String consumableCode,
         @RequestParam(required = false) Integer status) {
-        return ApiResponse.success(consumableService.page(pageNum, pageSize, labId, consumableName, consumableCode, status));
+        return ApiResponse.success(consumableService.page(pageNum, pageSize, labId, labType, consumableName, consumableCode, status));
     }
 
     @GetMapping("/options")

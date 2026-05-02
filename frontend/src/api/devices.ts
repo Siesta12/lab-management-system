@@ -10,6 +10,7 @@ import { del, get, patch, post, put } from './http';
 
 export interface DeviceQuery {
   labId?: number;
+  labType?: string;
   pageNum?: number;
   pageSize?: number;
   deviceName?: string;
@@ -19,6 +20,7 @@ export interface DeviceQuery {
 
 export interface DeviceRepairQuery {
   labId?: number;
+  labType?: string;
   deviceId?: number;
   status?: number;
   pageNum?: number;
@@ -32,6 +34,9 @@ export function fetchDevices(query: DeviceQuery = {}, token?: string): Promise<P
 
   if (query.labId !== undefined) {
     params.set('labId', String(query.labId));
+  }
+  if (query.labType) {
+    params.set('labType', query.labType);
   }
   if (query.deviceName) {
     params.set('deviceName', query.deviceName);
@@ -73,6 +78,9 @@ export function fetchDeviceRepairs(query: DeviceRepairQuery = {}, token?: string
 
   if (query.labId !== undefined) {
     params.set('labId', String(query.labId));
+  }
+  if (query.labType) {
+    params.set('labType', query.labType);
   }
   if (query.deviceId !== undefined) {
     params.set('deviceId', String(query.deviceId));

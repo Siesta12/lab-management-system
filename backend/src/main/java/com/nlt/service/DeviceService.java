@@ -18,7 +18,7 @@ public interface DeviceService {
      * @param status 状态值
      * @return 分页数据
      */
-    PageData<DeviceEntity> page(int pageNum, int pageSize, Long labId, String deviceName, String deviceCode, Integer status);
+    PageData<DeviceEntity> page(int pageNum, int pageSize, Long labId, String labType, String deviceName, String deviceCode, Integer status);
 
     /**
      * 新增设备信息

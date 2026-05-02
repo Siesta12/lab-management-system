@@ -18,7 +18,7 @@ public interface ConsumableService {
      * @param consumableCode 参数
      * @return 分页数据
      */
-    PageData<ConsumableEntity> page(int pageNum, int pageSize, Long labId, String consumableName, String consumableCode,
+    PageData<ConsumableEntity> page(int pageNum, int pageSize, Long labId, String labType, String consumableName, String consumableCode,
         Integer status);
 
     List<ConsumableEntity> availableOptions(Long labId);

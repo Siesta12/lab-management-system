@@ -21,9 +21,10 @@ public class DeviceRepairController {
     public ApiResponse<PageData<DeviceRepairEntity>> page(@RequestParam(defaultValue = "1") int pageNum,
         @RequestParam(defaultValue = "10") int pageSize,
         @RequestParam(required = false) Long labId,
+        @RequestParam(required = false) String labType,
         @RequestParam(required = false) Long deviceId,
         @RequestParam(required = false) Integer status) {
-        return ApiResponse.success(deviceRepairService.page(pageNum, pageSize, labId, deviceId, status));
+        return ApiResponse.success(deviceRepairService.page(pageNum, pageSize, labId, labType, deviceId, status));
     }
 
     @PostMapping

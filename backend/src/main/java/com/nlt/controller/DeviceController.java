@@ -33,10 +33,11 @@ public class DeviceController {
     public ApiResponse<PageData<DeviceEntity>> page(@RequestParam(defaultValue = "1") int pageNum,
         @RequestParam(defaultValue = "10") int pageSize,
         @RequestParam(required = false) Long labId,
+        @RequestParam(required = false) String labType,
         @RequestParam(required = false) String deviceName,
         @RequestParam(required = false) String deviceCode,
         @RequestParam(required = false) Integer status) {
-        return ApiResponse.success(deviceService.page(pageNum, pageSize, labId, deviceName, deviceCode, status));
+        return ApiResponse.success(deviceService.page(pageNum, pageSize, labId, labType, deviceName, deviceCode, status));
     }
 
     /**

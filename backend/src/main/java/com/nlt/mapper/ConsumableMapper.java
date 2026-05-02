@@ -18,7 +18,7 @@ public interface ConsumableMapper {
      * @return 数据列表
      */
     List<ConsumableEntity> selectPage(@Param("offset") int offset, @Param("pageSize") int pageSize,
-                                      @Param("labId") Long labId, @Param("consumableName") String consumableName,
+                                      @Param("labId") Long labId, @Param("labType") String labType, @Param("consumableName") String consumableName,
                                       @Param("consumableCode") String consumableCode,
                                       @Param("departmentId") Long departmentId,
                                       @Param("status") Integer status);
@@ -30,7 +30,7 @@ public interface ConsumableMapper {
      * @param consumableCode 耗材编码
      * @return 总数
      */
-    long countPage(@Param("labId") Long labId, @Param("consumableName") String consumableName,
+    long countPage(@Param("labId") Long labId, @Param("labType") String labType, @Param("consumableName") String consumableName,
                    @Param("consumableCode") String consumableCode,
                    @Param("departmentId") Long departmentId,
                    @Param("status") Integer status);

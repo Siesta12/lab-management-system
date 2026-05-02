@@ -10,6 +10,9 @@
         <if test="labId != null">
             and d.lab_id = #{labId}
         </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
         <if test="(deviceName != null and deviceName != '') or (deviceCode != null and deviceCode != '')">
             and (
             <if test="deviceName != null and deviceName != ''">
@@ -41,6 +44,9 @@
           and l.deleted = 0
         <if test="labId != null">
             and d.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
         </if>
         <if test="(deviceName != null and deviceName != '') or (deviceCode != null and deviceCode != '')">
             and (

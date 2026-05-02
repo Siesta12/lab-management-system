@@ -25,12 +25,12 @@ public class DeviceServiceImpl implements DeviceService {
     private final CurrentUserScopeService currentUserScopeService;
 
     @Override
-    public PageData<DeviceEntity> page(int pageNum, int pageSize, Long labId, String deviceName, String deviceCode, Integer status) {
+    public PageData<DeviceEntity> page(int pageNum, int pageSize, Long labId, String labType, String deviceName, String deviceCode, Integer status) {
         int offset = (pageNum - 1) * pageSize;
         Long departmentId = currentUserScopeService.requireCurrentDepartmentId();
         return new PageData<>(
-            deviceMapper.selectPage(offset, pageSize, labId, deviceName, deviceCode, status, departmentId),
-            deviceMapper.countPage(labId, deviceName, deviceCode, status, departmentId),
+            deviceMapper.selectPage(offset, pageSize, labId, trimToNull(labType), deviceName, deviceCode, status, departmentId),
+            deviceMapper.countPage(labId, trimToNull(labType), deviceName, deviceCode, status, departmentId),
             pageNum,
             pageSize
         );
@@ -133,5 +133,9 @@ public class DeviceServiceImpl implements DeviceService {
         if (!currentUserScopeService.isAdmin()) {
             throw new BusinessException(403, "无权修改设备信息");
         }
+    }
+
+    private String trimToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

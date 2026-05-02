@@ -10,6 +10,9 @@
         <if test="labId != null">
             and c.lab_id = #{labId}
         </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
         <if test="consumableName != null and consumableName != ''">
             and c.consumable_name like concat('%', #{consumableName}, '%')
         </if>
@@ -34,6 +37,9 @@
           and l.deleted = 0
         <if test="labId != null">
             and c.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
         </if>
         <if test="consumableName != null and consumableName != ''">
             and c.consumable_name like concat('%', #{consumableName}, '%')

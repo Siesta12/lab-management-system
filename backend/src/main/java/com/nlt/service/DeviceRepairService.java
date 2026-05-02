@@ -7,7 +7,7 @@ import com.nlt.domain.entity.DeviceRepairEntity;
 
 public interface DeviceRepairService {
 
-    PageData<DeviceRepairEntity> page(int pageNum, int pageSize, Long labId, Long deviceId, Integer status);
+    PageData<DeviceRepairEntity> page(int pageNum, int pageSize, Long labId, String labType, Long deviceId, Integer status);
 
     DeviceRepairEntity create(DeviceRepairCreateRequest request);
 

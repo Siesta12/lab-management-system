@@ -2,12 +2,16 @@
   <section class="consumables-page">
     <BasePanel tag="耗材台账" title="库存与预警状态">
       <div class="toolbar">
-        <select v-model.number="query.labId" class="toolbar-select">
+        <select v-model="query.labType" class="toolbar-select" @change="handleLabTypeChange">
+          <option value="">全部类型</option>
+          <option v-for="type in labTypeOptions" :key="type" :value="type">{{ type }}</option>
+        </select>
+        <select v-model.number="query.labId" class="toolbar-select" @change="loadConsumables(1)">
           <option :value="0">全部实验室</option>
-          <option v-for="lab in labOptions" :key="lab.value" :value="lab.value">{{ lab.label }}</option>
+          <option v-for="lab in filteredLabOptions" :key="lab.value" :value="lab.value">{{ lab.label }}</option>
         </select>
         <input v-model.trim="query.keyword" class="toolbar-input" placeholder="搜索名称或编号" @keyup.enter="loadConsumables(1)" />
-        <select v-model.number="query.status" class="toolbar-select">
+        <select v-model.number="query.status" class="toolbar-select" @change="loadConsumables(1)">
           <option :value="-1">全部状态</option>
           <option :value="1">启用</option>
           <option :value="0">停用</option>
@@ -139,17 +143,18 @@ import {
   updateConsumable,
   updateConsumableStock,
 } from '../api/consumables';
-import { fetchLabOptions } from '../api/labs';
+import { fetchLabs } from '../api/labs';
 import BasePanel from '../components/BasePanel.vue';
 import BaseTable from '../components/BaseTable.vue';
 import { useGlobalToast } from '../composables/useGlobalToast';
 import { useAuthStore } from '../stores/auth';
 import { getBadgeClass } from '../utils/format';
-import type { ConsumableDto, ConsumableSavePayload, OptionItem, PageData } from '../types';
+import type { ConsumableDto, ConsumableSavePayload, LabDto, OptionItem, PageData } from '../types';
 
 const auth = useAuthStore();
 const { showToast } = useGlobalToast();
 const labOptions = ref<OptionItem[]>([]);
+const labCatalog = ref<LabDto[]>([]);
 const consumableState = ref<PageData<ConsumableDto>>({ list: [], total: 0, pageNum: 1, pageSize: 10 });
 const loading = ref(false);
 const saving = ref(false);
@@ -161,7 +166,7 @@ const editingId = ref<number | null>(null);
 const selectedConsumable = ref<ConsumableDto | null>(null);
 const stockTarget = ref<ConsumableDto | null>(null);
 
-const query = reactive({ labId: 0, keyword: '', status: -1 });
+const query = reactive({ labType: '', labId: 0, keyword: '', status: -1 });
 const form = reactive<ConsumableSavePayload>({
   labId: 0,
   consumableName: '',
@@ -175,11 +180,21 @@ const form = reactive<ConsumableSavePayload>({
 });
 const stockForm = reactive({ stockQuantity: 0, changeType: 'ADJUST', remark: '' });
 const consumableTotalPages = computed(() => Math.max(1, Math.ceil(consumableState.value.total / consumableState.value.pageSize)));
+const labTypeOptions = computed(() => Array.from(new Set(labCatalog.value.map((lab) => lab.labType).filter(Boolean) as string[])));
+const filteredLabOptions = computed(() => labCatalog.value
+  .filter((lab) => !query.labType || lab.labType === query.labType)
+  .map((lab) => ({ label: lab.labName, value: lab.id })));
 
 onMounted(async () => {
-  labOptions.value = await fetchLabOptions({}, auth.token.value);
+  await loadLabOptions();
   await loadConsumables(1);
 });
+
+async function loadLabOptions(): Promise<void> {
+  const data = await fetchLabs({ pageNum: 1, pageSize: 1000, departmentId: auth.currentUser.value?.departmentId ?? undefined }, auth.token.value);
+  labCatalog.value = data.list;
+  labOptions.value = data.list.map((lab) => ({ label: lab.labName, value: lab.id }));
+}
 
 function labName(labId?: number): string {
   return labOptions.value.find((lab) => lab.value === labId)?.label ?? '--';
@@ -194,6 +209,7 @@ async function loadConsumables(pageNum = 1): Promise<void> {
         pageNum,
         pageSize: consumableState.value.pageSize,
         labId: query.labId || undefined,
+        labType: query.labType || undefined,
         consumableName: query.keyword || undefined,
         status: query.status >= 0 ? query.status : undefined,
       },
@@ -204,6 +220,11 @@ async function loadConsumables(pageNum = 1): Promise<void> {
   } finally {
     loading.value = false;
   }
+}
+
+function handleLabTypeChange(): void {
+  query.labId = 0;
+  void loadConsumables(1);
 }
 
 function openCreate(): void {

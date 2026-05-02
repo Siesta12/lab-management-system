@@ -9,11 +9,11 @@ import org.apache.ibatis.annotations.Param;
 public interface DeviceRepairMapper {
 
     List<DeviceRepairEntity> selectPage(@Param("offset") int offset, @Param("pageSize") int pageSize,
-                                        @Param("labId") Long labId, @Param("deviceId") Long deviceId,
+                                        @Param("labId") Long labId, @Param("labType") String labType, @Param("deviceId") Long deviceId,
                                         @Param("status") Integer status, @Param("departmentId") Long departmentId,
                                         @Param("applicantUserId") Long applicantUserId);
 
-    long countPage(@Param("labId") Long labId, @Param("deviceId") Long deviceId,
+    long countPage(@Param("labId") Long labId, @Param("labType") String labType, @Param("deviceId") Long deviceId,
                    @Param("status") Integer status, @Param("departmentId") Long departmentId,
                    @Param("applicantUserId") Long applicantUserId);
 

@@ -32,14 +32,14 @@ public class ConsumableServiceImpl implements ConsumableService {
     private final CurrentUserScopeService currentUserScopeService;
 
     @Override
-    public PageData<ConsumableEntity> page(int pageNum, int pageSize, Long labId, String consumableName,
+    public PageData<ConsumableEntity> page(int pageNum, int pageSize, Long labId, String labType, String consumableName,
         String consumableCode, Integer status) {
         int offset = (pageNum - 1) * pageSize;
         Long departmentId = currentUserScopeService.requireCurrentDepartmentId();
         return new PageData<>(
-            consumableMapper.selectPage(offset, pageSize, labId, trimToNull(consumableName), trimToNull(consumableCode),
+            consumableMapper.selectPage(offset, pageSize, labId, trimToNull(labType), trimToNull(consumableName), trimToNull(consumableCode),
                 departmentId, status),
-            consumableMapper.countPage(labId, trimToNull(consumableName), trimToNull(consumableCode), departmentId,
+            consumableMapper.countPage(labId, trimToNull(labType), trimToNull(consumableName), trimToNull(consumableCode), departmentId,
                 status),
             pageNum,
             pageSize
