@@ -2,22 +2,26 @@
   <section class="report-page">
     <BasePanel :title="pageTitle" panel-class="report-panel">
       <div class="toolbar">
-        <input
-          v-model.trim="keyword"
-          class="toolbar-input"
-          placeholder="搜索实验名称"
-          @keyup.enter="loadReports(1)"
-        />
-        <select v-model.number="statusFilter" class="toolbar-select">
-          <option :value="0">全部状态</option>
-          <option :value="1">草稿</option>
-          <option :value="2">待审核</option>
-          <option :value="3">已通过</option>
-          <option :value="4">已退回</option>
-        </select>
-        <button type="button" class="ghost-btn" @click="loadReports(1)">查询</button>
-        <button type="button" class="ghost-btn" @click="resetFilters">重置</button>
-        <button v-if="isStudent" type="button" class="primary-btn" @click="openEditor()">新建报告</button>
+        <div class="toolbar-filters">
+          <input
+            v-model.trim="keyword"
+            class="toolbar-input"
+            placeholder="搜索实验名称"
+            @keyup.enter="loadReports(1)"
+          />
+          <select v-model.number="statusFilter" class="toolbar-select">
+            <option :value="0">全部状态</option>
+            <option :value="1">草稿</option>
+            <option :value="2">待审核</option>
+            <option :value="3">已通过</option>
+            <option :value="4">已退回</option>
+          </select>
+        </div>
+        <div class="toolbar-actions">
+          <button type="button" class="ghost-btn" @click="loadReports(1)">查询</button>
+          <button type="button" class="ghost-btn" @click="resetFilters">重置</button>
+          <button v-if="isStudent" type="button" class="primary-btn" @click="openEditor()">新建报告</button>
+        </div>
       </div>
 
       <p v-if="message" class="info-text">{{ message }}</p>
@@ -76,7 +80,6 @@
           <button type="button" class="ghost-btn small-btn" @click="closeDetail">关闭</button>
         </div>
         <div v-if="selectedReport" class="detail-grid">
-          <div><span>报告编号</span><strong>{{ selectedReport.reportNo }}</strong></div>
           <div><span>状态</span><strong>{{ statusText(selectedReport.status) }}</strong></div>
           <div><span>学生</span><strong>{{ selectedReport.studentName || '--' }}</strong></div>
           <div><span>指导教师</span><strong>{{ selectedReport.teacherName || '--' }}</strong></div>
@@ -577,6 +580,7 @@ async function handleDownload(report: ExperimentReportDto): Promise<void> {
     link.download = `实验报告-${report.studentName || '学生'}-${report.experimentName}.docx`;
     link.click();
     URL.revokeObjectURL(url);
+    showToast('success', 'Word 文件下载成功');
   } catch (error) {
     showToast('error', error instanceof Error ? error.message : '下载失败');
   }
@@ -621,6 +625,18 @@ function normalizedPayload(): ExperimentReportSavePayload {
 .toolbar {
   justify-content: flex-end;
   margin-bottom: 16px;
+}
+
+.toolbar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.toolbar-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .toolbar-input,
@@ -871,6 +887,14 @@ function normalizedPayload(): ExperimentReportSavePayload {
   .toolbar-input,
   .toolbar-select {
     width: 100%;
+  }
+
+  .toolbar-actions {
+    justify-content: flex-start;
+  }
+
+  .toolbar-filters {
+    justify-content: flex-start;
   }
 
   .detail-grid,

@@ -34,6 +34,16 @@ public final class ReservationCheckConstants {
     public static final int NO_SHOW_SCORE_DEDUCTION = -15;
 
     /**
+     * 临近取消扣减信誉分。
+     */
+    public static final int NEAR_CANCEL_SCORE_DEDUCTION = -3;
+
+    /**
+     * 提前取消的免责时间，单位：分钟。
+     */
+    public static final int CANCEL_EARLY_MINUTES = 30;
+
+    /**
      * 违规类型：爽约。
      */
     public static final int VIOLATION_TYPE_NO_SHOW = 1;
@@ -42,6 +52,11 @@ public final class ReservationCheckConstants {
      * 违规类型：迟到。
      */
     public static final int VIOLATION_TYPE_LATE = 2;
+
+    /**
+     * 违规类型：临近取消。
+     */
+    public static final int VIOLATION_TYPE_NEAR_CANCEL = 5;
 
     /**
      * 审计动作：签到。

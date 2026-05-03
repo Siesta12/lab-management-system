@@ -2,11 +2,15 @@
   <section class="content-grid">
     <BasePanel tag="每日概览" title="查看今天所有实验室预约状态" :note="schedule ? schedule.date : ''">
       <div class="toolbar">
-        <label>
-          <span>日期</span>
-          <input v-model="date" type="date" />
-        </label>
-        <button type="button" class="ghost-btn" @click="loadDaily">查询</button>
+        <div class="toolbar-filters">
+          <label>
+            <span>日期</span>
+            <input v-model="date" type="date" />
+          </label>
+        </div>
+        <div class="toolbar-actions">
+          <button type="button" class="ghost-btn" @click="loadDaily">查询</button>
+        </div>
       </div>
 
       <p v-if="message" class="info-text">{{ message }}</p>
@@ -224,5 +228,4 @@ onMounted(() => {
   background: rgba(148, 163, 184, 0.16);
 }
 </style>
-
 

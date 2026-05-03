@@ -48,14 +48,20 @@ public interface ViolationMapper {
      * @param pageSize 每页条数
      * @return 数据列表
      */
-    List<ViolationRecordEntity> selectMine(@Param("userId") Long userId, @Param("offset") int offset, @Param("pageSize") int pageSize);
+    List<ViolationRecordEntity> selectMine(@Param("userId") Long userId,
+        @Param("offset") int offset,
+        @Param("pageSize") int pageSize,
+        @Param("violationType") Integer violationType,
+        @Param("scoreDirection") Integer scoreDirection);
 
     /**
      * 统计我的违规记录数量
      * @param userId 用户ID
      * @return 处理结果
      */
-    long countMine(@Param("userId") Long userId);
+    long countMine(@Param("userId") Long userId,
+        @Param("violationType") Integer violationType,
+        @Param("scoreDirection") Integer scoreDirection);
 
     /**
      * 新增违规记录

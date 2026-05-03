@@ -1,28 +1,5 @@
 <template>
-  <section class="card-grid metrics-grid student-metrics">
-    <RouterLink class="metric-card brand metric-link" to="/admin/my-reservations">
-      <span>我的预约</span>
-      <strong>{{ myReservationCount }}</strong>
-      <small>当前账号下的预约总数</small>
-    </RouterLink>
-    <RouterLink class="metric-card warning metric-link" :to="{ path: '/admin/my-reservations', query: { status: '1' } }">
-      <span>待审批预约</span>
-      <strong>{{ pendingCount }}</strong>
-      <small>建议及时关注审批状态</small>
-    </RouterLink>
-    <RouterLink class="metric-card success metric-link" to="/admin/my-credit">
-      <span>信用分</span>
-      <strong>{{ profile?.creditScore ?? '--' }}</strong>
-      <small>保持良好信用可提升预约体验</small>
-    </RouterLink>
-    <RouterLink class="metric-card accent metric-link" to="/admin/my-credit">
-      <span>违规次数</span>
-      <strong>{{ profile?.violationCount ?? '--' }}</strong>
-      <small>可在“我的信用”查看详细记录</small>
-    </RouterLink>
-  </section>
-
-  <section class="content-grid two-columns student-grid">
+  <section class="content-grid student-grid student-main-stack">
     <BasePanel tag="今日安排" title="今日安排">
       <div v-if="loading" class="empty-state muted">
         <strong>正在加载学生首页数据...</strong>
@@ -70,35 +47,29 @@
           >
             去签到
           </RouterLink>
-          <RouterLink to="/admin/labs" class="action-btn ghost">
-            去预约
-          </RouterLink>
         </div>
       </div>
 
       <div v-else class="empty-state">
         <strong>今日暂无预约，可前往实验室查询进行预约</strong>
         <span>你可以先查看实验室开放情况，再按节次提交预约申请。</span>
-        <div class="action-row compact">
-          <RouterLink to="/admin/labs" class="action-btn primary">去预约</RouterLink>
-        </div>
       </div>
     </BasePanel>
 
-    <BasePanel tag="待处理事项" title="待处理事项">
+    <BasePanel tag="提醒事项" title="提醒事项">
       <div v-if="loading" class="empty-state muted">
         <strong>正在计算待处理事项...</strong>
         <span>会根据你的预约、签到与信用情况自动整理。</span>
       </div>
 
       <div v-else-if="pendingItems.length" class="task-list">
-        <article v-for="item in pendingItems" :key="item.key" class="task-item">
+        <RouterLink v-for="item in pendingItems" :key="item.key" class="task-item" :to="item.to">
           <div class="task-head">
             <span class="task-tag" :class="item.tone">{{ item.title }}</span>
             <strong>{{ item.summary }}</strong>
           </div>
           <p>{{ item.detail }}</p>
-        </article>
+        </RouterLink>
       </div>
 
       <div v-else class="empty-state">
@@ -108,43 +79,6 @@
     </BasePanel>
   </section>
 
-  <section class="content-grid two-columns student-grid">
-    <BasePanel tag="提示" title="本周使用提示">
-      <div v-if="loading" class="empty-state muted">
-        <strong>正在生成本周提示...</strong>
-        <span>会结合最近预约、审批和信用情况自动更新。</span>
-      </div>
-
-      <ul v-else-if="usageTips.length" class="tip-list">
-        <li v-for="tip in usageTips" :key="tip">{{ tip }}</li>
-      </ul>
-
-      <div v-else class="empty-state">
-        <strong>本周暂无特别提示。</strong>
-        <span>保持当前节奏即可，后续有预约时这里会自动更新。</span>
-      </div>
-    </BasePanel>
-
-    <BasePanel tag="概览" title="本周使用概览">
-      <div v-if="loading" class="empty-state muted">
-        <strong>正在统计本周数据...</strong>
-        <span>请稍候，首页会自动汇总本周预约情况。</span>
-      </div>
-
-      <div v-else-if="weekOverviewCards.length" class="overview-grid">
-        <article v-for="item in weekOverviewCards" :key="item.label" class="overview-card" :class="item.tone">
-          <span>{{ item.label }}</span>
-          <strong>{{ item.value }}</strong>
-          <small>{{ item.hint }}</small>
-        </article>
-      </div>
-
-      <div v-else class="empty-state">
-        <strong>本周暂无预约数据。</strong>
-        <span>如果你刚刚登录或还没有预约记录，这里会保持空状态。</span>
-      </div>
-    </BasePanel>
-  </section>
 </template>
 
 <script setup lang="ts">
@@ -165,13 +99,7 @@ interface PendingItem {
   summary: string;
   detail: string;
   tone: StatusTone;
-}
-
-interface OverviewCard {
-  label: string;
-  value: string;
-  hint: string;
-  tone: StatusTone;
+  to: string | { path: string; query: Record<string, string | number> };
 }
 
 const auth = useAuthStore();
@@ -180,7 +108,6 @@ const reservations = ref<ReservationDto[]>([]);
 const labs = ref<LabDto[]>([]);
 const loading = ref(true);
 
-const myReservationCount = computed(() => reservations.value.length);
 const pendingCount = computed(() => reservations.value.filter((item) => item.status === 1).length);
 
 const labMap = computed(() => {
@@ -209,7 +136,7 @@ const todayReservation = computed(() =>
 
 const upcomingReservation = computed(() =>
   sortedReservations.value.find((item) => {
-    if (![1, 2].includes(item.status)) {
+    if (item.status !== 2) {
       return false;
     }
     const slot = firstSlot(item);
@@ -230,49 +157,6 @@ const riskReservations = computed(() =>
   }),
 );
 
-const weekReservations = computed(() =>
-  sortedReservations.value.filter((item) => {
-    const slot = firstSlot(item);
-    if (!slot?.reservationDate) {
-      return false;
-    }
-    return isThisWeek(slot.reservationDate);
-  }),
-);
-
-const weekOverviewCards = computed<OverviewCard[]>(() => {
-  if (!weekReservations.value.length) {
-    return [];
-  }
-
-  return [
-    {
-      label: '本周预约次数',
-      value: String(weekReservations.value.length),
-      hint: '按预约单统计',
-      tone: 'brand',
-    },
-    {
-      label: '已完成次数',
-      value: String(weekReservations.value.filter((item) => item.status === 5).length),
-      hint: '已结束的预约',
-      tone: 'success',
-    },
-    {
-      label: '待审批次数',
-      value: String(weekReservations.value.filter((item) => item.status === 1).length),
-      hint: '正在等待审核',
-      tone: 'warning',
-    },
-    {
-      label: '已取消次数',
-      value: String(weekReservations.value.filter((item) => item.status === 4).length),
-      hint: '被取消的预约',
-      tone: 'neutral',
-    },
-  ];
-});
-
 const pendingItems = computed<PendingItem[]>(() => {
   const items: PendingItem[] = [];
 
@@ -283,6 +167,7 @@ const pendingItems = computed<PendingItem[]>(() => {
       summary: `${pendingCount.value} 条待审批`,
       detail: '请关注预约审核结果，审核通过后才能进入签到流程。',
       tone: 'warning',
+      to: { path: '/admin/my-reservations', query: { status: '1' } },
     });
   }
 
@@ -294,6 +179,7 @@ const pendingItems = computed<PendingItem[]>(() => {
       summary: `${getLabName(upcomingReservation.value.labId)} · ${slot?.reservationDate ?? '--'}`,
       detail: `节次：${reservationSlotsText(upcomingReservation.value)}，请提前确认实验室与时间安排。`,
       tone: 'brand',
+      to: reservationDetailLink(upcomingReservation.value),
     });
   }
 
@@ -308,6 +194,7 @@ const pendingItems = computed<PendingItem[]>(() => {
         ? '你已经签到，可以继续关注后续使用安排。'
         : '当前预约尚未签到，若已到场请尽快完成签到，避免爽约风险。',
       tone: 'danger',
+      to: reservationDetailLink(item),
     });
   }
 
@@ -321,35 +208,11 @@ const pendingItems = computed<PendingItem[]>(() => {
           ? '信用分低于 80，请注意违规、迟到和爽约对后续预约的影响。'
           : `当前违规次数为 ${profile.value?.violationCount ?? 0} 次，请继续保持良好记录。`,
       tone: (profile.value?.creditScore ?? 100) < 80 ? 'warning' : 'neutral',
+      to: '/admin/my-credit',
     });
   }
 
   return items.slice(0, 4);
-});
-
-const usageTips = computed<string[]>(() => {
-  const tips: string[] = [];
-
-  if (todayReservation.value) {
-    const slot = firstSlot(todayReservation.value);
-    tips.push(`你今天有预约：${getLabName(todayReservation.value.labId)} · ${slot?.reservationDate ?? '--'} · ${reservationSlotsText(todayReservation.value)}。`);
-    tips.push(todayReservation.value.checkInTime ? '已签到的预约会继续进入完成流程，请留意后续状态变化。' : '如已到场请尽快签到，避免影响信用分。');
-  } else if (upcomingReservation.value) {
-    const slot = firstSlot(upcomingReservation.value);
-    tips.push(`最近一条预约是：${getLabName(upcomingReservation.value.labId)} · ${slot?.reservationDate ?? '--'} · ${reservationSlotsText(upcomingReservation.value)}。`);
-  } else {
-    tips.push('当前没有预约记录，可以先查看未来三周课表再安排预约。');
-  }
-
-  if (pendingCount.value > 0) {
-    tips.push(`你还有 ${pendingCount.value} 条待审批预约，记得关注审核状态。`);
-  }
-
-  if ((profile.value?.creditScore ?? 100) < 80) {
-    tips.push('信用分低于 80，后续预约请尽量避免违规和爽约。');
-  }
-
-  return tips.slice(0, 3);
 });
 
 function getLabName(labId: number): string {
@@ -509,29 +372,6 @@ function formatDateOnly(value: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function parseDateOnly(value: string): Date | null {
-  const parts = value.split('-').map((item) => Number(item));
-  if (parts.length !== 3 || parts.some((part) => Number.isNaN(part))) {
-    return null;
-  }
-  const [year, month, day] = parts;
-  return new Date(year, month - 1, day);
-}
-
-function isThisWeek(dateText: string): boolean {
-  const date = parseDateOnly(dateText);
-  if (!date) {
-    return false;
-  }
-  const today = new Date();
-  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const day = start.getDay() || 7;
-  start.setDate(start.getDate() - day + 1);
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6);
-  return date.getTime() >= start.getTime() && date.getTime() <= end.getTime();
-}
-
 async function loadHomeData(): Promise<void> {
   loading.value = true;
   try {
@@ -555,29 +395,13 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.student-metrics {
-  margin-bottom: 2px;
-}
-
-.metric-link {
-  color: inherit;
-  text-decoration: none;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-}
-
-.metric-link:hover {
-  transform: translateY(-2px);
-  border-color: rgba(37, 99, 235, 0.26);
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.1);
-}
-
-.metric-link:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.22);
-  outline-offset: 3px;
-}
-
 .student-grid {
   margin-top: 2px;
+  align-items: start;
+}
+
+.student-main-stack {
+  grid-template-columns: 1fr;
 }
 
 .agenda-card,
@@ -632,8 +456,7 @@ onMounted(() => {
   border: 1px solid rgba(148, 163, 184, 0.12);
 }
 
-.agenda-meta span,
-.overview-card span {
+.agenda-meta span {
   display: block;
   color: #64748b;
   font-size: 12px;
@@ -693,12 +516,27 @@ onMounted(() => {
 .task-list {
   display: grid;
   gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .task-item {
   padding: 16px 18px;
   display: grid;
   gap: 10px;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.task-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(37, 99, 235, 0.2);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.task-item:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.22);
+  outline-offset: 3px;
 }
 
 .task-head {
@@ -754,64 +592,16 @@ onMounted(() => {
   color: #64748b;
 }
 
-.tip-list {
-  margin: 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 10px;
-  color: #0f172a;
-}
-
-.tip-list li {
-  color: #334155;
-  line-height: 1.7;
-}
-
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.overview-card {
-  display: grid;
-  gap: 8px;
-  padding: 16px 18px;
-}
-
-.overview-card strong {
-  font-size: 28px;
-  line-height: 1;
-  color: #0f172a;
-}
-
-.overview-card small {
-  color: #64748b;
-  line-height: 1.5;
-}
-
-.overview-card.brand {
-  background: linear-gradient(180deg, rgba(37, 99, 235, 0.1), rgba(255, 255, 255, 0.9));
-}
-
-.overview-card.success {
-  background: linear-gradient(180deg, rgba(15, 140, 127, 0.1), rgba(255, 255, 255, 0.9));
-}
-
-.overview-card.warning {
-  background: linear-gradient(180deg, rgba(245, 158, 11, 0.1), rgba(255, 255, 255, 0.9));
-}
-
-.overview-card.neutral {
-  background: linear-gradient(180deg, rgba(148, 163, 184, 0.12), rgba(255, 255, 255, 0.9));
-}
-
 .empty-state {
   display: grid;
   gap: 8px;
   align-items: start;
   padding: 10px 2px 2px;
   color: #334155;
+}
+
+.student-grid .panel {
+  height: auto;
 }
 
 .empty-state strong {
@@ -882,8 +672,11 @@ onMounted(() => {
 }
 
 @media (max-width: 720px) {
-  .agenda-meta,
-  .overview-grid {
+  .task-list {
+    grid-template-columns: 1fr;
+  }
+
+  .agenda-meta {
     grid-template-columns: 1fr;
   }
 

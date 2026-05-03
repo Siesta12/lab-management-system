@@ -788,11 +788,37 @@ th {
 }
 
 .toolbar {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.toolbar-top {
   display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
   align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.toolbar-filters {
+  display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.toolbar-ghost-btn {
+  min-width: 86px;
+  padding: 11px 18px;
+  font-weight: 600;
 }
 
 .toolbar select {
@@ -1184,6 +1210,11 @@ th {
   .quick-grid {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .toolbar-top,
+  .toolbar-actions {
+    justify-content: flex-start;
   }
 }
 

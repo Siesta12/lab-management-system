@@ -71,9 +71,14 @@ public class ViolationServiceImpl implements ViolationService {
      * @return 分页数据
      */
     @Override
-    public PageData<ViolationRecordEntity> mine(Long userId, int pageNum, int pageSize) {
+    public PageData<ViolationRecordEntity> mine(Long userId, int pageNum, int pageSize, Integer violationType, Integer scoreDirection) {
         int offset = (pageNum - 1) * pageSize;
-        return new PageData<>(violationMapper.selectMine(userId, offset, pageSize), violationMapper.countMine(userId), pageNum, pageSize);
+        return new PageData<>(
+            violationMapper.selectMine(userId, offset, pageSize, violationType, scoreDirection),
+            violationMapper.countMine(userId, violationType, scoreDirection),
+            pageNum,
+            pageSize
+        );
     }
 
     /**

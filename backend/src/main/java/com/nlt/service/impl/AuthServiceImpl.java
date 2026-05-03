@@ -31,7 +31,7 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(400, "学号/工号不能为空");
         }
 
-        UserEntity user = userMapper.selectByUserNo(userNo);
+        UserEntity user = userMapper.selectCredentialByUserNo(userNo);
         if (user == null || !user.getPassword().equals(request.getPassword())) {
             throw new BusinessException(401, "学号/工号或密码错误");
         }

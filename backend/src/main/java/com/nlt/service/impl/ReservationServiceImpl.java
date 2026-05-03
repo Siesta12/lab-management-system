@@ -3,6 +3,7 @@ package com.nlt.service.impl;
 import com.nlt.common.api.PageData;
 import com.nlt.common.exception.BusinessException;
 import com.nlt.common.security.CurrentUserScopeService;
+import com.nlt.common.constant.ReservationCheckConstants;
 import com.nlt.domain.dto.reservation.ReservationApproveRequest;
 import com.nlt.domain.dto.reservation.ReservationCreateRequest;
 import com.nlt.domain.dto.reservation.ReservationRecommendationRequest;
@@ -14,6 +15,7 @@ import com.nlt.domain.entity.LabOpenSlotEntity;
 import com.nlt.domain.entity.LabReservationSlotEntity;
 import com.nlt.domain.entity.ReservationAuditLogEntity;
 import com.nlt.domain.entity.ReservationEntity;
+import com.nlt.domain.entity.ViolationRecordEntity;
 import com.nlt.domain.vo.reservation.ReservationApplyResponse;
 import com.nlt.domain.vo.reservation.ReservationConflictReservationVo;
 import com.nlt.domain.vo.reservation.ReservationConflictRowVo;
@@ -32,6 +34,8 @@ import com.nlt.mapper.LabReservationSlotMapper;
 import com.nlt.mapper.ReservationAuditLogMapper;
 import com.nlt.mapper.ReservationMapper;
 import com.nlt.mapper.UserRoleMapper;
+import com.nlt.mapper.UserMapper;
+import com.nlt.mapper.ViolationMapper;
 import com.nlt.service.ReservationConflictService;
 import com.nlt.service.ReservationRecommendationService;
 import com.nlt.service.ReservationService;
@@ -67,6 +71,8 @@ public class ReservationServiceImpl implements ReservationService {
     private final LabOpenSlotMapper labOpenSlotMapper;
     private final LabMapper labMapper;
     private final UserRoleMapper userRoleMapper;
+    private final UserMapper userMapper;
+    private final ViolationMapper violationMapper;
     private final ReservationConflictService reservationConflictService;
     private final ReservationRecommendationService reservationRecommendationService;
     private final ClassPeriodMapper classPeriodMapper;
@@ -315,9 +321,26 @@ public class ReservationServiceImpl implements ReservationService {
         if (entity.getStatus() == null || (entity.getStatus() != 1 && entity.getStatus() != 2)) {
             throw new BusinessException(400, "仅待审核或已通过预约可取消");
         }
+
+        LocalDateTime earliestStartTime = resolveEarliestStartTime(id);
+        LocalDateTime now = LocalDateTime.now();
+        if (!now.isBefore(earliestStartTime)) {
+            throw new BusinessException(400, "预约已经开始，无法取消");
+        }
+
+        boolean nearCancel = !now.isBefore(earliestStartTime.minusMinutes(ReservationCheckConstants.CANCEL_EARLY_MINUTES));
+        if (nearCancel) {
+            applyNearCancelPenalty(entity, id);
+        }
+
         reservationMapper.cancel(id);
         labReservationSlotMapper.cancelByReservationId(id);
-        insertAuditLog(id, currentUserId, 4, "取消预约");
+        insertAuditLog(
+            id,
+            currentUserId,
+            4,
+            nearCancel ? "临近开始取消预约，扣减 3 分" : "提前 30 分钟以上取消预约"
+        );
         return getById(id);
     }
 
@@ -400,6 +423,60 @@ public class ReservationServiceImpl implements ReservationService {
         if (hasRole(roleCodes, "STUDENT") && (reservationType == null || reservationType != 3)) {
             throw new BusinessException(400, "学生仅支持个人预约");
         }
+    }
+
+    private LocalDateTime resolveEarliestStartTime(Long reservationId) {
+        List<ReservationSlotVo> slots = labReservationSlotMapper.selectDetailByReservationId(reservationId);
+        if (slots == null || slots.isEmpty()) {
+            throw new BusinessException(400, "预约节次不存在，无法取消");
+        }
+
+        Map<Long, LocalTime> periodStartMap = new HashMap<>();
+        for (ReservationSlotVo slot : slots) {
+            Long periodId = slot.getPeriodId();
+            if (periodId == null || periodStartMap.containsKey(periodId)) {
+                continue;
+            }
+            ClassPeriodEntity period = classPeriodMapper.selectById(periodId);
+            if (period != null && period.getStartTime() != null) {
+                periodStartMap.put(periodId, period.getStartTime());
+            }
+        }
+
+        return slots.stream()
+            .filter(slot -> slot.getSlotStatus() == null || slot.getSlotStatus() == 1)
+            .map(slot -> toStartDateTime(slot, periodStartMap))
+            .filter(Objects::nonNull)
+            .min(LocalDateTime::compareTo)
+            .orElseThrow(() -> new BusinessException(400, "无法识别预约开始时间，暂不支持取消"));
+    }
+
+    private LocalDateTime toStartDateTime(ReservationSlotVo slot, Map<Long, LocalTime> periodStartMap) {
+        if (slot.getReservationDate() == null || slot.getPeriodId() == null) {
+            return null;
+        }
+        LocalTime startTime = periodStartMap.get(slot.getPeriodId());
+        if (startTime == null) {
+            return null;
+        }
+        return LocalDateTime.of(LocalDate.parse(slot.getReservationDate(), DATE_FORMATTER), startTime);
+    }
+
+    private void applyNearCancelPenalty(ReservationEntity entity, Long reservationId) {
+        Long applicantUserId = entity.getApplicantUserId();
+        if (applicantUserId == null) {
+            return;
+        }
+        userMapper.adjustCreditAndViolation(applicantUserId, ReservationCheckConstants.NEAR_CANCEL_SCORE_DEDUCTION, 1);
+        userMapper.resetNormalReservationStreak(applicantUserId);
+
+        ViolationRecordEntity violation = new ViolationRecordEntity();
+        violation.setUserId(applicantUserId);
+        violation.setReservationId(reservationId);
+        violation.setViolationType(ReservationCheckConstants.VIOLATION_TYPE_NEAR_CANCEL);
+        violation.setScoreChange(ReservationCheckConstants.NEAR_CANCEL_SCORE_DEDUCTION);
+        violation.setRemark("预约开始前30分钟内取消");
+        violationMapper.insert(violation);
     }
 
     private ReservedSlotRow choosePreferredRow(ReservedSlotRow left, ReservedSlotRow right, Long currentUserId) {

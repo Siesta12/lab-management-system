@@ -57,8 +57,12 @@ public class ViolationController {
     @GetMapping("/mine")
     public ApiResponse<PageData<ViolationRecordEntity>> mine(@RequestParam(defaultValue = "1") int pageNum,
         @RequestParam(defaultValue = "10") int pageSize,
+        @RequestParam(required = false) Integer violationType,
+        @RequestParam(required = false) Integer scoreDirection,
         HttpServletRequest servletRequest) {
-        return ApiResponse.success(violationService.mine(tokenService.getCurrentUserId(servletRequest), pageNum, pageSize));
+        return ApiResponse.success(
+            violationService.mine(tokenService.getCurrentUserId(servletRequest), pageNum, pageSize, violationType, scoreDirection)
+        );
     }
 
     /**

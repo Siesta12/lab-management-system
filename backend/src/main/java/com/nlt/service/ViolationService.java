@@ -38,7 +38,7 @@ public interface ViolationService {
      * @param pageSize 每页条数
      * @return 分页数据
      */
-    PageData<ViolationRecordEntity> mine(Long userId, int pageNum, int pageSize);
+    PageData<ViolationRecordEntity> mine(Long userId, int pageNum, int pageSize, Integer violationType, Integer scoreDirection);
 
     /**
      * 删除违规记录

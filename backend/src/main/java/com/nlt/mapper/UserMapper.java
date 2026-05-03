@@ -17,7 +17,11 @@ public interface UserMapper {
 
     UserEntity selectById(@Param("id") Long id);
 
+    UserEntity selectCredentialById(@Param("id") Long id);
+
     UserEntity selectByUserNo(@Param("userNo") String userNo);
+
+    UserEntity selectCredentialByUserNo(@Param("userNo") String userNo);
 
     UserEntity selectByPhone(@Param("phone") String phone);
 

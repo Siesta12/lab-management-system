@@ -898,8 +898,9 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         return switch (type) {
             case 1 -> "爽约";
             case 2 -> "迟到";
-            case 3 -> "违规使用";
+            case 3 -> "其他";
             case 4 -> "其他";
+            case 5 -> "临近取消";
             default -> "未分类";
         };
     }

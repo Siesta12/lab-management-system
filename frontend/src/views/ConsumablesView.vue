@@ -2,22 +2,26 @@
   <section class="consumables-page">
     <BasePanel tag="耗材台账" title="库存与预警状态">
       <div class="toolbar">
-        <select v-model="query.labType" class="toolbar-select" @change="handleLabTypeChange">
-          <option value="">全部类型</option>
-          <option v-for="type in labTypeOptions" :key="type" :value="type">{{ type }}</option>
-        </select>
-        <select v-model.number="query.labId" class="toolbar-select" @change="loadConsumables(1)">
-          <option :value="0">全部实验室</option>
-          <option v-for="lab in filteredLabOptions" :key="lab.value" :value="lab.value">{{ lab.label }}</option>
-        </select>
-        <input v-model.trim="query.keyword" class="toolbar-input" placeholder="搜索名称或编号" @keyup.enter="loadConsumables(1)" />
-        <select v-model.number="query.status" class="toolbar-select" @change="loadConsumables(1)">
-          <option :value="-1">全部状态</option>
-          <option :value="1">启用</option>
-          <option :value="0">停用</option>
-        </select>
-        <button type="button" class="ghost-btn" @click="loadConsumables(1)">查询</button>
-        <button type="button" class="primary-btn" @click="openCreate">新增耗材</button>
+        <div class="toolbar-filters">
+          <select v-model="query.labType" class="toolbar-select" @change="handleLabTypeChange">
+            <option value="">全部类型</option>
+            <option v-for="type in labTypeOptions" :key="type" :value="type">{{ type }}</option>
+          </select>
+          <select v-model.number="query.labId" class="toolbar-select" @change="loadConsumables(1)">
+            <option :value="0">全部实验室</option>
+            <option v-for="lab in filteredLabOptions" :key="lab.value" :value="lab.value">{{ lab.label }}</option>
+          </select>
+          <input v-model.trim="query.keyword" class="toolbar-input" placeholder="搜索名称或编号" @keyup.enter="loadConsumables(1)" />
+          <select v-model.number="query.status" class="toolbar-select" @change="loadConsumables(1)">
+            <option :value="-1">全部状态</option>
+            <option :value="1">启用</option>
+            <option :value="0">停用</option>
+          </select>
+        </div>
+        <div class="toolbar-actions">
+          <button type="button" class="ghost-btn" @click="loadConsumables(1)">查询</button>
+          <button type="button" class="primary-btn" @click="openCreate">新增耗材</button>
+        </div>
       </div>
 
       <p v-if="message" class="info-text">{{ message }}</p>
@@ -353,8 +357,19 @@ async function handleStockSave(): Promise<void> {
 }
 
 .toolbar {
-  justify-content: flex-end;
   margin-bottom: 16px;
+}
+
+.toolbar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.toolbar-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .pagination-wrap {
@@ -507,16 +522,16 @@ td small {
 }
 
 @media (max-width: 760px) {
-  .toolbar {
-    justify-content: flex-start;
-  }
-
   .toolbar-input,
   .toolbar-select,
   .detail-grid,
   .form-grid {
     width: 100%;
     grid-template-columns: 1fr;
+  }
+
+  .toolbar-actions {
+    justify-content: flex-start;
   }
 }
 </style>

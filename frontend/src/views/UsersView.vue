@@ -1,20 +1,24 @@
 ﻿<template>
   <section class="content-grid users-page">    <BasePanel title="用户管理" panel-class="users-panel">
       <div class="toolbar">
-        <input v-model="keyword" class="toolbar-input" placeholder="搜索学号/工号或姓名" />
-        <select v-model="filters.roleCode" class="toolbar-select">
-          <option :value="null">全部角色</option>
-          <option value="TEACHER">教师</option>
-          <option value="STUDENT">学生</option>
-        </select>
-        <select v-model="filters.status" class="toolbar-select">
-          <option :value="null">全部状态</option>
-          <option :value="1">启用</option>
-          <option :value="0">禁用</option>
-        </select>
-        <button type="button" class="ghost-btn" @click="handleReset">重置筛选</button>
-        <button type="button" class="ghost-btn" @click="openImportDialog">批量导入</button>
-        <button type="button" class="primary-btn" @click="openCreateDialog">新增用户</button>
+        <div class="toolbar-filters">
+          <input v-model="keyword" class="toolbar-input" placeholder="搜索学号/工号或姓名" />
+          <select v-model="filters.roleCode" class="toolbar-select">
+            <option :value="null">全部角色</option>
+            <option value="TEACHER">教师</option>
+            <option value="STUDENT">学生</option>
+          </select>
+          <select v-model="filters.status" class="toolbar-select">
+            <option :value="null">全部状态</option>
+            <option :value="1">启用</option>
+            <option :value="0">禁用</option>
+          </select>
+        </div>
+        <div class="toolbar-actions">
+          <button type="button" class="ghost-btn" @click="handleReset">重置筛选</button>
+          <button type="button" class="ghost-btn" @click="openImportDialog">批量导入</button>
+          <button type="button" class="primary-btn" @click="openCreateDialog">新增用户</button>
+        </div>
       </div>
 
       <p v-if="message" class="info-text">{{ message }}</p>
@@ -686,13 +690,21 @@ onUnmounted(() => {
 }
 
 .toolbar {
-  display: flex;
-  flex-wrap: nowrap;
   gap: 10px;
-  align-items: center;
   margin-bottom: 16px;
-  overflow-x: auto;
-  padding-bottom: 2px;
+}
+
+.toolbar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .toolbar-input,
@@ -751,8 +763,8 @@ onUnmounted(() => {
   background: rgba(56, 102, 219, 0.04);
 }
 
-.toolbar .ghost-btn,
-.toolbar .primary-btn {
+.toolbar-actions .ghost-btn,
+.toolbar-actions .primary-btn {
   min-height: 42px;
   padding: 10px 14px;
   border-radius: 16px;
@@ -1323,13 +1335,13 @@ onUnmounted(() => {
 }
 
 @media (max-width: 960px) {
-  .toolbar {
-    align-items: center;
-  }
-
   .toolbar-input,
   .toolbar-select {
     width: auto;
+  }
+
+  .toolbar-actions {
+    justify-content: flex-start;
   }
 
   .user-form {

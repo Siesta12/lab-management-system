@@ -43,6 +43,22 @@
         select *
         from user_violation_record
         where user_id = #{userId}
+        <if test="violationType != null">
+            and violation_type = #{violationType}
+        </if>
+        <if test="scoreDirection != null">
+            <choose>
+                <when test="scoreDirection == 1">
+                    and score_change <![CDATA[ > ]]> 0
+                </when>
+                <when test="scoreDirection == -1">
+                    and score_change <![CDATA[ < ]]> 0
+                </when>
+                <otherwise>
+                    and score_change = 0
+                </otherwise>
+            </choose>
+        </if>
         order by id desc
         limit #{offset}, #{pageSize}
     </select>
@@ -51,6 +67,22 @@
         select count(*)
         from user_violation_record
         where user_id = #{userId}
+        <if test="violationType != null">
+            and violation_type = #{violationType}
+        </if>
+        <if test="scoreDirection != null">
+            <choose>
+                <when test="scoreDirection == 1">
+                    and score_change <![CDATA[ > ]]> 0
+                </when>
+                <when test="scoreDirection == -1">
+                    and score_change <![CDATA[ < ]]> 0
+                </when>
+                <otherwise>
+                    and score_change = 0
+                </otherwise>
+            </choose>
+        </if>
     </select>
 
     <insert id="insert"

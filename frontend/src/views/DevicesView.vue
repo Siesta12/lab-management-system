@@ -39,8 +39,8 @@
               <option :value="2">维修中</option>
               <option :value="3">禁用</option>
             </select>
-            <button type="button" class="ghost-btn" @click="loadDevices(1)">查询</button>
-            <button type="button" class="ghost-btn" @click="resetDeviceFilters">重置</button>
+            <button type="button" class="ghost-btn toolbar-ghost-btn" @click="loadDevices(1)">查询</button>
+            <button type="button" class="ghost-btn toolbar-ghost-btn" @click="resetDeviceFilters">重置</button>
           </template>
 
           <template v-else>
@@ -60,8 +60,8 @@
               <option :value="3">已完成</option>
               <option :value="4">已驳回</option>
             </select>
-            <button type="button" class="ghost-btn" @click="loadRepairs(1)">查询</button>
-            <button type="button" class="ghost-btn" @click="resetRepairFilters">重置</button>
+            <button type="button" class="ghost-btn toolbar-ghost-btn" @click="loadRepairs(1)">查询</button>
+            <button type="button" class="ghost-btn toolbar-ghost-btn" @click="resetRepairFilters">重置</button>
           </template>
         </div>
       </div>

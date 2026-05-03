@@ -2,22 +2,35 @@
   <section class="content-grid">
     <BasePanel>
       <div class="toolbar">
-        <div class="toolbar-title">{{ pagePanelTitle }}</div>
-        <input v-model="keyword" :placeholder="isAdmin ? '输入实验室名称或编号' : '输入实验室名称或编号等'" @keyup.enter="handleSearch" />
-        <select v-model="filters.labType" class="toolbar-select" @change="handleLabTypeChange">
-          <option value="">全部类型</option>
-          <option v-for="type in labTypeOptions" :key="type" :value="type">{{ type }}</option>
-        </select>
-        <select v-if="isAdmin" v-model="filters.departmentId" :disabled="isDepartmentScopedAdmin">
-          <option v-if="!isDepartmentScopedAdmin" :value="undefined">全部学院</option>
-          <option v-for="dept in visibleDepartments" :key="dept.value" :value="dept.value">{{ dept.label }}</option>
-        </select>
-        <select v-if="isAdmin" v-model="filters.labId" :disabled="!filteredAdminLabOptions.length">
-          <option :value="undefined">全部实验室</option>
-          <option v-for="lab in filteredAdminLabOptions" :key="lab.value" :value="lab.value">{{ lab.label }}</option>
-        </select>
-        <button type="button" class="ghost-btn" @click="handleSearch">查询</button>
-        <button type="button" class="ghost-btn" @click="handleReset">重置</button>
+        <div class="toolbar-top">
+          <div class="toolbar-title">{{ pagePanelTitle }}</div>
+        </div>
+        <div class="toolbar-row">
+          <div class="toolbar-filters">
+            <input
+              v-model="keyword"
+              class="toolbar-input"
+              :placeholder="isAdmin ? '输入实验室名称或编号' : '输入实验室名称或编号等'"
+              @keyup.enter="handleSearch"
+            />
+            <select v-model="filters.labType" class="toolbar-select" @change="handleLabTypeChange">
+              <option value="">全部类型</option>
+              <option v-for="type in labTypeOptions" :key="type" :value="type">{{ type }}</option>
+            </select>
+            <select v-if="isAdmin" v-model="filters.departmentId" class="toolbar-select" :disabled="isDepartmentScopedAdmin">
+              <option v-if="!isDepartmentScopedAdmin" :value="undefined">全部学院</option>
+              <option v-for="dept in visibleDepartments" :key="dept.value" :value="dept.value">{{ dept.label }}</option>
+            </select>
+            <select v-if="isAdmin" v-model="filters.labId" class="toolbar-select" :disabled="!filteredAdminLabOptions.length">
+              <option :value="undefined">全部实验室</option>
+              <option v-for="lab in filteredAdminLabOptions" :key="lab.value" :value="lab.value">{{ lab.label }}</option>
+            </select>
+          </div>
+          <div class="toolbar-actions">
+            <button type="button" class="ghost-btn toolbar-ghost-btn" @click="handleSearch">查询</button>
+            <button type="button" class="ghost-btn toolbar-ghost-btn" @click="handleReset">重置</button>
+          </div>
+        </div>
       </div>
 
       <BaseTable :headers="isAdmin ? ['名称', '编号', '类型', '位置', '开放状态', '运行状态', '容量', '操作'] : ['名称', '编号', '位置', '开放状态', '运行状态', '容量']">
@@ -73,21 +86,6 @@
         </div>
         <p v-if="loadingDetail" class="info-text">正在加载实验室详情...</p>
         <div v-else-if="selectedLab" class="detail-stack">
-          <div class="lab-hero">
-            <div class="lab-hero-main">
-              <h4 class="lab-title">{{ selectedLab.labName }}</h4>
-              <p class="lab-subtitle">{{ selectedDepartmentName }} · {{ selectedLab.labType || '类型暂未设置' }}</p>
-            </div>
-            <div class="lab-hero-meta">
-              <span class="chip">{{ buildLocation(selectedLab) }}</span>
-              <span class="chip">{{ selectedLab.capacity }} 人</span>
-              <span class="chip" :class="getBadgeClass(openStatusText(selectedLab.openStatus))">{{ openStatusText(selectedLab.openStatus) }}</span>
-              <span class="chip" :class="getBadgeClass(labStatusText(selectedLab.labStatus))">{{ labStatusText(selectedLab.labStatus) }}</span>
-              <span class="chip subtle">设备 {{ selectedDevices.length }}</span>
-              <span class="chip subtle">耗材 {{ selectedConsumables.length }}</span>
-            </div>
-          </div>
-
           <div class="detail-tabs">
             <button type="button" class="tab-btn" :class="{ active: detailTab === 'schedule' }" @click="detailTab = 'schedule'">
               未来三周课表
@@ -103,20 +101,36 @@
             </button>
           </div>
 
-          <div v-show="detailTab === 'schedule'" class="detail-pane">
-            <div class="schedule-head compact-head">
-              <div class="schedule-head-left">
-                <h5 class="section-title">课表（按节次）</h5>
-                <p class="section-hint">未来 21 天</p>
-              </div>
-              <div v-if="isAuthenticated" class="schedule-actions">
-                <button type="button" class="ghost-btn" @click="reloadSchedule">刷新</button>
-                <span v-if="isAdmin" class="section-hint">管理员可点击空闲/维护格设置维护</span>
-              </div>
-            </div>
+          <div v-show="detailTab === 'schedule'" class="detail-pane schedule-pane">
+            <div v-if="schedule" class="schedule-layout">
+              <div class="schedule-left">
+                <div class="lab-hero">
+                  <div class="lab-hero-main">
+                    <h4 class="lab-title">{{ selectedLab.labName }}</h4>
+                    <p class="lab-subtitle">{{ selectedDepartmentName }} · {{ selectedLab.labType || '类型暂未设置' }}</p>
+                  </div>
+                  <div class="lab-hero-meta">
+                    <span class="chip">{{ buildLocation(selectedLab) }}</span>
+                    <span class="chip">{{ selectedLab.capacity }} 人</span>
+                    <span class="chip" :class="getBadgeClass(openStatusText(selectedLab.openStatus))">{{ openStatusText(selectedLab.openStatus) }}</span>
+                    <span class="chip" :class="getBadgeClass(labStatusText(selectedLab.labStatus))">{{ labStatusText(selectedLab.labStatus) }}</span>
+                    <span class="chip subtle">设备 {{ selectedDevices.length }}</span>
+                    <span class="chip subtle">耗材 {{ selectedConsumables.length }}</span>
+                  </div>
+                </div>
 
-            <div v-if="schedule" class="schedule-wrap">
-              <div class="schedule-main">
+                <div class="schedule-head compact-head">
+                  <div class="schedule-head-left">
+                    <h5 class="section-title">课表（按节次）</h5>
+                    <p class="section-hint">未来 21 天</p>
+                  </div>
+                  <div v-if="isAuthenticated" class="schedule-actions">
+                    <button type="button" class="ghost-btn" @click="reloadSchedule">刷新</button>
+                    <span v-if="isAdmin" class="section-hint">管理员可点击空闲/维护格设置维护</span>
+                  </div>
+                </div>
+
+                <div class="schedule-main">
                 <div class="legend">
                   <template v-if="isAdmin">
                     <span class="legend-item free">空闲</span>
@@ -188,6 +202,7 @@
                       </tr>
                     </tbody>
                   </table>
+                </div>
                 </div>
               </div>
 
@@ -1483,29 +1498,41 @@ onMounted(async () => {
   padding: 10px 8px;
 }
 
-.schedule-wrap {
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.66);
-  overflow: clip;
+.schedule-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 420px;
-  gap: 0;
+  gap: 24px;
   align-items: start;
+  width: 100%;
+}
+
+.schedule-left {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
 }
 
 .schedule-main {
   min-width: 0;
+  width: 100%;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 16px;
+  background: #ffffff;
+  overflow: clip;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.06);
 }
 
 .schedule-sidebar {
   position: sticky;
-  top: 16px;
+  top: 24px;
   align-self: start;
-  max-height: calc(100vh - 48px);
+  width: 420px;
+  max-height: calc(92vh - 72px);
   overflow: auto;
-  border-left: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.1);
 }
 
 .schedule-sidebar.blocked {
@@ -1513,7 +1540,7 @@ onMounted(async () => {
 }
 
 .schedule-sidebar .schedule-forms {
-  padding: 16px;
+  padding: 18px;
 }
 
 .pagination-wrap {
@@ -1537,15 +1564,61 @@ onMounted(async () => {
 }
 
 .toolbar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
 }
 
+.toolbar-top {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.toolbar-input,
+.toolbar-select {
+  border: 1px solid #dbe4ee;
+  border-radius: 16px;
+  background: #fff;
+  color: #0f172a;
+  height: 42px;
+  padding: 0 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.toolbar-input {
+  width: 240px;
+}
+
+.toolbar-select {
+  width: 150px;
+}
+
+.toolbar-input::placeholder {
+  color: #94a3b8;
+}
+
+.toolbar-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .toolbar-title {
-  margin-right: 8px;
   color: #0f172a;
   font-size: 28px;
   line-height: 1.15;
@@ -1557,30 +1630,29 @@ onMounted(async () => {
   font-size: 13px;
 }
 
-.toolbar button {
-  padding: 8px 12px;
-  font-size: 13px;
+.toolbar-actions .ghost-btn {
+  min-width: 86px;
 }
 
 .detail-modal-mask {
   position: fixed;
   inset: 0;
-  background: rgba(2, 6, 23, 0.45);
+  background: rgba(2, 6, 23, 0.48);
   display: grid;
   place-items: center;
   z-index: 1200;
-  padding: 20px;
+  padding: 18px;
 }
 
 .detail-modal {
-  width: min(1200px, 96vw);
-  max-height: 90vh;
+  width: min(1280px, 97vw);
+  max-height: 92vh;
   overflow-y: auto;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: #ffffff;
-  padding: 16px;
-  box-shadow: 0 28px 48px rgba(15, 23, 42, 0.3);
+  border-radius: 22px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  padding: 18px;
+  box-shadow: 0 32px 70px rgba(15, 23, 42, 0.32);
 }
 
 .success-dialog-mask {
@@ -1648,8 +1720,8 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 14px;
+  margin-bottom: 14px;
 }
 
 .detail-modal-head h3 {
@@ -1670,19 +1742,26 @@ onMounted(async () => {
 
 .detail-stack {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .lab-hero {
   border: 1px solid rgba(15, 23, 42, 0.12);
-  border-radius: 14px;
-  background: rgba(15, 23, 42, 0.02);
-  padding: 12px;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 12px 14px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  width: 100%;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.05);
+}
+
+.lab-hero-main {
+  min-width: 0;
+  flex: 0 1 420px;
 }
 
 .lab-title {
@@ -1746,11 +1825,11 @@ onMounted(async () => {
 
 .detail-pane {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .compact-head {
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .schedule-head-left {
@@ -1972,8 +2051,9 @@ onMounted(async () => {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
 }
 
 .legend-item {
@@ -1990,6 +2070,7 @@ onMounted(async () => {
 }
 
 .schedule-table-scroll {
+  width: 100%;
   overflow-x: auto;
 }
 
@@ -2004,10 +2085,10 @@ onMounted(async () => {
 .schedule-table td {
   border-right: 1px solid rgba(15, 23, 42, 0.08);
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  padding: 8px;
+  padding: 9px 10px;
   text-align: center;
   vertical-align: middle;
-  min-width: 92px;
+  min-width: 98px;
 }
 
 .schedule-table th.sticky-col,
@@ -2180,16 +2261,16 @@ onMounted(async () => {
 }
 
 .form-card {
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 18px;
-  padding: 18px;
-  background: #ffffff;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .reservation-form-card {
   display: grid;
-  gap: 18px;
+  gap: 16px;
 }
 
 .form-card-header {
@@ -2199,7 +2280,7 @@ onMounted(async () => {
 
 .form-card-header h6 {
   margin: 0;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
   color: #1f2a44;
 }
@@ -2207,7 +2288,7 @@ onMounted(async () => {
 .form-card-header p {
   margin: 0;
   padding: 14px 16px;
-  border-radius: 14px;
+  border-radius: 16px;
   background: #eef4ff;
   border: 1px solid #d6e4ff;
   color: #42526e;
@@ -2217,7 +2298,7 @@ onMounted(async () => {
 .beauty-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px 28px;
+  gap: 16px 22px;
 }
 
 .field-card {
@@ -2281,34 +2362,39 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 16px;
-  padding: 16px 18px;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  background: #fafbfc;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
 
 .recommend-title {
   min-width: 0;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 750;
   line-height: 1.2;
-  color: #334155;
+  color: #1f2a44;
 }
 
 .conflict-card {
   display: grid;
-  gap: 12px;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
 
 .conflict-card.warning {
-  border-color: rgba(245, 158, 11, 0.25);
-  background: rgba(255, 251, 235, 0.9);
+  border-color: rgba(245, 158, 11, 0.26);
+  background: linear-gradient(180deg, #fff8e6 0%, #fffdf7 100%);
 }
 
 .conflict-card.info {
-  border-color: rgba(59, 130, 246, 0.18);
-  background: rgba(239, 246, 255, 0.9);
+  border-color: rgba(59, 130, 246, 0.2);
+  background: linear-gradient(180deg, #eef6ff 0%, #fbfdff 100%);
 }
 
 .conflict-card-head {
@@ -2320,28 +2406,35 @@ onMounted(async () => {
 
 .conflict-card-head h6 {
   margin: 0;
-  font-size: 18px;
-  color: #1f2937;
+  font-size: 20px;
+  line-height: 1.25;
+  color: #172033;
 }
 
 .conflict-card p {
   margin: 0;
-  line-height: 1.7;
-  color: #475569;
+  line-height: 1.65;
+  color: #506079;
+  font-size: 14px;
 }
 
 .conflict-chip {
-  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 600;
-  background: rgba(15, 23, 42, 0.08);
-  color: #334155;
+  font-weight: 750;
+  background: rgba(255, 255, 255, 0.76);
+  color: #374151;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
 }
 
 .recommend-btn {
-  min-width: 160px;
-  padding-inline: 20px;
+  min-width: 156px;
+  height: 38px;
+  padding-inline: 18px;
   white-space: nowrap;
 }
 
@@ -2405,55 +2498,87 @@ onMounted(async () => {
 
 .recommendation-list {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .recommendation-result-card {
   scroll-margin-top: 18px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
   border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 16px;
+  background: #ffffff;
   box-shadow: 0 12px 26px rgba(37, 99, 235, 0.08);
+}
+
+.recommendation-result-card h6 {
+  margin: 0;
+  color: #1f2a44;
+  font-size: 16px;
+  font-weight: 750;
 }
 
 .recommendation-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 14px 16px;
+  gap: 12px;
+  padding: 12px 14px;
   border-radius: 14px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(248, 250, 252, 0.88);
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.recommendation-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(37, 99, 235, 0.18);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.07);
 }
 
 .recommendation-main {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
 .recommendation-main strong {
   color: #1e293b;
+  font-size: 15px;
+  line-height: 1.25;
 }
 
 .recommendation-main span {
   color: #334155;
   font-size: 14px;
+  line-height: 1.35;
 }
 
 .recommendation-main small {
   color: #64748b;
+  line-height: 1.45;
 }
 
-@media (max-width: 980px) {
-  .schedule-wrap {
+@media (max-width: 1100px) {
+  .toolbar-row,
+  .toolbar-filters,
+  .toolbar-actions {
+    justify-content: flex-start;
+  }
+
+  .schedule-layout {
     grid-template-columns: 1fr;
   }
 
   .schedule-sidebar {
     position: static;
+    width: 100%;
     max-height: none;
     overflow: visible;
-    border-left: none;
-    border-top: 1px solid rgba(15, 23, 42, 0.08);
   }
 
   .schedule-sidebar .schedule-forms {
@@ -2463,6 +2588,11 @@ onMounted(async () => {
   .lab-hero-meta {
     justify-content: flex-start;
   }
+
+  .lab-hero {
+    width: 100%;
+  }
+
   .detail-tabs {
     width: 100%;
     justify-content: space-between;

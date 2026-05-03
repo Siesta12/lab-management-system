@@ -193,7 +193,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void updatePassword(Long userId, PasswordUpdateRequest request) {
-        UserEntity entity = userMapper.selectById(userId);
+        UserEntity entity = userMapper.selectCredentialById(userId);
         if (entity == null) {
             throw new BusinessException(404, "用户不存在");
         }
