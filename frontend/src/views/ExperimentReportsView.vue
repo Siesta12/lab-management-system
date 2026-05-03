@@ -5,7 +5,7 @@
         <input
           v-model.trim="keyword"
           class="toolbar-input"
-          placeholder="搜索报告标题或实验名称"
+          placeholder="搜索实验名称"
           @keyup.enter="loadReports(1)"
         />
         <select v-model.number="statusFilter" class="toolbar-select">
@@ -30,7 +30,6 @@
           <td :colspan="headers.length" class="empty-cell">暂无实验报告</td>
         </tr>
         <tr v-for="report in reportState.list" :key="report.id" class="row-clickable" @click="openDetail(report)">
-          <td>{{ report.title }}</td>
           <td>{{ report.experimentName }}</td>
           <td v-if="!isStudent">{{ report.studentName || '--' }}</td>
           <td>{{ report.teacherName || '--' }}</td>
@@ -72,7 +71,7 @@
         <div class="dialog-head">
           <div>
             <p class="dialog-tag">报告详情</p>
-            <h3>{{ selectedReport?.title || '--' }}</h3>
+            <h3>{{ selectedReport?.experimentName || '--' }}</h3>
           </div>
           <button type="button" class="ghost-btn small-btn" @click="closeDetail">关闭</button>
         </div>
@@ -162,7 +161,6 @@
           <button type="button" class="ghost-btn small-btn" @click="closeEditor">关闭</button>
         </div>
         <div class="form-grid">
-          <label><span>报告标题</span><input v-model.trim="form.title" /></label>
           <label><span>实验名称</span><input v-model.trim="form.experimentName" /></label>
           <label><span>实验日期</span><input v-model="form.experimentDate" type="date" /></label>
           <label>
@@ -225,7 +223,7 @@
         <div class="dialog-head">
           <div>
             <p class="dialog-tag">教师审核</p>
-            <h3>{{ selectedReport?.title || '--' }}</h3>
+            <h3>{{ selectedReport?.experimentName || '--' }}</h3>
           </div>
           <button type="button" class="ghost-btn small-btn" @click="closeReview">关闭</button>
         </div>
@@ -280,8 +278,8 @@ const isAdmin = computed(() => role.value === 'ADMIN');
 const pageTitle = computed(() => (isTeacher.value ? '报告审核' : isAdmin.value ? '实验报告管理' : '实验报告'));
 const headers = computed(() =>
   isStudent.value
-    ? ['标题', '实验名称', '指导教师', '实验室', '实验日期', '状态', '操作']
-    : ['标题', '实验名称', '学生', '指导教师', '实验室', '实验日期', '状态', '操作'],
+    ? ['实验名称', '指导教师', '实验室', '实验日期', '状态', '操作']
+    : ['实验名称', '学生', '指导教师', '实验室', '实验日期', '状态', '操作'],
 );
 
 const reportState = ref<PageData<ExperimentReportDto>>({ list: [], total: 0, pageNum: 1, pageSize: 10 });
@@ -304,7 +302,6 @@ const form = reactive<ExperimentReportSavePayload>({
   teacherId: 0,
   labId: 0,
   reservationId: null,
-  title: '',
   experimentName: '',
   experimentDate: '',
   purpose: '',
@@ -417,7 +414,6 @@ async function openEditor(report?: ExperimentReportDto): Promise<void> {
   form.teacherId = data?.teacherId ?? teacherOptions.value[0]?.value ?? 0;
   form.labId = data?.labId ?? labOptions.value[0]?.value ?? 0;
   form.reservationId = data?.reservationId ?? null;
-  form.title = data?.title ?? '';
   form.experimentName = data?.experimentName ?? '';
   form.experimentDate = data?.experimentDate ?? new Date().toISOString().slice(0, 10);
   form.purpose = data?.purpose ?? '';
@@ -505,8 +501,8 @@ function validateConsumables(): boolean {
 }
 
 async function handleSaveDraft(): Promise<void> {
-  if (!form.title || !form.experimentName || !form.teacherId || !form.labId || !form.experimentDate) {
-    showToast('error', '请填写标题、实验名称、实验室、指导教师和实验日期');
+  if (!form.experimentName || !form.teacherId || !form.labId || !form.experimentDate) {
+    showToast('error', '请填写实验名称、实验室、指导教师和实验日期');
     return;
   }
   if (!validateConsumables()) {

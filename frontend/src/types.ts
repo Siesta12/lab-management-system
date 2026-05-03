@@ -505,7 +505,6 @@ export interface ExperimentReportDto {
   departmentId: number;
   labId: number;
   reservationId?: number | null;
-  title: string;
   experimentName: string;
   experimentDate: string;
   purpose?: string;
@@ -532,7 +531,6 @@ export interface ExperimentReportSavePayload {
   teacherId: number;
   labId: number;
   reservationId?: number | null;
-  title: string;
   experimentName: string;
   experimentDate: string;
   purpose?: string;

@@ -19,6 +19,7 @@ DROP TABLE IF EXISTS `lab_open_slot`;
 DROP TABLE IF EXISTS `class_period`;
 DROP TABLE IF EXISTS `lab_consumable`;
 DROP TABLE IF EXISTS `lab_device`;
+DROP TABLE IF EXISTS `lab_device_repair`;
 DROP TABLE IF EXISTS `lab`;
 DROP TABLE IF EXISTS `sys_user_role`;
 DROP TABLE IF EXISTS `sys_role`;
@@ -477,7 +478,6 @@ create table lab_experiment_report
   department_id   bigint                             not null comment 'Department id',
   lab_id          bigint                             not null comment 'Lab id',
   reservation_id  bigint null comment 'Reservation id',
-  title           varchar(100)                       not null comment 'Report title',
   experiment_name varchar(100)                       not null comment 'Experiment name',
   experiment_date date                               not null comment 'Experiment date',
   purpose         text null comment 'Purpose',

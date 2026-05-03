@@ -208,8 +208,14 @@ public class ExperimentReportServiceImpl implements ExperimentReportService {
         entity.setTeacherId(request.getTeacherId());
         entity.setLabId(request.getLabId());
         entity.setReservationId(request.getReservationId());
-        entity.setTitle(request.getTitle().trim());
-        entity.setExperimentName(request.getExperimentName().trim());
+        String experimentName = trimToNull(request.getExperimentName());
+        if (!StringUtils.hasText(experimentName)) {
+            experimentName = trimToNull(request.getTitle());
+        }
+        if (!StringUtils.hasText(experimentName)) {
+            throw new BusinessException(400, "实验名称不能为空");
+        }
+        entity.setExperimentName(experimentName);
         entity.setExperimentDate(request.getExperimentDate());
         entity.setPurpose(trimToNull(request.getPurpose()));
         entity.setPrinciple(trimToNull(request.getPrinciple()));

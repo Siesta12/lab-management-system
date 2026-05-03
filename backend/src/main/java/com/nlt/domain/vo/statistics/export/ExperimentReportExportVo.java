@@ -12,8 +12,6 @@ public class ExperimentReportExportVo {
 
     private String labName;
 
-    private String title;
-
     private String experimentName;
 
     private String submitterName;

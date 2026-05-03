@@ -1,7 +1,6 @@
 package com.nlt.domain.dto.experiment;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -19,10 +18,8 @@ public class ExperimentReportSaveRequest {
 
     private Long reservationId;
 
-    @NotBlank
     private String title;
 
-    @NotBlank
     private String experimentName;
 
     @NotNull

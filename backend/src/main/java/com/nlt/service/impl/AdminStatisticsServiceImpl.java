@@ -468,7 +468,7 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
                 cell(row.getReportNo()),
                 cell(row.getReservationNo()),
                 cell(row.getLabName()),
-                cell(preferText(row.getTitle(), row.getExperimentName())),
+                cell(row.getExperimentName()),
                 cell(row.getSubmitterName()),
                 cell(row.getUserNo()),
                 cell(row.getSubmittedAt()),
@@ -483,7 +483,7 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         return new ExportData(
             "实验报告数据",
             List.of(
-                "报告编号", "预约编号", "实验室名称", "实验名称/报告标题",
+                "报告编号", "预约编号", "实验室名称", "实验名称",
                 "提交人姓名", "学号/工号", "提交时间", "审核状态",
                 "审核人", "审核时间", "得分", "评价", "备注"
             ),
@@ -941,4 +941,3 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         String resolve(Object value);
     }
 }
-

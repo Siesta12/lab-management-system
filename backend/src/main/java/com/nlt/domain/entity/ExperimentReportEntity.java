@@ -23,8 +23,6 @@ public class ExperimentReportEntity {
 
     private Long reservationId;
 
-    private String title;
-
     private String experimentName;
 
     private LocalDate experimentDate;

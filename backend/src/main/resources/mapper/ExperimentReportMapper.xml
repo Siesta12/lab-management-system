@@ -32,8 +32,7 @@
         </if>
         <if test="keyword != null and keyword != ''">
             and (
-                r.title like concat('%', #{keyword}, '%')
-                or r.experiment_name like concat('%', #{keyword}, '%')
+                r.experiment_name like concat('%', #{keyword}, '%')
                 or r.report_no like concat('%', #{keyword}, '%')
                 or stu.real_name like concat('%', #{keyword}, '%')
             )
@@ -61,8 +60,7 @@
         </if>
         <if test="keyword != null and keyword != ''">
             and (
-                r.title like concat('%', #{keyword}, '%')
-                or r.experiment_name like concat('%', #{keyword}, '%')
+                r.experiment_name like concat('%', #{keyword}, '%')
                 or r.report_no like concat('%', #{keyword}, '%')
                 or stu.real_name like concat('%', #{keyword}, '%')
             )
@@ -184,12 +182,12 @@
     <insert id="insert" parameterType="com.nlt.domain.entity.ExperimentReportEntity" useGeneratedKeys="true" keyProperty="id">
         insert into lab_experiment_report(
             report_no, student_id, teacher_id, department_id, lab_id, reservation_id,
-            title, experiment_name, experiment_date, purpose, principle, steps,
+            experiment_name, experiment_date, purpose, principle, steps,
             result_data, analysis, conclusion, status, teacher_comment, deleted
         )
         values(
             #{reportNo}, #{studentId}, #{teacherId}, #{departmentId}, #{labId}, #{reservationId},
-            #{title}, #{experimentName}, #{experimentDate}, #{purpose}, #{principle}, #{steps},
+            #{experimentName}, #{experimentDate}, #{purpose}, #{principle}, #{steps},
             #{resultData}, #{analysis}, #{conclusion}, #{status}, #{teacherComment}, 0
         )
     </insert>
@@ -199,7 +197,6 @@
         set teacher_id = #{teacherId},
             lab_id = #{labId},
             reservation_id = #{reservationId},
-            title = #{title},
             experiment_name = #{experimentName},
             experiment_date = #{experimentDate},
             purpose = #{purpose},
@@ -306,7 +303,6 @@
         select r.report_no as reportNo,
                lr.reservation_no as reservationNo,
                l.lab_name as labName,
-               r.title as title,
                r.experiment_name as experimentName,
                stu.real_name as submitterName,
                stu.user_no as userNo,
