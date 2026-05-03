@@ -114,4 +114,98 @@
         </if>
         group by violation_type
     </select>
+
+    <sql id="ViolationExportFilter">
+        from user_violation_record v
+        join sys_user u on u.id = v.user_id
+        left join lab_reservation r on r.id = v.reservation_id
+        left join lab l on l.id = r.lab_id
+        left join (
+            select s.reservation_id,
+                   min(timestamp(s.reservation_date, p.start_time)) as firstStartAt,
+                   min(s.reservation_date) as firstDate
+            from lab_reservation_slot s
+            join class_period p on p.id = s.period_id
+            where s.slot_status = 1
+            group by s.reservation_id
+        ) slot on slot.reservation_id = v.reservation_id
+        where u.deleted = 0
+          and u.department_id = #{departmentId}
+          and coalesce(slot.firstStartAt, v.created_at) <![CDATA[ >= ]]> #{startDate}
+          and coalesce(slot.firstStartAt, v.created_at) <![CDATA[ < ]]> date_add(#{endDate}, interval 1 day)
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        <if test="labId != null">
+            and r.lab_id = #{labId}
+        </if>
+        <if test="status != null">
+            and (r.id is not null and r.status = #{status})
+        </if>
+        <if test="reservationType != null">
+            and (r.id is not null and r.reservation_type = #{reservationType})
+        </if>
+    </sql>
+
+    <select id="countExport" resultType="long">
+        select count(*)
+        <include refid="ViolationExportFilter"/>
+    </select>
+
+    <select id="selectExportList" resultType="com.nlt.domain.vo.statistics.export.CreditViolationExportVo">
+        select u.real_name as realName,
+               u.user_no as userNo,
+               case when exists (
+                   select 1
+                   from sys_user_role ur
+                   join sys_role role on role.id = ur.role_id
+                   where ur.user_id = u.id
+                     and role.role_code in ('TEACHER', 'ROLE_TEACHER')
+               ) then '教师' else '学生' end as userRole,
+               u.credit_score as creditScore,
+               v.violation_type as violationType,
+               v.score_change as scoreChange,
+               coalesce(slot.firstStartAt, v.created_at) as violationTime,
+               r.reservation_no as reservationNo,
+               total.totalViolationCount as totalViolationCount,
+               v.remark as remark
+        from user_violation_record v
+        join sys_user u on u.id = v.user_id
+        left join lab_reservation r on r.id = v.reservation_id
+        left join lab l on l.id = r.lab_id
+        left join (
+            select s.reservation_id,
+                   min(timestamp(s.reservation_date, p.start_time)) as firstStartAt
+            from lab_reservation_slot s
+            join class_period p on p.id = s.period_id
+            where s.slot_status = 1
+            group by s.reservation_id
+        ) slot on slot.reservation_id = v.reservation_id
+        left join (
+            select v1.user_id, count(*) as totalViolationCount
+            from user_violation_record v1
+            join sys_user u1 on u1.id = v1.user_id
+            where u1.deleted = 0
+              and u1.department_id = #{departmentId}
+            group by v1.user_id
+        ) total on total.user_id = v.user_id
+        where u.deleted = 0
+          and u.department_id = #{departmentId}
+          and coalesce(slot.firstStartAt, v.created_at) <![CDATA[ >= ]]> #{startDate}
+          and coalesce(slot.firstStartAt, v.created_at) <![CDATA[ < ]]> date_add(#{endDate}, interval 1 day)
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        <if test="labId != null">
+            and r.lab_id = #{labId}
+        </if>
+        <if test="status != null">
+            and (r.id is not null and r.status = #{status})
+        </if>
+        <if test="reservationType != null">
+            and (r.id is not null and r.reservation_type = #{reservationType})
+        </if>
+        order by coalesce(slot.firstStartAt, v.created_at) desc, v.id desc
+        limit #{limit}
+    </select>
 </mapper>

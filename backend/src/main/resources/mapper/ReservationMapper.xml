@@ -552,4 +552,111 @@
         group by s.reservation_date
         order by s.reservation_date asc
     </select>
+
+    <sql id="ReservationExportFilter">
+        from lab_reservation r
+        join lab l on l.id = r.lab_id
+        join sys_user u on u.id = r.applicant_user_id
+        join (
+            select s.reservation_id,
+                   min(timestamp(s.reservation_date, p.start_time)) as first_start_at,
+                   max(timestamp(s.reservation_date, p.end_time)) as last_end_at
+            from lab_reservation_slot s
+            join class_period p on p.id = s.period_id
+            where s.slot_status = 1
+            group by s.reservation_id
+        ) slot on slot.reservation_id = r.id
+        where l.deleted = 0
+          and u.deleted = 0
+          and l.department_id = #{departmentId}
+          and slot.first_start_at <![CDATA[ >= ]]> #{startDate}
+          and slot.first_start_at <![CDATA[ < ]]> date_add(#{endDate}, interval 1 day)
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        <if test="labId != null">
+            and r.lab_id = #{labId}
+        </if>
+        <if test="status != null">
+            and r.status = #{status}
+        </if>
+        <if test="reservationType != null">
+            and r.reservation_type = #{reservationType}
+        </if>
+    </sql>
+
+    <select id="countExport" resultType="long">
+        select count(*)
+        <include refid="ReservationExportFilter"/>
+    </select>
+
+    <select id="selectExportList" resultType="com.nlt.domain.vo.statistics.export.ReservationExportVo">
+        select r.reservation_no as reservationNo,
+               l.lab_name as labName,
+               coalesce(nullif(l.lab_type, ''), '未分类') as labType,
+               u.real_name as applicantName,
+               u.user_no as userNo,
+               case when exists (
+                   select 1
+                   from sys_user_role ur
+                   join sys_role role on role.id = ur.role_id
+                   where ur.user_id = u.id
+                     and role.role_code in ('TEACHER', 'ROLE_TEACHER')
+               ) then '教师' else '学生' end as userRole,
+               r.reservation_type as reservationType,
+               r.status as status,
+               slot.first_start_at as startTime,
+               slot.last_end_at as endTime,
+               case when exists (
+                   select 1 from user_violation_record v
+                   where v.reservation_id = r.id and v.violation_type = 2
+               ) then 1 else 0 end as lateViolation,
+               case when exists (
+                   select 1 from user_violation_record v
+                   where v.reservation_id = r.id and v.violation_type = 1
+               ) then 1 else 0 end as noShowViolation,
+               r.created_at as createdAt,
+               approver.real_name as approverName,
+               audit.audited_at as auditedAt
+        from lab_reservation r
+        join lab l on l.id = r.lab_id
+        join sys_user u on u.id = r.applicant_user_id
+        join (
+            select s.reservation_id,
+                   min(timestamp(s.reservation_date, p.start_time)) as first_start_at,
+                   max(timestamp(s.reservation_date, p.end_time)) as last_end_at
+            from lab_reservation_slot s
+            join class_period p on p.id = s.period_id
+            where s.slot_status = 1
+            group by s.reservation_id
+        ) slot on slot.reservation_id = r.id
+        left join (
+            select reservation_id,
+                   max(created_at) as audited_at,
+                   substring_index(group_concat(audit_user_id order by created_at desc separator ','), ',', 1) as latestAuditUserId
+            from reservation_audit_log
+            where audit_action in (2, 3)
+            group by reservation_id
+        ) audit on audit.reservation_id = r.id
+        left join sys_user approver on approver.id = cast(audit.latestAuditUserId as unsigned)
+        where l.deleted = 0
+          and u.deleted = 0
+          and l.department_id = #{departmentId}
+          and slot.first_start_at <![CDATA[ >= ]]> #{startDate}
+          and slot.first_start_at <![CDATA[ < ]]> date_add(#{endDate}, interval 1 day)
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        <if test="labId != null">
+            and r.lab_id = #{labId}
+        </if>
+        <if test="status != null">
+            and r.status = #{status}
+        </if>
+        <if test="reservationType != null">
+            and r.reservation_type = #{reservationType}
+        </if>
+        order by slot.first_start_at desc, r.id desc
+        limit #{limit}
+    </select>
 </mapper>

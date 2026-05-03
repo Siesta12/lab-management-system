@@ -1,6 +1,7 @@
 package com.nlt.mapper;
 
 import com.nlt.domain.entity.ReservationEntity;
+import com.nlt.domain.vo.statistics.export.ReservationExportVo;
 import com.nlt.domain.vo.reservation.ReservationCheckCandidateVo;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -94,6 +95,23 @@ public interface ReservationMapper {
 
     List<Map<String, Object>> reservationTrend(@Param("startDate") LocalDate startDate,
         @Param("endDate") LocalDate endDate);
+
+    long countExport(@Param("departmentId") Long departmentId,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate,
+        @Param("labType") String labType,
+        @Param("labId") Long labId,
+        @Param("status") Integer status,
+        @Param("reservationType") Integer reservationType);
+
+    List<ReservationExportVo> selectExportList(@Param("departmentId") Long departmentId,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate,
+        @Param("labType") String labType,
+        @Param("labId") Long labId,
+        @Param("status") Integer status,
+        @Param("reservationType") Integer reservationType,
+        @Param("limit") int limit);
 }
 
 

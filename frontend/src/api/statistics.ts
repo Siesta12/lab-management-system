@@ -1,4 +1,4 @@
-import { ApiError, get, getApiBaseUrl } from './http';
+﻿import { ApiError, get, getApiBaseUrl } from './http';
 
 export interface StatisticsQuery {
   startDate?: string;
@@ -156,6 +156,30 @@ export function fetchCreditStatistics(query: StatisticsQuery, token: string): Pr
   return get<CreditStats>(`/statistics/admin/credit${buildQuery(query)}`, token);
 }
 
+function fallbackExportFilename(exportType?: string): string {
+  const timestamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+  const labelMap: Record<string, string> = {
+    reservation: '预约数据',
+    labUsage: '实验室使用统计',
+    device: '设备统计',
+    consumable: '耗材统计数据',
+    creditViolation: '信用违规数据',
+  };
+  return `${labelMap[exportType || ''] || '统计导出数据'}_${timestamp}.xlsx`;
+}
+
+function resolveDownloadFilename(disposition: string, exportType?: string): string {
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1]);
+  }
+  const plainMatch = disposition.match(/filename="?([^";]+)"?/i);
+  if (plainMatch?.[1]) {
+    return decodeURIComponent(plainMatch[1]);
+  }
+  return fallbackExportFilename(exportType);
+}
+
 export async function downloadStatisticsExport(query: StatisticsQuery, token: string): Promise<void> {
   const response = await fetch(`${getApiBaseUrl()}/statistics/admin/export${buildQuery(query)}`, {
     method: 'GET',
@@ -177,8 +201,7 @@ export async function downloadStatisticsExport(query: StatisticsQuery, token: st
 
   const blob = await response.blob();
   const disposition = response.headers.get('Content-Disposition') || '';
-  const filenameMatch = disposition.match(/filename\*=UTF-8''([^;]+)/);
-  const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : '统计分析导出.xlsx';
+  const filename = resolveDownloadFilename(disposition, query.exportType);
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;

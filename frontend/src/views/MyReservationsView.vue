@@ -302,6 +302,34 @@ watch(
   { immediate: true },
 );
 
+watch(
+  () => route.query.status,
+  () => {
+    const status = route.query.status;
+    if (status === '1') {
+      statusFilter.value = '1';
+      return;
+    }
+    if (status === '2') {
+      statusFilter.value = '2';
+      return;
+    }
+    if (status === '3') {
+      statusFilter.value = '3';
+      return;
+    }
+    if (status === '4') {
+      statusFilter.value = '4';
+      return;
+    }
+    if (status === '5') {
+      statusFilter.value = '5';
+      return;
+    }
+  },
+  { immediate: true },
+);
+
 watch([statusFilter, reservationTypeFilter], () => {
   void loadReservations(1);
 });

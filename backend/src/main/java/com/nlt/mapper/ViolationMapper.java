@@ -1,6 +1,7 @@
 package com.nlt.mapper;
 
 import com.nlt.domain.entity.ViolationRecordEntity;
+import com.nlt.domain.vo.statistics.export.CreditViolationExportVo;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -87,6 +88,23 @@ public interface ViolationMapper {
     @Param("endDate") LocalDate endDate,
     @Param("departmentId") Long departmentId,
     @Param("violationType") Integer violationType);
+
+    long countExport(@Param("departmentId") Long departmentId,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate,
+        @Param("labType") String labType,
+        @Param("labId") Long labId,
+        @Param("status") Integer status,
+        @Param("reservationType") Integer reservationType);
+
+    List<CreditViolationExportVo> selectExportList(@Param("departmentId") Long departmentId,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate,
+        @Param("labType") String labType,
+        @Param("labId") Long labId,
+        @Param("status") Integer status,
+        @Param("reservationType") Integer reservationType,
+        @Param("limit") int limit);
 
 }
 

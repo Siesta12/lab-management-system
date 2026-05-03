@@ -269,4 +269,54 @@
         where id = #{id}
           and status = 1
     </update>
+
+    <sql id="ExperimentReportExportFilter">
+        from lab_experiment_report r
+        left join lab_reservation lr on lr.id = r.reservation_id
+        join lab l on l.id = r.lab_id
+        join sys_user stu on stu.id = r.student_id
+        left join sys_user tea on tea.id = r.teacher_id
+        where r.deleted = 0
+          and l.deleted = 0
+          and stu.deleted = 0
+          and r.department_id = #{departmentId}
+          and r.submitted_at is not null
+          and r.submitted_at <![CDATA[ >= ]]> #{startDate}
+          and r.submitted_at <![CDATA[ < ]]> date_add(#{endDate}, interval 1 day)
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        <if test="labId != null">
+            and r.lab_id = #{labId}
+        </if>
+        <if test="status != null">
+            and (lr.id is not null and lr.status = #{status})
+        </if>
+        <if test="reservationType != null">
+            and (lr.id is not null and lr.reservation_type = #{reservationType})
+        </if>
+    </sql>
+
+    <select id="countExport" resultType="long">
+        select count(*)
+        <include refid="ExperimentReportExportFilter"/>
+    </select>
+
+    <select id="selectExportList" resultType="com.nlt.domain.vo.statistics.export.ExperimentReportExportVo">
+        select r.report_no as reportNo,
+               lr.reservation_no as reservationNo,
+               l.lab_name as labName,
+               r.title as title,
+               r.experiment_name as experimentName,
+               stu.real_name as submitterName,
+               stu.user_no as userNo,
+               r.submitted_at as submittedAt,
+               r.status as status,
+               tea.real_name as reviewerName,
+               r.reviewed_at as reviewedAt,
+               r.teacher_comment as teacherComment
+        <include refid="ExperimentReportExportFilter"/>
+        order by r.submitted_at desc, r.id desc
+        limit #{limit}
+    </select>
 </mapper>

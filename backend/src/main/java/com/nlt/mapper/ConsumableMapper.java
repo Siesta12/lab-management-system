@@ -1,6 +1,8 @@
 package com.nlt.mapper;
 
 import com.nlt.domain.entity.ConsumableEntity;
+import com.nlt.domain.vo.statistics.export.ConsumableExportVo;
+import java.time.LocalDate;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -82,6 +84,19 @@ public interface ConsumableMapper {
      * @return 影响行数
      */
     int softDelete(@Param("id") Long id);
+
+    long countExport(@Param("departmentId") Long departmentId,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate,
+        @Param("labType") String labType,
+        @Param("labId") Long labId);
+
+    List<ConsumableExportVo> selectExportList(@Param("departmentId") Long departmentId,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate,
+        @Param("labType") String labType,
+        @Param("labId") Long labId,
+        @Param("limit") int limit);
 
 }
 

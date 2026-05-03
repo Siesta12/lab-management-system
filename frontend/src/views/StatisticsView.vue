@@ -452,7 +452,8 @@ const options = reactive<StatisticsOptions>({
   reservationTypes: [],
   exportTypes: [
     { label: '预约数据', value: 'reservation' },
-    { label: '实验报告数据', value: 'experimentReport' },
+    { label: '实验室使用统计', value: 'labUsage' },
+    { label: '设备统计', value: 'device' },
     { label: '耗材统计数据', value: 'consumable' },
     { label: '违规/信用数据', value: 'creditViolation' },
   ],
@@ -473,10 +474,11 @@ const quickRanges: Array<{ label: string; value: RangeKey }> = [
 ];
 
 const exportChoices = [
-  { type: 'reservation', label: '导出预约数据', action: '立即导出', description: '查看预约编号、实验室、申请人、状态和时间段。', fields: '字段摘要：预约编号、实验室、申请人、角色、类型、状态、时间' },
-  { type: 'experimentReport', label: '导出实验报告数据', action: '立即导出', description: '查看报告编号、实验室、提交人、审核状态和时间。', fields: '字段摘要：报告编号、预约编号、实验室、提交人、状态、审核时间' },
-  { type: 'consumable', label: '导出耗材统计数据', action: '立即导出', description: '查看库存、预警阈值、入库和出库统计。', fields: '字段摘要：耗材名称、实验室、库存、阈值、本月入库、本月出库' },
-  { type: 'creditViolation', label: '导出信用 / 违规数据', action: '立即导出', description: '查看违规类型、扣分、发生时间和当前信用分。', fields: '字段摘要：姓名、学工号、角色、违规类型、扣分、时间、信用分' },
+  { type: 'reservation', label: '预约统计 Excel 导出', action: '立即导出', description: '导出当前筛选下的预约统计明细。', fields: '字段摘要：预约编号、实验室、申请人、角色、类型、状态、时间' },
+  { type: 'labUsage', label: '实验室使用统计 Excel 导出', action: '立即导出', description: '导出使用率、热度、高频与空闲实验室统计。', fields: '字段摘要：汇总指标、类型使用率、时间段热度、高频/空闲实验室 Top' },
+  { type: 'device', label: '设备统计 Excel 导出', action: '立即导出', description: '导出设备状态、品牌分布、报修趋势和实验室设备分布。', fields: '字段摘要：设备汇总、状态分布、品牌分布、报修趋势、实验室设备 Top' },
+  { type: 'consumable', label: '耗材统计 Excel 导出', action: '立即导出', description: '导出库存、预警阈值、入库和出库统计。', fields: '字段摘要：耗材名称、实验室、库存、阈值、本月入库、本月出库' },
+  { type: 'creditViolation', label: '信用 / 违规统计 Excel 导出', action: '立即导出', description: '导出违规类型、扣分、发生时间和当前信用分。', fields: '字段摘要：姓名、学工号、角色、违规类型、扣分、时间、信用分' },
 ];
 
 const entryCards = computed<EntryCard[]>(() => {
@@ -545,10 +547,10 @@ const entryCards = computed<EntryCard[]>(() => {
       type: 'export',
       tag: 'EXPORT',
       title: 'Excel 导出',
-      description: '基于当前筛选条件导出预约、实验报告、耗材统计和信用违规数据。',
+      description: '基于当前筛选条件导出预约、实验室使用、设备、耗材和信用违规统计数据。',
       actionText: '选择导出',
       metrics: [
-        { label: '支持类型', value: '4 类' },
+        { label: '支持类型', value: '5 类' },
         { label: '当前范围', value: selectedLabName.value },
       ],
     },
@@ -588,9 +590,9 @@ const dialogHeaderActionLabel = computed(() => {
     return '';
   }
   const exportMap: Partial<Record<DialogModule, string>> = {
-    reservation: '导出预约数据',
-    consumable: '导出耗材统计',
-    credit: '导出信用 / 违规数据',
+    reservation: 'Excel导出',
+    consumable: 'Excel导出',
+    credit: 'Excel导出',
   };
   return exportMap[dialogModule.value] ?? 'Excel 导出';
 });
@@ -1005,16 +1007,6 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
 
 function handleDialogHeaderAction(): void {
   if (!dialogModule.value) {
-    return;
-  }
-  const exportMap: Partial<Record<DialogModule, string>> = {
-    reservation: 'reservation',
-    consumable: 'consumable',
-    credit: 'creditViolation',
-  };
-  const exportType = exportMap[dialogModule.value];
-  if (exportType) {
-    void exportByType(exportType);
     return;
   }
   openDialog('export');

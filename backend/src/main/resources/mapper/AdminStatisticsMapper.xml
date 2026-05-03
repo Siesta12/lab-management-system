@@ -1,0 +1,908 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nlt.mapper.AdminStatisticsMapper">
+
+    <select id="selectLabOptions" resultType="com.nlt.domain.vo.statistics.AdminStatisticsVo$OptionItemVo">
+        select lab_name as label, cast(id as char) as value
+        from lab
+        where deleted = 0
+          and department_id = #{departmentId}
+        order by lab_name asc, id asc
+    </select>
+
+    <select id="countAccessibleLab" resultType="long">
+        select count(*)
+        from lab
+        where id = #{labId}
+          and department_id = #{departmentId}
+          and deleted = 0
+    </select>
+
+    <select id="countOverviewMonthReservations" resultType="long">
+        select count(distinct r.id)
+        from lab_reservation r
+        join lab l on l.id = r.lab_id
+        join lab_reservation_slot s on s.reservation_id = r.id
+        where l.deleted = 0
+          and l.department_id = #{departmentId}
+          and s.slot_status = 1
+          and s.reservation_date between #{startDate} and #{endDate}
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+    </select>
+
+    <select id="countTodayReservations" resultType="long">
+        select count(distinct r.id)
+        from lab_reservation r
+        join lab l on l.id = r.lab_id
+        join lab_reservation_slot s on s.reservation_id = r.id
+        where l.deleted = 0
+          and l.department_id = #{departmentId}
+          and s.slot_status = 1
+          and s.reservation_date = #{today}
+    </select>
+
+    <select id="countPendingReservations" resultType="long">
+        select count(*)
+        from lab_reservation r
+        join lab l on l.id = r.lab_id
+        where l.deleted = 0
+          and l.department_id = #{departmentId}
+          and r.status = 1
+    </select>
+
+    <select id="countBrokenDevices" resultType="long">
+        select count(*)
+        from lab_device d
+        join lab l on l.id = d.lab_id
+        where d.deleted = 0
+          and l.deleted = 0
+          and l.department_id = #{departmentId}
+          and d.status != 1
+    </select>
+
+    <select id="countRepairingDevices" resultType="long">
+        select count(*)
+        from lab_device d
+        join lab l on l.id = d.lab_id
+        where d.deleted = 0
+          and l.deleted = 0
+          and l.department_id = #{departmentId}
+          and d.status = 2
+    </select>
+
+    <select id="countLowStockConsumables" resultType="long">
+        select count(*)
+        from lab_consumable c
+        join lab l on l.id = c.lab_id
+        where c.deleted = 0
+          and l.deleted = 0
+          and l.department_id = #{departmentId}
+          and c.stock_quantity <![CDATA[ <= ]]> c.warning_threshold
+    </select>
+
+    <select id="countOverviewMonthViolations" resultType="long">
+        select count(*)
+        from user_violation_record v
+        join sys_user u on u.id = v.user_id
+        left join lab_reservation r on r.id = v.reservation_id
+        left join (
+            select s.reservation_id, min(s.reservation_date) as first_date
+            from lab_reservation_slot s
+            where s.slot_status = 1
+            group by s.reservation_id
+        ) slot on slot.reservation_id = v.reservation_id
+        where u.deleted = 0
+          and u.department_id = #{departmentId}
+          and coalesce(slot.first_date, date(r.created_at)) between #{startDate} and #{endDate}
+    </select>
+
+    <select id="selectAverageCreditScore" resultType="java.math.BigDecimal">
+        select avg(u.credit_score)
+        from sys_user u
+        where u.deleted = 0
+          and u.department_id = #{departmentId}
+    </select>
+
+    <select id="countLowCreditUsers" resultType="long">
+        select count(*)
+        from sys_user u
+        where u.deleted = 0
+          and u.department_id = #{departmentId}
+          and u.credit_score <![CDATA[ < ]]> #{lowCreditScore}
+    </select>
+
+    <sql id="ReservationStatsBaseWhere">
+        from lab_reservation r
+        join lab l on l.id = r.lab_id
+        join lab_reservation_slot s on s.reservation_id = r.id
+        where l.deleted = 0
+          and l.department_id = #{departmentId}
+          and s.slot_status = 1
+          and s.reservation_date between #{startDate} and #{endDate}
+    </sql>
+
+    <select id="countReservationTotal" resultType="long">
+        select count(distinct r.id)
+        <include refid="ReservationStatsBaseWhere"/>
+        <if test="labId != null">
+            and r.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        <if test="status != null">
+            and r.status = #{status}
+        </if>
+        <if test="reservationType != null">
+            and r.reservation_type = #{reservationType}
+        </if>
+    </select>
+
+    <select id="countReservationPending" resultType="long">
+        select count(distinct r.id)
+        <include refid="ReservationStatsBaseWhere"/>
+        <if test="labId != null">
+            and r.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        and r.status = 1
+        <if test="reservationType != null">
+            and r.reservation_type = #{reservationType}
+        </if>
+    </select>
+
+    <select id="countReservationCompleted" resultType="long">
+        select count(distinct r.id)
+        <include refid="ReservationStatsBaseWhere"/>
+        <if test="labId != null">
+            and r.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        and r.status = 5
+        <if test="reservationType != null">
+            and r.reservation_type = #{reservationType}
+        </if>
+    </select>
+
+    <select id="selectReservationTrend" resultType="map">
+        select date_format(s.reservation_date, '%Y-%m-%d') as name, count(distinct r.id) as value
+        <include refid="ReservationStatsBaseWhere"/>
+        <if test="labId != null">
+            and r.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        <choose>
+            <when test="status != null">
+                and r.status = #{status}
+            </when>
+            <otherwise>
+                and r.status in (2, 5)
+            </otherwise>
+        </choose>
+        <if test="reservationType != null">
+            and r.reservation_type = #{reservationType}
+        </if>
+        group by date_format(s.reservation_date, '%Y-%m-%d')
+        order by name asc
+    </select>
+
+    <select id="selectReservationStatusDistribution" resultType="map">
+        select r.status as name, count(distinct r.id) as value
+        <include refid="ReservationStatsBaseWhere"/>
+        <if test="labId != null">
+            and r.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        <if test="reservationType != null">
+            and r.reservation_type = #{reservationType}
+        </if>
+        group by r.status
+    </select>
+
+    <select id="selectReservationTypeDistribution" resultType="map">
+        select r.reservation_type as name, count(distinct r.id) as value
+        <include refid="ReservationStatsBaseWhere"/>
+        <if test="labId != null">
+            and r.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        <if test="status != null">
+            and r.status = #{status}
+        </if>
+        group by r.reservation_type
+    </select>
+
+    <select id="selectReservationApplicantRoleDistribution" resultType="map">
+        select case
+                 when exists (
+                   select 1 from sys_user_role ur
+                   join sys_role role on role.id = ur.role_id
+                   where ur.user_id = u.id and role.role_code in ('TEACHER', 'ROLE_TEACHER')
+                 ) then 'TEACHER'
+                 else 'STUDENT'
+               end as name,
+               count(distinct s.reservation_id) as value
+        from lab_reservation r
+        join lab l on l.id = r.lab_id
+        join sys_user u on u.id = r.applicant_user_id
+        join lab_reservation_slot s on s.reservation_id = r.id
+        where l.deleted = 0
+          and l.department_id = #{departmentId}
+          and s.slot_status = 1
+          and s.reservation_date between #{startDate} and #{endDate}
+        <if test="labId != null">
+            and r.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        <if test="status != null">
+            and r.status = #{status}
+        </if>
+        <if test="reservationType != null">
+            and r.reservation_type = #{reservationType}
+        </if>
+        group by name
+    </select>
+
+    <select id="selectReservationLabTypeDistribution" resultType="map">
+        select coalesce(nullif(l.lab_type, ''), 'UNCLASSIFIED') as name,
+               count(distinct r.id) as value
+        <include refid="ReservationStatsBaseWhere"/>
+        <if test="labId != null">
+            and r.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        <if test="status != null">
+            and r.status = #{status}
+        </if>
+        <if test="reservationType != null">
+            and r.reservation_type = #{reservationType}
+        </if>
+        group by coalesce(nullif(l.lab_type, ''), 'UNCLASSIFIED')
+        order by value desc, name asc
+    </select>
+
+    <select id="selectLabUsageRanking" resultType="map">
+        select l.id, l.lab_name as name, concat(l.building_name, l.room_no) as secondary,
+               count(distinct s.reservation_id) as value
+        from lab l
+        left join lab_reservation r on r.lab_id = l.id and r.status in (2, 5)
+        left join lab_reservation_slot s on s.reservation_id = r.id
+            and s.slot_status = 1
+            and s.reservation_date between #{startDate} and #{endDate}
+        where l.deleted = 0
+          and l.department_id = #{departmentId}
+        <if test="labId != null">
+            and l.id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        group by l.id, l.lab_name, l.building_name, l.room_no
+        order by value desc, l.id asc
+        limit 10
+    </select>
+
+    <select id="selectLabUsageIdleLabs" resultType="map">
+        select l.id, l.lab_name as name, concat(l.building_name, l.room_no) as secondary,
+               count(distinct r.id) as value
+        from lab l
+        left join lab_reservation r on r.lab_id = l.id and r.status in (2, 5)
+        left join lab_reservation_slot s on s.reservation_id = r.id
+            and s.slot_status = 1
+            and s.reservation_date between #{startDate} and #{endDate}
+        where l.deleted = 0
+          and l.department_id = #{departmentId}
+        <if test="labId != null">
+            and l.id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        group by l.id, l.lab_name, l.building_name, l.room_no
+        order by value asc, l.id asc
+        limit 10
+    </select>
+
+    <select id="selectLabUsageTimeHeat" resultType="map">
+        select p.period_name as name, count(*) as value
+        from lab_reservation_slot s
+        join lab_reservation r on r.id = s.reservation_id
+        join lab l on l.id = r.lab_id
+        join class_period p on p.id = s.period_id
+        where l.deleted = 0
+          and l.department_id = #{departmentId}
+          and r.status in (2, 5)
+          and s.slot_status = 1
+          and s.reservation_date between #{startDate} and #{endDate}
+        <if test="labId != null">
+            and r.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        group by p.id, p.period_name, p.sort_order, p.period_no
+        order by p.sort_order asc, p.period_no asc
+    </select>
+
+    <select id="countHighUsageLabs" resultType="long">
+        select count(*) from (
+            select l.id, count(distinct s.reservation_id) as reservation_count
+            from lab l
+            left join lab_reservation r on r.lab_id = l.id and r.status in (2, 5)
+            left join lab_reservation_slot s on s.reservation_id = r.id
+                and s.slot_status = 1
+                and s.reservation_date between #{startDate} and #{endDate}
+            where l.deleted = 0
+              and l.department_id = #{departmentId}
+            <if test="labId != null">
+                and l.id = #{labId}
+            </if>
+            <if test="labType != null and labType != ''">
+                and l.lab_type = #{labType}
+            </if>
+            group by l.id
+        ) summary
+        where summary.reservation_count > 0
+    </select>
+
+    <select id="countIdleLabs" resultType="long">
+        select count(*) from (
+            select l.id, count(distinct s.reservation_id) as reservation_count
+            from lab l
+            left join lab_reservation r on r.lab_id = l.id and r.status in (2, 5)
+            left join lab_reservation_slot s on s.reservation_id = r.id
+                and s.slot_status = 1
+                and s.reservation_date between #{startDate} and #{endDate}
+            where l.deleted = 0
+              and l.department_id = #{departmentId}
+            <if test="labId != null">
+                and l.id = #{labId}
+            </if>
+            <if test="labType != null and labType != ''">
+                and l.lab_type = #{labType}
+            </if>
+            group by l.id
+        ) summary
+        where summary.reservation_count = 0
+    </select>
+
+    <select id="countLabUsageOccupiedSlots" resultType="long">
+        select count(*)
+        from lab_reservation_slot s
+        join lab_reservation r on r.id = s.reservation_id
+        join lab l on l.id = s.lab_id
+        where l.deleted = 0
+          and l.department_id = #{departmentId}
+          and r.status in (2, 5)
+          and s.slot_status = 1
+          and s.reservation_date between #{startDate} and #{endDate}
+        <if test="labId != null">
+            and s.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+    </select>
+
+    <select id="selectUsageLabTypes" resultType="map">
+        select coalesce(nullif(lab_type, ''), 'UNCLASSIFIED') as labType
+        from lab
+        where deleted = 0
+          and department_id = #{departmentId}
+        <if test="labId != null">
+            and id = #{labId}
+        </if>
+        <if test="selectedLabType != null and selectedLabType != ''">
+            and lab_type = #{selectedLabType}
+        </if>
+        group by coalesce(nullif(lab_type, ''), 'UNCLASSIFIED')
+        order by labType asc
+    </select>
+
+    <select id="countLabTypeOccupied" resultType="long">
+        select count(*)
+        from lab_reservation_slot s
+        join lab_reservation r on r.id = s.reservation_id
+        join lab l on l.id = s.lab_id
+        where l.deleted = 0
+          and l.department_id = #{departmentId}
+          and coalesce(nullif(l.lab_type, ''), 'UNCLASSIFIED') = #{labType}
+          and r.status in (2, 5)
+          and s.slot_status = 1
+          and s.reservation_date between #{startDate} and #{endDate}
+        <if test="labId != null">
+            and s.lab_id = #{labId}
+        </if>
+    </select>
+
+    <select id="selectOpenSlotWeekdayCounts" resultType="map">
+        select os.weekday as weekday, count(*) as value
+        from lab_open_slot os
+        join lab l on l.id = os.lab_id
+        where l.deleted = 0
+          and l.department_id = #{departmentId}
+          and os.status = 1
+        <if test="labId != null">
+            and os.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and coalesce(nullif(l.lab_type, ''), 'UNCLASSIFIED') = #{labType}
+        </if>
+        group by os.weekday
+    </select>
+
+    <select id="countOpenSlotLabCount" resultType="long">
+        select count(*)
+        from lab
+        where deleted = 0
+          and department_id = #{departmentId}
+        <if test="labId != null">
+            and id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and coalesce(nullif(lab_type, ''), 'UNCLASSIFIED') = #{labType}
+        </if>
+    </select>
+
+    <select id="countActiveClassPeriods" resultType="long">
+        select count(*)
+        from class_period
+        where status = 1
+    </select>
+
+    <select id="countDevicesTotal" resultType="long">
+        select count(*)
+        from lab_device d
+        join lab l on l.id = d.lab_id
+        where d.deleted = 0
+          and l.deleted = 0
+          and l.department_id = #{departmentId}
+        <if test="labId != null">
+            and d.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+    </select>
+
+    <select id="countDevicesByStatus" resultType="long">
+        select count(*)
+        from lab_device d
+        join lab l on l.id = d.lab_id
+        where d.deleted = 0
+          and l.deleted = 0
+          and l.department_id = #{departmentId}
+          and d.status = #{deviceStatus}
+        <if test="labId != null">
+            and d.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+    </select>
+
+    <select id="countDeviceRepairOrders" resultType="long">
+        select count(*)
+        from lab_device_repair rr
+        join lab l on l.id = rr.lab_id
+        where l.deleted = 0
+          and l.department_id = #{departmentId}
+          and rr.created_at <![CDATA[ >= ]]> #{startDate}
+          and rr.created_at <![CDATA[ < ]]> date_add(#{endDate}, interval 1 day)
+        <if test="labId != null">
+            and rr.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+    </select>
+
+    <select id="selectLabDeviceCounts" resultType="map">
+        select l.id, l.lab_name as name, concat(l.building_name, l.room_no) as secondary,
+               coalesce(sum(d.quantity), 0) as value
+        from lab l
+        left join lab_device d on d.lab_id = l.id and d.deleted = 0
+        where l.deleted = 0
+          and l.department_id = #{departmentId}
+        <if test="labId != null">
+            and l.id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        group by l.id, l.lab_name, l.building_name, l.room_no
+        order by value desc, l.id asc
+        limit 12
+    </select>
+
+    <select id="selectAbnormalDevices" resultType="map">
+        select d.id, d.device_name as name, concat(l.lab_name, ' / ', d.device_code) as secondary,
+               d.status as value
+        from lab_device d
+        join lab l on l.id = d.lab_id
+        where d.deleted = 0
+          and l.deleted = 0
+          and l.department_id = #{departmentId}
+          and d.status != 1
+        <if test="labId != null">
+            and d.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        order by d.updated_at desc, d.id desc
+        limit 10
+    </select>
+
+    <select id="selectDeviceCategoryDistribution" resultType="map">
+        select coalesce(nullif(d.brand, ''), 'OTHER_BRAND') as name,
+               coalesce(sum(d.quantity), 0) as value
+        from lab_device d
+        join lab l on l.id = d.lab_id
+        where d.deleted = 0
+          and l.deleted = 0
+          and l.department_id = #{departmentId}
+        <if test="labId != null">
+            and d.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        group by coalesce(nullif(d.brand, ''), 'OTHER_BRAND')
+        order by value desc, name asc
+        limit 8
+    </select>
+
+    <select id="selectDeviceRepairTrend" resultType="map">
+        select date(rr.created_at) as name, count(*) as value
+        from lab_device_repair rr
+        join lab l on l.id = rr.lab_id
+        where l.deleted = 0
+          and l.department_id = #{departmentId}
+          and rr.created_at <![CDATA[ >= ]]> #{startDate}
+          and rr.created_at <![CDATA[ < ]]> date_add(#{endDate}, interval 1 day)
+        <if test="labId != null">
+            and rr.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        group by date(rr.created_at)
+        order by date(rr.created_at) asc
+    </select>
+
+    <select id="countConsumableTypes" resultType="long">
+        select count(*)
+        from lab_consumable c
+        join lab l on l.id = c.lab_id
+        where c.deleted = 0
+          and l.deleted = 0
+          and l.department_id = #{departmentId}
+        <if test="labId != null">
+            and c.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+    </select>
+
+    <select id="countLowStockConsumablesByQuery" resultType="long">
+        select count(*)
+        from lab_consumable c
+        join lab l on l.id = c.lab_id
+        where c.deleted = 0
+          and l.deleted = 0
+          and l.department_id = #{departmentId}
+          and c.stock_quantity <![CDATA[ <= ]]> c.warning_threshold
+        <if test="labId != null">
+            and c.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+    </select>
+
+    <select id="sumConsumableInQuantity" resultType="long">
+        select coalesce(sum(abs(log.change_amount)), 0)
+        from consumable_stock_log log
+        join lab_consumable c on c.id = log.consumable_id
+        join lab l on l.id = c.lab_id
+        where c.deleted = 0
+          and l.deleted = 0
+          and l.department_id = #{departmentId}
+          and log.change_type = 'IN'
+          and log.created_at <![CDATA[ >= ]]> #{startDate}
+          and log.created_at <![CDATA[ < ]]> date_add(#{endDate}, interval 1 day)
+        <if test="labId != null">
+            and c.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+    </select>
+
+    <select id="sumConsumableOutQuantity" resultType="long">
+        select coalesce(sum(abs(log.change_amount)), 0)
+        from consumable_stock_log log
+        join lab_consumable c on c.id = log.consumable_id
+        join lab l on l.id = c.lab_id
+        where c.deleted = 0
+          and l.deleted = 0
+          and l.department_id = #{departmentId}
+          and log.change_type = 'OUT'
+          and log.created_at <![CDATA[ >= ]]> #{startDate}
+          and log.created_at <![CDATA[ < ]]> date_add(#{endDate}, interval 1 day)
+        <if test="labId != null">
+            and c.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+    </select>
+
+    <select id="selectConsumableConsumptionRanking" resultType="map">
+        select c.id, c.consumable_name as name, concat(l.lab_name, ' / ', c.unit) as secondary,
+               coalesce(sum(abs(log.change_amount)), 0) as value
+        from lab_consumable c
+        join lab l on l.id = c.lab_id
+        left join consumable_stock_log log on log.consumable_id = c.id
+            and log.change_type = 'OUT'
+            and log.created_at <![CDATA[ >= ]]> #{startDate}
+            and log.created_at <![CDATA[ < ]]> date_add(#{endDate}, interval 1 day)
+        where c.deleted = 0
+          and l.deleted = 0
+          and l.department_id = #{departmentId}
+        <if test="labId != null">
+            and c.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        group by c.id, c.consumable_name, l.lab_name, c.unit
+        order by value desc, c.id asc
+        limit 10
+    </select>
+
+    <select id="selectConsumableWarningList" resultType="map">
+        select c.id, c.consumable_name as name, concat(l.lab_name, ' / warning:', c.warning_threshold, c.unit) as secondary,
+               c.stock_quantity as value
+        from lab_consumable c
+        join lab l on l.id = c.lab_id
+        where c.deleted = 0
+          and l.deleted = 0
+          and l.department_id = #{departmentId}
+          and c.stock_quantity <![CDATA[ <= ]]> c.warning_threshold
+        <if test="labId != null">
+            and c.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        order by c.stock_quantity asc, c.id asc
+        limit 10
+    </select>
+
+    <select id="selectConsumableInTrend" resultType="map">
+        select date_format(log.created_at, '%Y-%m-%d') as name,
+               coalesce(sum(abs(log.change_amount)), 0) as value
+        from consumable_stock_log log
+        join lab_consumable c on c.id = log.consumable_id
+        join lab l on l.id = c.lab_id
+        where c.deleted = 0
+          and l.deleted = 0
+          and l.department_id = #{departmentId}
+          and log.change_type = 'IN'
+          and log.created_at <![CDATA[ >= ]]> #{startDate}
+          and log.created_at <![CDATA[ < ]]> date_add(#{endDate}, interval 1 day)
+        <if test="labId != null">
+            and c.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        group by date_format(log.created_at, '%Y-%m-%d')
+        order by name asc
+    </select>
+
+    <select id="selectConsumableOutTrend" resultType="map">
+        select date_format(log.created_at, '%Y-%m-%d') as name,
+               coalesce(sum(abs(log.change_amount)), 0) as value
+        from consumable_stock_log log
+        join lab_consumable c on c.id = log.consumable_id
+        join lab l on l.id = c.lab_id
+        where c.deleted = 0
+          and l.deleted = 0
+          and l.department_id = #{departmentId}
+          and log.change_type = 'OUT'
+          and log.created_at <![CDATA[ >= ]]> #{startDate}
+          and log.created_at <![CDATA[ < ]]> date_add(#{endDate}, interval 1 day)
+        <if test="labId != null">
+            and c.lab_id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        group by date_format(log.created_at, '%Y-%m-%d')
+        order by name asc
+    </select>
+
+    <select id="selectConsumableLabUsageRanking" resultType="map">
+        select l.id, l.lab_name as name, coalesce(nullif(l.lab_type, ''), 'UNCLASSIFIED') as secondary,
+               coalesce(sum(abs(log.change_amount)), 0) as value
+        from lab l
+        left join lab_consumable c on c.lab_id = l.id and c.deleted = 0
+        left join consumable_stock_log log on log.consumable_id = c.id
+            and log.change_type = 'OUT'
+            and log.created_at <![CDATA[ >= ]]> #{startDate}
+            and log.created_at <![CDATA[ < ]]> date_add(#{endDate}, interval 1 day)
+        where l.deleted = 0
+          and l.department_id = #{departmentId}
+        <if test="labId != null">
+            and l.id = #{labId}
+        </if>
+        <if test="labType != null and labType != ''">
+            and l.lab_type = #{labType}
+        </if>
+        group by l.id, l.lab_name, l.lab_type
+        order by value desc, l.id asc
+        limit 10
+    </select>
+
+    <sql id="ViolationBaseWhere">
+        from user_violation_record v
+        join sys_user u on u.id = v.user_id
+        left join lab_reservation r on r.id = v.reservation_id
+        left join (
+            select s.reservation_id, min(s.reservation_date) as first_date
+            from lab_reservation_slot s
+            where s.slot_status = 1
+            group by s.reservation_id
+        ) slot on slot.reservation_id = v.reservation_id
+        where u.deleted = 0
+          and u.department_id = #{departmentId}
+          and coalesce(slot.first_date, date(r.created_at)) between #{startDate} and #{endDate}
+    </sql>
+
+    <select id="countViolationsByType" resultType="long">
+        select count(*)
+        <include refid="ViolationBaseWhere"/>
+        and v.violation_type = #{violationType}
+    </select>
+
+    <select id="selectViolationTypeDistribution" resultType="map">
+        select v.violation_type as name, count(*) as value
+        <include refid="ViolationBaseWhere"/>
+        group by v.violation_type
+    </select>
+
+    <select id="selectLowCreditUsers" resultType="map">
+        select u.id, u.real_name as name, u.user_no as secondary, u.credit_score as value
+        from sys_user u
+        where u.deleted = 0
+          and u.department_id = #{departmentId}
+          and u.credit_score <![CDATA[ < ]]> #{lowCreditScore}
+        order by u.credit_score asc, u.id asc
+        limit 10
+    </select>
+
+    <select id="selectViolationRanking" resultType="map">
+        select u.id, u.real_name as name, u.user_no as secondary, count(v.id) as value
+        <include refid="ViolationBaseWhere"/>
+        group by u.id, u.real_name, u.user_no
+        order by value desc, u.id asc
+        limit 10
+    </select>
+
+    <select id="selectViolationTrend" resultType="map">
+        select date_format(coalesce(slot.first_date, date(r.created_at)), '%Y-%m-%d') as name, count(*) as value
+        <include refid="ViolationBaseWhere"/>
+        group by date_format(coalesce(slot.first_date, date(r.created_at)), '%Y-%m-%d')
+        order by name asc
+    </select>
+
+    <select id="selectLateTrend" resultType="map">
+        select date_format(coalesce(slot.first_date, date(r.created_at)), '%Y-%m-%d') as name, count(*) as value
+        <include refid="ViolationBaseWhere"/>
+        and v.violation_type = 2
+        group by date_format(coalesce(slot.first_date, date(r.created_at)), '%Y-%m-%d')
+        order by name asc
+    </select>
+
+    <select id="selectNoShowTrend" resultType="map">
+        select date_format(coalesce(slot.first_date, date(r.created_at)), '%Y-%m-%d') as name, count(*) as value
+        <include refid="ViolationBaseWhere"/>
+        and v.violation_type = 1
+        group by date_format(coalesce(slot.first_date, date(r.created_at)), '%Y-%m-%d')
+        order by name asc
+    </select>
+
+    <select id="selectCreditScoreDistribution" resultType="map">
+        select case
+                 when u.credit_score <![CDATA[ < ]]> 60 then 'LT60'
+                 when u.credit_score <![CDATA[ < ]]> 70 then '60_69'
+                 when u.credit_score <![CDATA[ < ]]> 80 then '70_79'
+                 when u.credit_score <![CDATA[ < ]]> 90 then '80_89'
+                 else 'GTE90'
+               end as name,
+               count(*) as value
+        from sys_user u
+        where u.deleted = 0
+          and u.department_id = #{departmentId}
+        group by name
+        order by value desc, name asc
+    </select>
+
+    <select id="selectRoleViolationDistribution" resultType="map">
+        select case
+                 when exists (
+                   select 1 from sys_user_role ur
+                   join sys_role role on role.id = ur.role_id
+                   where ur.user_id = u.id and role.role_code in ('TEACHER', 'ROLE_TEACHER')
+                 ) then 'TEACHER'
+                 else 'STUDENT'
+               end as name,
+               count(*) as value
+        <include refid="ViolationBaseWhere"/>
+        group by name
+    </select>
+
+    <select id="selectCreditReservationTypeDistribution" resultType="map">
+        select r.reservation_type as name, count(*) as value
+        from user_violation_record v
+        join sys_user u on u.id = v.user_id
+        join lab_reservation r on r.id = v.reservation_id
+        left join (
+            select s.reservation_id, min(s.reservation_date) as first_date
+            from lab_reservation_slot s
+            where s.slot_status = 1
+            group by s.reservation_id
+        ) slot on slot.reservation_id = v.reservation_id
+        where u.deleted = 0
+          and u.department_id = #{departmentId}
+          and coalesce(slot.first_date, date(r.created_at)) between #{startDate} and #{endDate}
+        group by r.reservation_type
+    </select>
+
+    <select id="selectCreditTimeSegmentDistribution" resultType="map">
+        select case
+                 when hour(coalesce(slot.first_start_at, r.created_at)) <![CDATA[ < ]]> 12 then 'MORNING'
+                 when hour(coalesce(slot.first_start_at, r.created_at)) <![CDATA[ < ]]> 18 then 'AFTERNOON'
+                 else 'EVENING'
+               end as name,
+               count(*) as value
+        from user_violation_record v
+        join sys_user u on u.id = v.user_id
+        left join lab_reservation r on r.id = v.reservation_id
+        left join (
+            select s.reservation_id,
+                   min(timestamp(s.reservation_date, p.start_time)) as first_start_at,
+                   min(s.reservation_date) as first_date
+            from lab_reservation_slot s
+            join class_period p on p.id = s.period_id
+            where s.slot_status = 1
+            group by s.reservation_id
+        ) slot on slot.reservation_id = v.reservation_id
+        where u.deleted = 0
+          and u.department_id = #{departmentId}
+          and coalesce(slot.first_date, date(r.created_at)) between #{startDate} and #{endDate}
+        group by name
+    </select>
+</mapper>

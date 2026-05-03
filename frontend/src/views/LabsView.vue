@@ -4,13 +4,13 @@
       <div class="toolbar">
         <div class="toolbar-title">{{ pagePanelTitle }}</div>
         <input v-model="keyword" :placeholder="isAdmin ? '输入实验室名称或编号' : '输入实验室名称或编号等'" @keyup.enter="handleSearch" />
+        <select v-model="filters.labType" class="toolbar-select" @change="handleLabTypeChange">
+          <option value="">全部类型</option>
+          <option v-for="type in labTypeOptions" :key="type" :value="type">{{ type }}</option>
+        </select>
         <select v-if="isAdmin" v-model="filters.departmentId" :disabled="isDepartmentScopedAdmin">
           <option v-if="!isDepartmentScopedAdmin" :value="undefined">全部学院</option>
           <option v-for="dept in visibleDepartments" :key="dept.value" :value="dept.value">{{ dept.label }}</option>
-        </select>
-        <select v-if="isAdmin" v-model="filters.labType">
-          <option value="">全部类型</option>
-          <option v-for="type in filteredLabTypeOptions" :key="type" :value="type">{{ type }}</option>
         </select>
         <select v-if="isAdmin" v-model="filters.labId" :disabled="!filteredAdminLabOptions.length">
           <option :value="undefined">全部实验室</option>
@@ -115,160 +115,172 @@
               </div>
             </div>
 
-            <p v-if="scheduleMessage" class="info-text">{{ scheduleMessage }}</p>
-
             <div v-if="schedule" class="schedule-wrap">
-              <div class="legend">
-                <template v-if="isAdmin">
-                  <span class="legend-item free">空闲</span>
-                  <span class="legend-item reserved">已预约</span>
-                  <span class="legend-item pending">待审核</span>
-                  <span class="legend-item maintenance">维护中</span>
-                  <span class="legend-item closed">不开放</span>
-                </template>
-                <template v-else>
-                  <span class="legend-item free">空闲</span>
-                  <span class="legend-item reserved">已预约</span>
-                  <span class="legend-item pending">待审核（本人）</span>
-                  <span class="legend-item pendingOther">可申请（他人待审核）</span>
-                  <span class="legend-item maintenance">维护中</span>
-                  <span class="legend-item closed">不开放</span>
-                </template>
-                <span v-if="selectedKeys.length" class="legend-selected">已选 {{ selectedKeys.length }} 个</span>
-              </div>
-
-              <div v-if="selectedKeys.length || recommendationRequestKeys.length" class="selection-strip">
-                <div class="selection-left">
-                  <span class="selection-label">{{ selectedKeys.length ? '已选' : '推荐依据' }}</span>
-                  <div class="selection-items">
-                    <span
-                      v-for="k in (selectedKeys.length ? selectedKeys : recommendationRequestKeys)"
-                      :key="`${k.date}-${k.periodId}`"
-                      class="selection-pill"
-                      :class="{ blocked: !selectedKeys.length }"
-                    >
-                      {{ k.date.slice(5) }} · {{ periodLabel(k.periodId) }}
-                    </span>
-                  </div>
+              <div class="schedule-main">
+                <div class="legend">
+                  <template v-if="isAdmin">
+                    <span class="legend-item free">空闲</span>
+                    <span class="legend-item reserved">已预约</span>
+                    <span class="legend-item pending">待审核</span>
+                    <span class="legend-item maintenance">维护中</span>
+                    <span class="legend-item closed">不开放</span>
+                  </template>
+                  <template v-else>
+                    <span class="legend-item free">空闲</span>
+                    <span class="legend-item reserved">已预约</span>
+                    <span class="legend-item pending">待审核（本人）</span>
+                    <span class="legend-item pendingOther">可申请（他人待审核）</span>
+                    <span class="legend-item maintenance">维护中</span>
+                    <span class="legend-item closed">不开放</span>
+                  </template>
+                  <span v-if="selectedKeys.length" class="legend-selected">已选 {{ selectedKeys.length }} 个</span>
                 </div>
-                <button type="button" class="ghost-btn small-btn" @click="clearSelection">清空</button>
-              </div>
 
-              <div class="schedule-table-scroll">
-                <table class="schedule-table">
-                  <thead>
-                    <tr>
-                      <th class="sticky-col">节次</th>
-                      <th v-for="day in schedule.days" :key="day.date">
-                        <div class="day-head">
-                          <div class="day-date">{{ day.date.slice(5) }}</div>
-                          <div class="day-week">{{ weekdayText(day.weekday) }}</div>
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="period in schedule.periods" :key="period.id">
-                      <td class="sticky-col period-col">
-                        <div class="period-name">{{ period.periodName }}</div>
-                        <div class="period-time">{{ period.startTime }} - {{ period.endTime }}</div>
-                      </td>
-                      <td
-                        v-for="day in schedule.days"
-                        :key="`${day.date}-${period.id}`"
-                        class="schedule-cell"
-                        :class="cellClass(day, period.id)"
-                        @click="handleCellClick(day, period.id)"
+                <div v-if="selectedKeys.length || recommendationRequestKeys.length" class="selection-strip">
+                  <div class="selection-left">
+                    <span class="selection-label">{{ selectedKeys.length ? '已选' : '推荐依据' }}</span>
+                    <div class="selection-items">
+                      <span
+                        v-for="k in (selectedKeys.length ? selectedKeys : recommendationRequestKeys)"
+                        :key="`${k.date}-${k.periodId}`"
+                        class="selection-pill"
+                        :class="{ blocked: !selectedKeys.length }"
                       >
-                        <div class="cell-main">
-                          <span class="cell-status">{{ cellStatusText(day, period.id) }}</span>
-                          <span v-if="cell(day, period.id)?.reservationNo" class="cell-sub">#{{ cell(day, period.id)?.reservationNo }}</span>
-                          <span v-if="cell(day, period.id)?.maintenanceReason" class="cell-sub">{{ cell(day, period.id)?.maintenanceReason }}</span>
-                          <span v-else-if="cell(day, period.id)?.note" class="cell-sub">{{ cell(day, period.id)?.note }}</span>
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                        {{ k.date.slice(5) }} · {{ periodLabel(k.periodId) }}
+                      </span>
+                    </div>
+                  </div>
+                  <button type="button" class="ghost-btn small-btn" @click="clearSelection">清空</button>
+                </div>
+
+                <div class="schedule-table-scroll">
+                  <table class="schedule-table">
+                    <thead>
+                      <tr>
+                        <th class="sticky-col">节次</th>
+                        <th v-for="day in schedule.days" :key="day.date">
+                          <div class="day-head">
+                            <div class="day-date">{{ day.date.slice(5) }}</div>
+                            <div class="day-week">{{ weekdayText(day.weekday) }}</div>
+                          </div>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="period in schedule.periods" :key="period.id">
+                        <td class="sticky-col period-col">
+                          <div class="period-name">{{ period.periodName }}</div>
+                          <div class="period-time">{{ period.startTime }} - {{ period.endTime }}</div>
+                        </td>
+                        <td
+                          v-for="day in schedule.days"
+                          :key="`${day.date}-${period.id}`"
+                          class="schedule-cell"
+                          :class="cellClass(day, period.id)"
+                          @click="handleCellClick(day, period.id)"
+                        >
+                          <div class="cell-main">
+                            <span class="cell-status">{{ cellStatusText(day, period.id) }}</span>
+                            <span v-if="cell(day, period.id)?.maintenanceReason" class="cell-sub">{{ cell(day, period.id)?.maintenanceReason }}</span>
+                            <span v-else-if="cell(day, period.id)?.note" class="cell-sub">{{ cell(day, period.id)?.note }}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
-              <div v-if="isAuthenticated" class="schedule-forms">
-                <div class="form-card reservation-form-card">
-                  <div class="form-card-header" v-if="!isAdmin">
-                    <h6>预约信息</h6>
-                    <p>请填写预约信息，选择可用时间段后提交预约申请。</p>
-                  </div>
+              <div v-if="isAuthenticated" class="schedule-sidebar" :class="{ blocked: reservationFormLocked }">
+                <div class="schedule-forms">
+                  <div class="form-card reservation-form-card">
+                    <div class="form-card-header" v-if="!isAdmin">
+                      <h6>{{ reservationPanelState.title }}</h6>
+                      <p>{{ reservationPanelState.detail }}</p>
+                    </div>
 
-                  <div v-if="isAdmin" class="form-card-header">
-                    <h6>维护设置</h6>
-                    <p>选择未来三周内的空闲或维护节次，可批量设置维护或取消维护。</p>
-                  </div>
+                    <div v-if="isAdmin" class="form-card-header">
+                      <h6>维护设置</h6>
+                      <p>选择未来三周内的空闲或维护节次，可批量设置维护或取消维护。</p>
+                    </div>
 
-                  <p v-if="!selectedKeys.length && !isAdmin" class="info-text compact-tip">
-                    先在课表中选择空闲节次提交预约，或点击不可预约格子获取推荐。
-                  </p>
+                    <p v-if="!selectedKeys.length && !isAdmin" class="info-text compact-tip">
+                      先在课表中选择空闲节次提交预约，或点击不可预约格子获取推荐。
+                    </p>
 
-                  <p v-if="!blockedKeys.length && isAdmin" class="info-text compact-tip">
-                    先在课表中点击需要维护的节次，维护中的格子也可再次点击查看并取消。
-                  </p>
+                    <p v-if="!blockedKeys.length && isAdmin" class="info-text compact-tip">
+                      先在课表中点击需要维护的节次，维护中的格子也可再次点击查看并取消。
+                    </p>
 
-                  <div v-else-if="!isAdmin" class="beauty-form">
-                    <label class="field-card">
-                      <span class="field-label">预约类型</span>
-                      <select v-if="!isStudent" v-model.number="reservationForm.reservationType">
-                        <option v-for="item in teacherReservationTypeOptions" :key="item.value" :value="item.value">
-                          {{ item.label }}
-                        </option>
-                      </select>
-                      <input v-else :value="'个人预约'" disabled />
-                    </label>
+                    <fieldset v-if="!isAdmin" class="reservation-fields" :disabled="reservationFormLocked">
+                      <div class="beauty-form">
+                        <label class="field-card">
+                          <span class="field-label">预约类型</span>
+                          <select v-if="!isStudent" v-model.number="reservationForm.reservationType">
+                            <option v-for="item in teacherReservationTypeOptions" :key="item.value" :value="item.value">
+                              {{ item.label }}
+                            </option>
+                          </select>
+                          <input v-else :value="'个人预约'" disabled />
+                        </label>
 
-                    <label v-if="reservationForm.reservationType === 1" class="field-card">
-                      <span class="field-label">课程名称</span>
-                      <input v-model="reservationForm.courseName" placeholder="请输入课程名称" />
-                    </label>
+                        <label v-if="reservationForm.reservationType === 1" class="field-card">
+                          <span class="field-label">课程名称</span>
+                          <input v-model="reservationForm.courseName" placeholder="请输入课程名称" />
+                        </label>
 
-                    <label v-if="reservationForm.reservationType === 1" class="field-card">
-                      <span class="field-label">班级名称</span>
-                      <input v-model="reservationForm.className" placeholder="请输入班级名称" />
-                    </label>
+                        <label v-if="reservationForm.reservationType === 1" class="field-card">
+                          <span class="field-label">班级名称</span>
+                          <input v-model="reservationForm.className" placeholder="请输入班级名称" />
+                        </label>
 
-                    <label v-if="reservationForm.reservationType === 2" class="field-card">
-                      <span class="field-label">科研项目名称</span>
-                      <input v-model="reservationForm.projectName" placeholder="请输入科研项目名称" />
-                    </label>
+                        <label v-if="reservationForm.reservationType === 2" class="field-card">
+                          <span class="field-label">科研项目名称</span>
+                          <input v-model="reservationForm.projectName" placeholder="请输入科研项目名称" />
+                        </label>
 
-                    <label class="field-card">
-                      <span class="field-label">参与人数</span>
-                      <input v-model.number="reservationForm.participantCount" type="number" min="1" />
-                    </label>
+                        <label class="field-card">
+                          <span class="field-label">参与人数</span>
+                          <input v-model.number="reservationForm.participantCount" type="number" min="1" />
+                        </label>
 
-                    <label v-if="reservationForm.reservationType === 3" class="field-card field-full">
-                      <span class="field-label">用途说明</span>
-                      <input
-                        v-model="reservationForm.usagePurpose"
-                        placeholder="例如：课程实验 / 科研训练 / 项目开发 / 设备调试等"
-                      />
-                    </label>
+                        <label v-if="reservationForm.reservationType === 3" class="field-card field-full">
+                          <span class="field-label">用途说明</span>
+                          <input
+                            v-model="reservationForm.usagePurpose"
+                            placeholder="例如：课程实验 / 科研训练 / 项目开发 / 设备调试等"
+                          />
+                        </label>
 
-                    <label class="field-card">
-                      <span class="field-label">联系电话</span>
-                      <input
-                        v-model="reservationForm.contactPhone"
-                        placeholder="请输入联系电话"
-                      />
-                    </label>
-                  </div>
+                        <label class="field-card">
+                          <span class="field-label">联系电话</span>
+                          <input
+                            v-model="reservationForm.contactPhone"
+                            placeholder="请输入联系电话"
+                          />
+                        </label>
+                      </div>
 
-                  <div v-else class="beauty-form">
-                    <label class="field-card field-full">
-                      <span class="field-label">维护原因</span>
-                      <input
-                        v-model="maintenanceForm.reason"
-                        placeholder="例如：设备检修 / 网络维护 / 深度清洁"
-                      />
-                    </label>
-                  </div>
+                      <button
+                        v-if="!isAdmin"
+                        type="button"
+                        class="primary-btn submit-reservation-btn"
+                        :disabled="submittingReservation || reservationFormLocked"
+                        @click="handleCreateReservation"
+                      >
+                        {{ submittingReservation ? '正在提交...' : '提交预约申请' }}
+                      </button>
+                    </fieldset>
+
+                    <div v-else class="beauty-form">
+                      <label class="field-card field-full">
+                        <span class="field-label">维护原因</span>
+                        <input
+                          v-model="maintenanceForm.reason"
+                          placeholder="例如：设备检修 / 网络维护 / 深度清洁"
+                        />
+                      </label>
+                    </div>
 
                   <div v-if="!isAdmin" class="recommend-box">
                     <div class="recommend-title">推荐可选节次</div>
@@ -291,38 +303,29 @@
                   >
                     {{ savingMaintenance ? '正在保存维护...' : '设置为维护' }}
                   </button>
-
-                   <button
-                       v-if="!isAdmin"
-                       type="button"
-                       class="primary-btn submit-reservation-btn"
-                       :disabled="!canSubmitReservation || submittingReservation"
-                       @click="handleCreateReservation"
-                   >
-                     {{ submittingReservation ? '正在提交...' : '提交预约申请' }}
-                   </button>
                  </div>
 
-                <div v-if="conflictPanel.visible" class="form-card conflict-card" :class="conflictPanel.type">
-                  <div class="conflict-card-head">
-                    <h6>{{ conflictPanel.title }}</h6>
-                    <span class="conflict-chip">{{ conflictPanel.type === 'warning' ? '冲突判定' : '提交提示' }}</span>
+                  <div v-if="conflictPanel.visible" class="form-card conflict-card" :class="conflictPanel.type">
+                    <div class="conflict-card-head">
+                      <h6>{{ conflictPanel.title }}</h6>
+                      <span class="conflict-chip">{{ conflictPanel.type === 'warning' ? '冲突判定' : '提交提示' }}</span>
+                    </div>
+                    <p>{{ conflictPanel.detail }}</p>
                   </div>
-                  <p>{{ conflictPanel.detail }}</p>
-                </div>
 
-                <div v-if="recommendations.length" class="form-card">
-                  <h6>推荐结果</h6>
-                  <div class="recommendation-list">
-                    <div v-for="(item, idx) in recommendations" :key="idx" class="recommendation-card">
-                      <div class="recommendation-main">
-                        <strong>{{ item.labName }}</strong>
-                        <span>{{ item.reservationDate }} · {{ item.periodName || `节次#${item.periodId}` }}</span>
-                        <small>{{ item.recommendationReason }}</small>
+                  <div v-if="recommendations.length" ref="recommendationResultRef" class="form-card recommendation-result-card">
+                    <h6>推荐结果</h6>
+                    <div class="recommendation-list">
+                      <div v-for="(item, idx) in recommendations" :key="idx" class="recommendation-card">
+                        <div class="recommendation-main">
+                          <strong>{{ item.labName }}</strong>
+                          <span>{{ item.reservationDate }} · {{ item.periodName || `节次#${item.periodId}` }}</span>
+                          <small>{{ item.recommendationReason }}</small>
+                        </div>
+                        <button type="button" class="ghost-btn small-btn" @click="applyRecommendation(item)">
+                          选用
+                        </button>
                       </div>
-                      <button type="button" class="ghost-btn small-btn" @click="applyRecommendation(item)">
-                        选用
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -507,7 +510,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, nextTick, reactive, ref, watch } from 'vue';
 import QRCode from 'qrcode';
 import { useGlobalToast } from '../composables/useGlobalToast';
 import { fetchConsumables } from '../api/consumables';
@@ -570,11 +573,22 @@ const checkinQrCodeDataUrl = ref('');
 
 const schedule = ref<LabScheduleDto | null>(null);
 const scheduleMessage = ref('');
+const scheduleMessageTone = ref<'info' | 'warning' | 'error' | 'success'>('info');
 
 const selectedKeys = ref<Array<{ date: string; periodId: number }>>([]);
 const blockedKeys = ref<Array<{ date: string; periodId: number }>>([]);
 const focusedKey = ref<{ date: string; periodId: number } | null>(null);
 const recommendations = ref<SlotRecommendationItem[]>([]);
+const recommendationResultRef = ref<HTMLElement | null>(null);
+const reservationPanelState = ref<{
+  mode: 'idle' | 'free' | 'blocked';
+  title: string;
+  detail: string;
+}>({
+  mode: 'idle',
+  title: '预约信息',
+  detail: '请先在课表中选择可预约时段，填写信息后提交。',
+});
 const conflictPanel = reactive<{
   visible: boolean;
   type: 'warning' | 'info';
@@ -669,8 +683,8 @@ const departmentScopedLabs = computed(() => {
   }
   return adminLabSource.value.filter((item) => !filters.departmentId || item.departmentId === filters.departmentId);
 });
-const filteredLabTypeOptions = computed(() => {
-  return Array.from(new Set(departmentScopedLabs.value.map((item) => item.labType).filter(Boolean) as string[]));
+const labTypeOptions = computed(() => {
+  return Array.from(new Set(adminLabSource.value.map((item) => item.labType).filter(Boolean) as string[]));
 });
 const filteredAdminLabOptions = computed(() => {
   return departmentScopedLabs.value
@@ -713,6 +727,7 @@ const canSubmitReservation = computed(() => {
     reservationDetailsComplete.value
   );
 });
+const reservationFormLocked = computed(() => !isAdmin.value && reservationPanelState.value.mode === 'blocked');
 
 const recommendationRequestKeys = computed(() => {
   return selectedKeys.value.length ? selectedKeys.value : blockedKeys.value;
@@ -769,6 +784,22 @@ function weekdayText(weekday: number): string {
 function periodLabel(periodId: number): string {
   const p = schedule.value?.periods?.find((item) => item.id === periodId);
   return p?.periodName ?? `节次#${periodId}`;
+}
+
+function blockedSlotToastText(status: ScheduleCellDto['status']): string {
+  if (status === 'PENDING_SELF') {
+    return '你已申请该时段，当前状态为待审核。';
+  }
+  if (status === 'RESERVED') {
+    return '该时段已被预约，当前不可填写。';
+  }
+  if (status === 'MAINTENANCE') {
+    return '该时段正在维护，当前不可填写。';
+  }
+  if (status === 'CLOSED') {
+    return '该时段不开放，当前不可填写。';
+  }
+  return '当前时段不可填写。';
 }
 
 function composeCourseOrProjectName(): string | undefined {
@@ -860,7 +891,7 @@ async function loadLabs(pageNum = currentPage.value): Promise<void> {
         labId: isAdmin.value ? filters.labId : undefined,
         labName: keyword.value.trim() || undefined,
         departmentId: scopedDepartmentId,
-        labType: isAdmin.value ? filters.labType || undefined : undefined,
+        labType: filters.labType || undefined,
       },
       auth.token.value || undefined,
     );
@@ -874,6 +905,10 @@ async function loadLabs(pageNum = currentPage.value): Promise<void> {
 }
 
 function handleSearch(): void {
+  void loadLabs(1);
+}
+
+function handleLabTypeChange(): void {
   void loadLabs(1);
 }
 
@@ -1038,14 +1073,17 @@ function toggleSelection(date: string, periodId: number): void {
 async function reloadSchedule(): Promise<void> {
   schedule.value = null;
   scheduleMessage.value = '';
+  scheduleMessageTone.value = 'info';
   if (!selectedLab.value || !auth.token.value) {
     scheduleMessage.value = '登录后可查看未来几周预约表并进行预约与管理操作。';
     return;
   }
   try {
     schedule.value = await fetchLabSchedule(selectedLab.value.id, auth.token.value);
+    scheduleMessageTone.value = 'success';
     scheduleMessage.value = isAdmin.value ? '课表已加载，可点击格子设置维护。' : '预约已加载，请点击空白格选择时段。';
   } catch (error) {
+    scheduleMessageTone.value = 'error';
     scheduleMessage.value = error instanceof Error ? `预约加载失败：${error.message}` : '预约加载失败。';
   }
 }
@@ -1055,9 +1093,15 @@ function clearSelection(): void {
   blockedKeys.value = [];
   focusedKey.value = null;
   recommendations.value = [];
+  reservationPanelState.value = {
+    mode: 'idle',
+    title: '预约信息',
+    detail: '请先在课表中选择可预约时段，填写信息后提交。',
+  };
   conflictPanel.visible = false;
   conflictPanel.title = '';
   conflictPanel.detail = '';
+  scheduleMessageTone.value = 'info';
   scheduleMessage.value = isAdmin.value ? '课表已加载，可点击格子设置维护。' : '预约已加载，请点击空白格选择时段。';
 }
 
@@ -1072,6 +1116,7 @@ async function handleCellClick(day: ScheduleDayDto, periodId: number): Promise<v
       selectedKeys.value = [];
       recommendations.value = [];
       conflictPanel.visible = false;
+      scheduleMessageTone.value = 'info';
       scheduleMessage.value = c.status === 'MAINTENANCE'
         ? '已选中维护中的节次，可在下方取消维护。'
         : '已选中节次，可填写维护原因后保存。';
@@ -1090,6 +1135,12 @@ async function handleCellClick(day: ScheduleDayDto, periodId: number): Promise<v
     blockedKeys.value = [];
     recommendations.value = [];
     conflictPanel.visible = false;
+    reservationPanelState.value = {
+      mode: 'free',
+      title: '预约信息',
+      detail: '已选中可预约时段，请填写预约信息并提交。',
+    };
+    scheduleMessageTone.value = 'success';
     toggleSelection(day.date, periodId);
 
     if (selectedKeys.value.length) {
@@ -1104,11 +1155,17 @@ async function handleCellClick(day: ScheduleDayDto, periodId: number): Promise<v
     focusedKey.value = null;
     blockedKeys.value = [];
     recommendations.value = [];
+    reservationPanelState.value = {
+      mode: 'free',
+      title: '可申请时段',
+      detail: '该时段当前可继续申请，右侧表单保持可填写状态。',
+    };
     conflictPanel.visible = true;
     conflictPanel.type = 'warning';
     conflictPanel.title = '该时段已有他人待审核';
     conflictPanel.detail = c.note || '你仍然可以提交申请，系统会在提交时进入冲突判定，并为你推荐其他可选方案。';
     toggleSelection(day.date, periodId);
+    scheduleMessageTone.value = 'warning';
     scheduleMessage.value = '该时段已有他人待审核，你可以继续填写表单并提交申请。';
     return;
   }
@@ -1117,12 +1174,18 @@ async function handleCellClick(day: ScheduleDayDto, periodId: number): Promise<v
     focusedKey.value = { date: day.date, periodId };
     selectedKeys.value = [];
     blockedKeys.value = [{ date: day.date, periodId }];
+    reservationPanelState.value = {
+      mode: 'blocked',
+      title: '待审核预约',
+      detail: '该时段已由你提交待审核申请，当前不可再次填写。',
+    };
     conflictPanel.visible = true;
     conflictPanel.type = 'warning';
     conflictPanel.title = '你已申请该时段';
     conflictPanel.detail = c.note || '该节次已由你提交待审核申请，不能重复申请。';
+    scheduleMessageTone.value = 'warning';
     scheduleMessage.value = '你已申请该时段，不能重复提交。';
-    showToast('error', '你已申请该时段，当前状态为待审核。');
+    showToast('error', blockedSlotToastText(c.status));
     return;
   }
 
@@ -1130,19 +1193,35 @@ async function handleCellClick(day: ScheduleDayDto, periodId: number): Promise<v
   selectedKeys.value = [];
   blockedKeys.value = [{ date: day.date, periodId }];
   recommendations.value = [];
+  reservationPanelState.value = {
+    mode: 'blocked',
+    title: c.status === 'RESERVED' ? '已预约时段' : c.status === 'MAINTENANCE' ? '维护中' : '不可预约时段',
+    detail:
+      c.status === 'RESERVED'
+        ? '该节次已经被占用，右侧表单已锁定，请改选其他可预约时段。'
+        : c.status === 'MAINTENANCE'
+          ? '该节次处于维护状态，右侧表单已锁定，请改选其他可预约时段。'
+          : '该节次当前不可预约，右侧表单已锁定，请改选其他可预约时段。',
+  };
   conflictPanel.visible = true;
   conflictPanel.type = 'info';
   conflictPanel.title = '该时段当前不可直接预约';
   conflictPanel.detail = c.note || '该时段不可预约，已为你锁定推荐依据，点击“查看推荐时段”即可。';
+  scheduleMessageTone.value = 'warning';
   scheduleMessage.value = '该时段不可预约，已为你锁定推荐依据，点击“查看推荐时段”即可。';
+  showToast('error', blockedSlotToastText(c.status));
 }
 
 async function handleCreateReservation(): Promise<void> {
   if (!selectedLab.value || !auth.token.value) return;
   if (!canSubmitReservation.value) {
-    scheduleMessage.value = reservationForm.reservationType === 3
-      ? '请先选择空闲时段，并填写用途说明与联系电话。'
-      : '请先选择空闲时段，并完善课程/项目名称与联系电话。';
+    const text =
+      reservationForm.reservationType === 3
+        ? '请先选择空闲时段，并填写用途说明与联系电话。'
+        : '请先选择空闲时段，并完善课程/项目名称与联系电话。';
+    scheduleMessageTone.value = 'warning';
+    scheduleMessage.value = text;
+    showToast('error', text);
     return;
   }
   if (submittingReservation.value) return;
@@ -1164,6 +1243,7 @@ async function handleCreateReservation(): Promise<void> {
     await applyReservationResult(response);
   } catch (error) {
     const text = error instanceof Error ? error.message : '\u9884\u7ea6\u63d0\u4ea4\u5931\u8d25\u3002';
+    scheduleMessageTone.value = 'error';
     scheduleMessage.value = text;
     showToast('error', text);
   } finally {
@@ -1176,6 +1256,7 @@ async function handleCreateReservation(): Promise<void> {
 async function handleRecommend(): Promise<void> {
   if (!selectedLab.value || !auth.token.value) return;
   if (!recommendationRequestKeys.value.length) {
+    scheduleMessageTone.value = 'warning';
     scheduleMessage.value = '请先选择您要预约的时段（或选择一个不可预约的时段，再查看推荐）。';
     return;
   }
@@ -1188,8 +1269,14 @@ async function handleRecommend(): Promise<void> {
       },
       auth.token.value,
     );
+    scheduleMessageTone.value = recommendations.value.length ? 'success' : 'info';
     scheduleMessage.value = recommendations.value.length ? '已生成推荐结果。' : '暂无可推荐的时段/实验室。';
+    if (recommendations.value.length) {
+      await nextTick();
+      recommendationResultRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   } catch (error) {
+    scheduleMessageTone.value = 'error';
     scheduleMessage.value = error instanceof Error ? error.message : '推荐查询失败。';
   }
 }
@@ -1203,8 +1290,14 @@ async function applyRecommendation(item: SlotRecommendationItem): Promise<void> 
   blockedKeys.value = [];
   focusedKey.value = null;
   recommendations.value = [];
+  reservationPanelState.value = {
+    mode: 'free',
+    title: '预约信息',
+    detail: '已选中推荐节次，请填写预约信息并提交。',
+  };
   conflictPanel.visible = false;
   detailTab.value = 'schedule';
+  scheduleMessageTone.value = 'success';
   scheduleMessage.value = `已选中推荐节次：${item.reservationDate} ${item.periodName || `节次#${item.periodId}`}，可直接提交预约。`;
 }
 
@@ -1394,7 +1487,33 @@ onMounted(async () => {
   border: 1px solid rgba(15, 23, 42, 0.12);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.66);
-  overflow: hidden;
+  overflow: clip;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 0;
+  align-items: start;
+}
+
+.schedule-main {
+  min-width: 0;
+}
+
+.schedule-sidebar {
+  position: sticky;
+  top: 16px;
+  align-self: start;
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border-left: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.schedule-sidebar.blocked {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.9), rgba(241, 245, 249, 0.92));
+}
+
+.schedule-sidebar .schedule-forms {
+  padding: 16px;
 }
 
 .pagination-wrap {
@@ -2039,7 +2158,25 @@ onMounted(async () => {
 .schedule-forms {
   display: grid;
   gap: 10px;
-  padding: 12px;
+}
+
+.reservation-fields {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+.reservation-fields:disabled .beauty-form,
+.reservation-fields:disabled .submit-reservation-btn {
+  opacity: 0.55;
+}
+
+.reservation-fields:disabled .beauty-form input,
+.reservation-fields:disabled .beauty-form select {
+  background: #f3f4f6;
+  color: #94a3b8;
+  cursor: not-allowed;
 }
 
 .form-card {
@@ -2141,19 +2278,21 @@ onMounted(async () => {
 }
 
 .recommend-box {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 18px 20px;
+  gap: 16px;
+  padding: 16px 18px;
   border: 1px solid #e5e7eb;
   border-radius: 18px;
   background: #fafbfc;
 }
 
 .recommend-title {
-  font-size: 18px;
-  font-weight: 600;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
   color: #334155;
 }
 
@@ -2201,12 +2340,20 @@ onMounted(async () => {
 }
 
 .recommend-btn {
-  min-width: 120px;
+  min-width: 160px;
+  padding-inline: 20px;
+  white-space: nowrap;
+}
+
+.schedule-sidebar.blocked .recommend-box {
+  border-color: rgba(148, 163, 184, 0.26);
+  background: rgba(241, 245, 249, 0.92);
 }
 
 .submit-reservation-btn {
   width: 100%;
   height: 54px;
+  margin-top: 8px;
   border: none;
   border-radius: 999px;
   font-size: 20px;
@@ -2223,8 +2370,12 @@ onMounted(async () => {
   }
 
   .recommend-box {
-    flex-direction: column;
-    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .recommend-btn {
+    min-width: 0;
+    width: 100%;
   }
 
   .checkin-qr-main {
@@ -2257,6 +2408,12 @@ onMounted(async () => {
   gap: 12px;
 }
 
+.recommendation-result-card {
+  scroll-margin-top: 18px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  box-shadow: 0 12px 26px rgba(37, 99, 235, 0.08);
+}
+
 .recommendation-card {
   display: flex;
   align-items: center;
@@ -2287,6 +2444,22 @@ onMounted(async () => {
 }
 
 @media (max-width: 980px) {
+  .schedule-wrap {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-sidebar {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    border-left: none;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  .schedule-sidebar .schedule-forms {
+    padding: 12px;
+  }
+
   .lab-hero-meta {
     justify-content: flex-start;
   }

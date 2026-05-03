@@ -13,6 +13,15 @@ import com.nlt.domain.vo.statistics.AdminStatisticsVo.OptionsVo;
 import com.nlt.domain.vo.statistics.AdminStatisticsVo.OverviewVo;
 import com.nlt.domain.vo.statistics.AdminStatisticsVo.RankItemVo;
 import com.nlt.domain.vo.statistics.AdminStatisticsVo.ReservationStatsVo;
+import com.nlt.domain.vo.statistics.export.ConsumableExportVo;
+import com.nlt.domain.vo.statistics.export.CreditViolationExportVo;
+import com.nlt.domain.vo.statistics.export.ExperimentReportExportVo;
+import com.nlt.domain.vo.statistics.export.ReservationExportVo;
+import com.nlt.mapper.AdminStatisticsMapper;
+import com.nlt.mapper.ConsumableMapper;
+import com.nlt.mapper.ExperimentReportMapper;
+import com.nlt.mapper.ReservationMapper;
+import com.nlt.mapper.ViolationMapper;
 import com.nlt.service.AdminStatisticsService;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -22,6 +31,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -35,9 +45,6 @@ import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -46,26 +53,21 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
 
     private static final int EXPORT_LIMIT = 5000;
     private static final int LOW_CREDIT_SCORE = 60;
-    private static final DateTimeFormatter FILE_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final DateTimeFormatter FILE_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final DateTimeFormatter CELL_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    private final NamedParameterJdbcTemplate jdbcTemplate;
     private final CurrentUserScopeService currentUserScopeService;
+    private final AdminStatisticsMapper adminStatisticsMapper;
+    private final ReservationMapper reservationMapper;
+    private final ExperimentReportMapper experimentReportMapper;
+    private final ConsumableMapper consumableMapper;
+    private final ViolationMapper violationMapper;
 
     @Override
     public OptionsVo options() {
         Long departmentId = requireAdminDepartmentId();
-        List<OptionItemVo> labs = jdbcTemplate.query("""
-                select id, lab_name
-                from lab
-                where deleted = 0
-                  and department_id = :departmentId
-                order by lab_name asc, id asc
-                """,
-            params(departmentId),
-            (rs, rowNum) -> new OptionItemVo(rs.getString("lab_name"), String.valueOf(rs.getLong("id"))));
-
         return new OptionsVo(
-            labs,
+            adminStatisticsMapper.selectLabOptions(departmentId),
             List.of(
                 new OptionItemVo("待审核", "1"),
                 new OptionItemVo("已通过", "2"),
@@ -93,90 +95,20 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         DateRange range = monthRange(query);
         validateLab(query.getLabId(), departmentId);
 
-        long monthReservationCount = count("""
-            select count(distinct r.id)
-            from lab_reservation r
-            join lab l on l.id = r.lab_id
-            join lab_reservation_slot s on s.reservation_id = r.id
-            where l.deleted = 0
-              and l.department_id = :departmentId
-              and s.slot_status = 1
-              and s.reservation_date between :startDate and :endDate
-              and (:labType is null or l.lab_type = :labType)
-            """, queryParams(departmentId, range, query));
-        long todayReservationCount = count("""
-            select count(distinct r.id)
-            from lab_reservation r
-            join lab l on l.id = r.lab_id
-            join lab_reservation_slot s on s.reservation_id = r.id
-            where l.deleted = 0
-              and l.department_id = :departmentId
-              and s.slot_status = 1
-              and s.reservation_date = :today
-            """, params(departmentId).addValue("today", LocalDate.now()));
-        long pendingReservationCount = count("""
-            select count(*)
-            from lab_reservation r
-            join lab l on l.id = r.lab_id
-            where l.deleted = 0
-              and l.department_id = :departmentId
-              and r.status = 1
-            """, params(departmentId));
-        long brokenDeviceCount = count("""
-            select count(*)
-            from lab_device d
-            join lab l on l.id = d.lab_id
-            where d.deleted = 0
-              and l.deleted = 0
-              and l.department_id = :departmentId
-              and d.status != 1
-            """, params(departmentId));
-        long repairingDeviceCount = count("""
-            select count(*)
-            from lab_device d
-            join lab l on l.id = d.lab_id
-            where d.deleted = 0
-              and l.deleted = 0
-              and l.department_id = :departmentId
-              and d.status = 2
-            """, params(departmentId));
-        long lowStockConsumableCount = count("""
-            select count(*)
-            from lab_consumable c
-            join lab l on l.id = c.lab_id
-            where c.deleted = 0
-              and l.deleted = 0
-              and l.department_id = :departmentId
-              and c.stock_quantity <= c.warning_threshold
-            """, params(departmentId));
-        long monthViolationCount = count("""
-            select count(*)
-            from user_violation_record v
-            join sys_user u on u.id = v.user_id
-            left join lab_reservation r on r.id = v.reservation_id
-            left join (
-                select s.reservation_id, min(s.reservation_date) as first_date
-                from lab_reservation_slot s
-                where s.slot_status = 1
-                group by s.reservation_id
-            ) slot on slot.reservation_id = v.reservation_id
-            where u.deleted = 0
-              and u.department_id = :departmentId
-              and coalesce(slot.first_date, date(r.created_at)) between :startDate and :endDate
-            """, queryParams(departmentId, range, query));
-        BigDecimal averageCreditScore = decimal("""
-            select avg(u.credit_score)
-            from sys_user u
-            where u.deleted = 0
-              and u.department_id = :departmentId
-            """, params(departmentId));
-        long lowCreditUserCount = count("""
-            select count(*)
-            from sys_user u
-            where u.deleted = 0
-              and u.department_id = :departmentId
-              and u.credit_score < :lowCreditScore
-            """, params(departmentId).addValue("lowCreditScore", LOW_CREDIT_SCORE));
+        long monthReservationCount = adminStatisticsMapper.countOverviewMonthReservations(
+            departmentId,
+            trimToNull(query.getLabType()),
+            range.startDate(),
+            range.endDate()
+        );
+        long todayReservationCount = adminStatisticsMapper.countTodayReservations(departmentId, LocalDate.now());
+        long pendingReservationCount = adminStatisticsMapper.countPendingReservations(departmentId);
+        long brokenDeviceCount = adminStatisticsMapper.countBrokenDevices(departmentId);
+        long repairingDeviceCount = adminStatisticsMapper.countRepairingDevices(departmentId);
+        long lowStockConsumableCount = adminStatisticsMapper.countLowStockConsumables(departmentId);
+        long monthViolationCount = adminStatisticsMapper.countOverviewMonthViolations(departmentId, range.startDate(), range.endDate());
+        BigDecimal averageCreditScore = defaultDecimal(adminStatisticsMapper.selectAverageCreditScore(departmentId));
+        long lowCreditUserCount = adminStatisticsMapper.countLowCreditUsers(departmentId, LOW_CREDIT_SCORE);
 
         return new OverviewVo(
             monthReservationCount,
@@ -197,136 +129,44 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         Long departmentId = requireAdminDepartmentId();
         DateRange range = defaultRange(query);
         validateLab(query.getLabId(), departmentId);
-        MapSqlParameterSource params = queryParams(departmentId, range, query);
 
-        long totalCount = count("""
-            select count(distinct r.id)
-            from lab_reservation r
-            join lab l on l.id = r.lab_id
-            join lab_reservation_slot s on s.reservation_id = r.id
-            where l.deleted = 0
-              and l.department_id = :departmentId
-              and s.slot_status = 1
-              and s.reservation_date between :startDate and :endDate
-              and (:labId is null or r.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-              and (:status is null or r.status = :status)
-              and (:reservationType is null or r.reservation_type = :reservationType)
-            """, params);
-        long pendingCount = count("""
-            select count(distinct r.id)
-            from lab_reservation r
-            join lab l on l.id = r.lab_id
-            join lab_reservation_slot s on s.reservation_id = r.id
-            where l.deleted = 0
-              and l.department_id = :departmentId
-              and s.slot_status = 1
-              and s.reservation_date between :startDate and :endDate
-              and r.status = 1
-              and (:labId is null or r.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-              and (:reservationType is null or r.reservation_type = :reservationType)
-            """, params);
-        long completedCount = count("""
-            select count(distinct r.id)
-            from lab_reservation r
-            join lab l on l.id = r.lab_id
-            join lab_reservation_slot s on s.reservation_id = r.id
-            where l.deleted = 0
-              and l.department_id = :departmentId
-              and s.slot_status = 1
-              and s.reservation_date between :startDate and :endDate
-              and r.status = 5
-              and (:labId is null or r.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-              and (:reservationType is null or r.reservation_type = :reservationType)
-            """, params);
+        long totalCount = adminStatisticsMapper.countReservationTotal(
+            departmentId, query.getLabId(), trimToNull(query.getLabType()), query.getStatus(), query.getReservationType(), range.startDate(), range.endDate()
+        );
+        long pendingCount = adminStatisticsMapper.countReservationPending(
+            departmentId, query.getLabId(), trimToNull(query.getLabType()), query.getReservationType(), range.startDate(), range.endDate()
+        );
+        long completedCount = adminStatisticsMapper.countReservationCompleted(
+            departmentId, query.getLabId(), trimToNull(query.getLabType()), query.getReservationType(), range.startDate(), range.endDate()
+        );
 
-        List<ChartItemVo> trend = chart("""
-            select date_format(s.reservation_date, '%Y-%m-%d') as name, count(distinct r.id) as value
-            from lab_reservation r
-            join lab l on l.id = r.lab_id
-            join lab_reservation_slot s on s.reservation_id = r.id
-            where l.deleted = 0
-              and l.department_id = :departmentId
-              and s.slot_status = 1
-              and ((:status is not null and r.status = :status) or (:status is null and r.status in (2, 5)))
-              and s.reservation_date between :startDate and :endDate
-              and (:labId is null or r.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-              and (:reservationType is null or r.reservation_type = :reservationType)
-            group by s.reservation_date
-            order by s.reservation_date asc
-            """, params);
-        List<ChartItemVo> statusDistribution = namedChart("""
-            select r.status as name, count(distinct r.id) as value
-            from lab_reservation r
-            join lab l on l.id = r.lab_id
-            join lab_reservation_slot s on s.reservation_id = r.id
-            where l.deleted = 0
-              and l.department_id = :departmentId
-              and s.slot_status = 1
-              and s.reservation_date between :startDate and :endDate
-              and (:labId is null or r.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-              and (:reservationType is null or r.reservation_type = :reservationType)
-            group by r.status
-            """, params, this::reservationStatusLabel);
-        List<ChartItemVo> typeDistribution = namedChart("""
-            select r.reservation_type as name, count(distinct r.id) as value
-            from lab_reservation r
-            join lab l on l.id = r.lab_id
-            join lab_reservation_slot s on s.reservation_id = r.id
-            where l.deleted = 0
-              and l.department_id = :departmentId
-              and s.slot_status = 1
-              and s.reservation_date between :startDate and :endDate
-              and (:labId is null or r.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-              and (:status is null or r.status = :status)
-            group by r.reservation_type
-            """, params, this::reservationTypeLabel);
-        List<ChartItemVo> applicantRoleDistribution = chart("""
-            select case
-                     when exists (
-                       select 1 from sys_user_role ur
-                       join sys_role role on role.id = ur.role_id
-                       where ur.user_id = u.id and role.role_code in ('TEACHER', 'ROLE_TEACHER')
-                     ) then '教师'
-                     else '学生'
-                   end as name,
-                   count(distinct s.reservation_id) as value
-            from lab_reservation r
-            join lab l on l.id = r.lab_id
-            join sys_user u on u.id = r.applicant_user_id
-            join lab_reservation_slot s on s.reservation_id = r.id
-            where l.deleted = 0
-              and l.department_id = :departmentId
-              and s.slot_status = 1
-              and s.reservation_date between :startDate and :endDate
-              and (:labId is null or r.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-              and (:status is null or r.status = :status)
-              and (:reservationType is null or r.reservation_type = :reservationType)
-            group by name
-            """, params);
-        List<ChartItemVo> labTypeDistribution = chart("""
-            select coalesce(nullif(l.lab_type, ''), '未分类') as name,
-                   count(distinct r.id) as value
-            from lab_reservation r
-            join lab l on l.id = r.lab_id
-            join lab_reservation_slot s on s.reservation_id = r.id
-            where l.deleted = 0
-              and l.department_id = :departmentId
-              and s.slot_status = 1
-              and s.reservation_date between :startDate and :endDate
-              and (:labId is null or r.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-              and (:status is null or r.status = :status)
-              and (:reservationType is null or r.reservation_type = :reservationType)
-            group by coalesce(nullif(l.lab_type, ''), '未分类')
-            order by value desc, name asc
-            """, params);
+        List<ChartItemVo> trend = chartRows(adminStatisticsMapper.selectReservationTrend(
+            departmentId, query.getLabId(), trimToNull(query.getLabType()), query.getStatus(), query.getReservationType(), range.startDate(), range.endDate()
+        ));
+        List<ChartItemVo> statusDistribution = namedChartRows(
+            adminStatisticsMapper.selectReservationStatusDistribution(
+                departmentId, query.getLabId(), trimToNull(query.getLabType()), query.getReservationType(), range.startDate(), range.endDate()
+            ),
+            this::reservationStatusLabel
+        );
+        List<ChartItemVo> typeDistribution = namedChartRows(
+            adminStatisticsMapper.selectReservationTypeDistribution(
+                departmentId, query.getLabId(), trimToNull(query.getLabType()), query.getStatus(), range.startDate(), range.endDate()
+            ),
+            this::reservationTypeLabel
+        );
+        List<ChartItemVo> applicantRoleDistribution = namedChartRows(
+            adminStatisticsMapper.selectReservationApplicantRoleDistribution(
+                departmentId, query.getLabId(), trimToNull(query.getLabType()), query.getStatus(), query.getReservationType(), range.startDate(), range.endDate()
+            ),
+            this::roleLabel
+        );
+        List<ChartItemVo> labTypeDistribution = namedChartRows(
+            adminStatisticsMapper.selectReservationLabTypeDistribution(
+                departmentId, query.getLabId(), trimToNull(query.getLabType()), query.getStatus(), query.getReservationType(), range.startDate(), range.endDate()
+            ),
+            this::labTypeLabel
+        );
 
         return new ReservationStatsVo(
             totalCount,
@@ -346,92 +186,26 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         Long departmentId = requireAdminDepartmentId();
         DateRange range = defaultRange(query);
         validateLab(query.getLabId(), departmentId);
-        MapSqlParameterSource params = queryParams(departmentId, range, query);
-        BigDecimal usageRate = labUsageRate(departmentId, query.getLabId(), query.getLabType(), range.startDate(), range.endDate());
 
-        List<RankItemVo> ranking = ranks("""
-            select l.id, l.lab_name as name, concat(l.building_name, l.room_no) as secondary,
-                   count(distinct s.reservation_id) as value
-            from lab l
-            left join lab_reservation r on r.lab_id = l.id and r.status in (2, 5)
-            left join lab_reservation_slot s on s.reservation_id = r.id
-                and s.slot_status = 1
-                and s.reservation_date between :startDate and :endDate
-            where l.deleted = 0
-              and l.department_id = :departmentId
-              and (:labId is null or l.id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            group by l.id, l.lab_name, l.building_name, l.room_no
-            order by value desc, l.id asc
-            limit 10
-            """, params);
-        List<RankItemVo> highUsageLabs = new ArrayList<>(ranking);
-        List<RankItemVo> idleLabs = ranks("""
-            select l.id, l.lab_name as name, concat(l.building_name, l.room_no) as secondary,
-                   count(distinct r.id) as value
-            from lab l
-            left join lab_reservation r on r.lab_id = l.id and r.status in (2, 5)
-            left join lab_reservation_slot s on s.reservation_id = r.id
-                and s.slot_status = 1
-                and s.reservation_date between :startDate and :endDate
-            where l.deleted = 0
-              and l.department_id = :departmentId
-              and (:labId is null or l.id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            group by l.id, l.lab_name, l.building_name, l.room_no
-            order by value asc, l.id asc
-            limit 10
-            """, params);
+        BigDecimal usageRate = labUsageRate(departmentId, query.getLabId(), query.getLabType(), range.startDate(), range.endDate());
+        List<RankItemVo> ranking = rankRows(adminStatisticsMapper.selectLabUsageRanking(
+            departmentId, query.getLabId(), trimToNull(query.getLabType()), range.startDate(), range.endDate()
+        ));
+        List<RankItemVo> highUsageLabs = List.copyOf(ranking);
+        List<RankItemVo> idleLabs = rankRows(adminStatisticsMapper.selectLabUsageIdleLabs(
+            departmentId, query.getLabId(), trimToNull(query.getLabType()), range.startDate(), range.endDate()
+        ));
         List<RankItemVo> typeUsageRates = labTypeRates(departmentId, query.getLabId(), query.getLabType(), range.startDate(), range.endDate());
-        List<ChartItemVo> timeHeat = chart("""
-            select p.period_name as name, count(*) as value
-            from lab_reservation_slot s
-            join lab_reservation r on r.id = s.reservation_id
-            join lab l on l.id = r.lab_id
-            join class_period p on p.id = s.period_id
-            where l.deleted = 0
-              and l.department_id = :departmentId
-              and r.status in (2, 5)
-              and s.slot_status = 1
-              and s.reservation_date between :startDate and :endDate
-              and (:labId is null or r.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            group by p.id, p.period_name, p.sort_order, p.period_no
-            order by p.sort_order asc, p.period_no asc
-            """, params);
+        List<ChartItemVo> timeHeat = chartRows(adminStatisticsMapper.selectLabUsageTimeHeat(
+            departmentId, query.getLabId(), trimToNull(query.getLabType()), range.startDate(), range.endDate()
+        ));
         long totalOccupiedSlots = timeHeat.stream().mapToLong(ChartItemVo::getValue).sum();
-        long highUsageLabCount = count("""
-            select count(*) from (
-                select l.id, count(distinct s.reservation_id) as reservation_count
-                from lab l
-                left join lab_reservation r on r.lab_id = l.id and r.status in (2, 5)
-                left join lab_reservation_slot s on s.reservation_id = r.id
-                    and s.slot_status = 1
-                    and s.reservation_date between :startDate and :endDate
-                where l.deleted = 0
-                  and l.department_id = :departmentId
-                  and (:labId is null or l.id = :labId)
-                  and (:labType is null or l.lab_type = :labType)
-                group by l.id
-            ) summary
-            where summary.reservation_count > 0
-            """, params);
-        long idleLabCount = count("""
-            select count(*) from (
-                select l.id, count(distinct s.reservation_id) as reservation_count
-                from lab l
-                left join lab_reservation r on r.lab_id = l.id and r.status in (2, 5)
-                left join lab_reservation_slot s on s.reservation_id = r.id
-                    and s.slot_status = 1
-                    and s.reservation_date between :startDate and :endDate
-                where l.deleted = 0
-                  and l.department_id = :departmentId
-                  and (:labId is null or l.id = :labId)
-                  and (:labType is null or l.lab_type = :labType)
-                group by l.id
-            ) summary
-            where summary.reservation_count = 0
-            """, params);
+        long highUsageLabCount = adminStatisticsMapper.countHighUsageLabs(
+            departmentId, query.getLabId(), trimToNull(query.getLabType()), range.startDate(), range.endDate()
+        );
+        long idleLabCount = adminStatisticsMapper.countIdleLabs(
+            departmentId, query.getLabId(), trimToNull(query.getLabType()), range.startDate(), range.endDate()
+        );
 
         return new LabUsageStatsVo(usageRate, totalOccupiedSlots, highUsageLabCount, idleLabCount, ranking, typeUsageRates, highUsageLabs, idleLabs, timeHeat);
     }
@@ -441,48 +215,20 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         Long departmentId = requireAdminDepartmentId();
         DateRange range = defaultRange(query);
         validateLab(query.getLabId(), departmentId);
-        MapSqlParameterSource params = queryParams(departmentId, range, query);
 
-        long total = count("""
-            select count(*) from lab_device d join lab l on l.id = d.lab_id
-            where d.deleted = 0 and l.deleted = 0 and l.department_id = :departmentId
-              and (:labId is null or d.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            """, params);
-        long normal = countByDeviceStatus(params, 1);
-        long repairing = countByDeviceStatus(params, 2);
-        long disabled = countByDeviceStatus(params, 3);
-        long repairOrders = count("""
-            select count(*) from lab_device_repair rr join lab l on l.id = rr.lab_id
-            where l.deleted = 0 and l.department_id = :departmentId
-              and rr.created_at >= :startDate and rr.created_at < date_add(:endDate, interval 1 day)
-              and (:labId is null or rr.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            """, params);
-        List<RankItemVo> labDeviceCounts = ranks("""
-            select l.id, l.lab_name as name, concat(l.building_name, l.room_no) as secondary,
-                   coalesce(sum(d.quantity), 0) as value
-            from lab l
-            left join lab_device d on d.lab_id = l.id and d.deleted = 0
-            where l.deleted = 0 and l.department_id = :departmentId
-              and (:labId is null or l.id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            group by l.id, l.lab_name, l.building_name, l.room_no
-            order by value desc, l.id asc
-            limit 12
-            """, params);
-        List<RankItemVo> abnormalDevices = ranks("""
-            select d.id, d.device_name as name, concat(l.lab_name, ' / ', d.device_code) as secondary,
-                   d.status as value
-            from lab_device d
-            join lab l on l.id = d.lab_id
-            where d.deleted = 0 and l.deleted = 0 and l.department_id = :departmentId
-              and d.status != 1
-              and (:labId is null or d.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            order by d.updated_at desc, d.id desc
-            limit 10
-            """, params).stream()
+        long total = adminStatisticsMapper.countDevicesTotal(departmentId, query.getLabId(), trimToNull(query.getLabType()));
+        long normal = adminStatisticsMapper.countDevicesByStatus(departmentId, query.getLabId(), trimToNull(query.getLabType()), 1);
+        long repairing = adminStatisticsMapper.countDevicesByStatus(departmentId, query.getLabId(), trimToNull(query.getLabType()), 2);
+        long disabled = adminStatisticsMapper.countDevicesByStatus(departmentId, query.getLabId(), trimToNull(query.getLabType()), 3);
+        long repairOrders = adminStatisticsMapper.countDeviceRepairOrders(
+            departmentId, query.getLabId(), trimToNull(query.getLabType()), range.startDate(), range.endDate()
+        );
+        List<RankItemVo> labDeviceCounts = rankRows(adminStatisticsMapper.selectLabDeviceCounts(
+            departmentId, query.getLabId(), trimToNull(query.getLabType())
+        ));
+        List<RankItemVo> abnormalDevices = rankRows(adminStatisticsMapper.selectAbnormalDevices(
+            departmentId, query.getLabId(), trimToNull(query.getLabType())
+        )).stream()
             .map(item -> new RankItemVo(item.getId(), item.getName(), deviceStatusLabel(item.getValue().intValue()) + " / " + item.getSecondary(), item.getValue(), item.getRate()))
             .toList();
         List<ChartItemVo> statusDistribution = withRates(List.of(
@@ -490,29 +236,13 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
             new ChartItemVo("维修中", repairing, BigDecimal.ZERO),
             new ChartItemVo("停用", disabled, BigDecimal.ZERO)
         ));
-        List<ChartItemVo> categoryDistribution = chart("""
-            select coalesce(nullif(d.brand, ''), '未标记品牌') as name,
-                   coalesce(sum(d.quantity), 0) as value
-            from lab_device d
-            join lab l on l.id = d.lab_id
-            where d.deleted = 0 and l.deleted = 0 and l.department_id = :departmentId
-              and (:labId is null or d.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            group by coalesce(nullif(d.brand, ''), '未标记品牌')
-            order by value desc, name asc
-            limit 8
-            """, params);
-        List<ChartItemVo> repairTrend = chart("""
-            select date(rr.created_at) as name, count(*) as value
-            from lab_device_repair rr
-            join lab l on l.id = rr.lab_id
-            where l.deleted = 0 and l.department_id = :departmentId
-              and rr.created_at >= :startDate and rr.created_at < date_add(:endDate, interval 1 day)
-              and (:labId is null or rr.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            group by date(rr.created_at)
-            order by date(rr.created_at) asc
-            """, params);
+        List<ChartItemVo> categoryDistribution = namedChartRows(
+            adminStatisticsMapper.selectDeviceCategoryDistribution(departmentId, query.getLabId(), trimToNull(query.getLabType())),
+            this::deviceCategoryLabel
+        );
+        List<ChartItemVo> repairTrend = chartRows(adminStatisticsMapper.selectDeviceRepairTrend(
+            departmentId, query.getLabId(), trimToNull(query.getLabType()), range.startDate(), range.endDate()
+        ));
 
         return new DeviceStatsVo(
             total,
@@ -520,7 +250,7 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
             repairing,
             disabled,
             repairOrders,
-            "品牌",
+            "品牌分布",
             statusDistribution,
             categoryDistribution,
             repairTrend,
@@ -534,114 +264,33 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         Long departmentId = requireAdminDepartmentId();
         DateRange range = monthRange(query);
         validateLab(query.getLabId(), departmentId);
-        MapSqlParameterSource params = queryParams(departmentId, range, query);
 
-        long totalTypeCount = count("""
-            select count(*) from lab_consumable c join lab l on l.id = c.lab_id
-            where c.deleted = 0 and l.deleted = 0 and l.department_id = :departmentId
-              and (:labId is null or c.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            """, params);
-        long lowStockCount = count("""
-            select count(*) from lab_consumable c join lab l on l.id = c.lab_id
-            where c.deleted = 0 and l.deleted = 0 and l.department_id = :departmentId
-              and c.stock_quantity <= c.warning_threshold
-              and (:labId is null or c.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            """, params);
-        long inQuantity = count("""
-            select coalesce(sum(abs(log.change_amount)), 0)
-            from consumable_stock_log log
-            join lab_consumable c on c.id = log.consumable_id
-            join lab l on l.id = c.lab_id
-            where c.deleted = 0 and l.deleted = 0 and l.department_id = :departmentId
-              and log.change_type = 'IN'
-              and log.created_at >= :startDate and log.created_at < date_add(:endDate, interval 1 day)
-              and (:labId is null or c.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            """, params);
-        long outQuantity = count("""
-            select coalesce(sum(abs(log.change_amount)), 0)
-            from consumable_stock_log log
-            join lab_consumable c on c.id = log.consumable_id
-            join lab l on l.id = c.lab_id
-            where c.deleted = 0 and l.deleted = 0 and l.department_id = :departmentId
-              and log.change_type = 'OUT'
-              and log.created_at >= :startDate and log.created_at < date_add(:endDate, interval 1 day)
-              and (:labId is null or c.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            """, params);
-        List<RankItemVo> consumptionRanking = ranks("""
-            select c.id, c.consumable_name as name, concat(l.lab_name, ' / ', c.unit) as secondary,
-                   coalesce(sum(abs(log.change_amount)), 0) as value
-            from lab_consumable c
-            join lab l on l.id = c.lab_id
-            left join consumable_stock_log log on log.consumable_id = c.id
-                and log.change_type = 'OUT'
-                and log.created_at >= :startDate and log.created_at < date_add(:endDate, interval 1 day)
-            where c.deleted = 0 and l.deleted = 0 and l.department_id = :departmentId
-              and (:labId is null or c.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            group by c.id, c.consumable_name, l.lab_name, c.unit
-            order by value desc, c.id asc
-            limit 10
-            """, params);
-        List<RankItemVo> warningList = ranks("""
-            select c.id, c.consumable_name as name, concat(l.lab_name, ' / 阈值 ', c.warning_threshold, c.unit) as secondary,
-                   c.stock_quantity as value
-            from lab_consumable c
-            join lab l on l.id = c.lab_id
-            where c.deleted = 0 and l.deleted = 0 and l.department_id = :departmentId
-              and c.stock_quantity <= c.warning_threshold
-              and (:labId is null or c.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            order by c.stock_quantity asc, c.id asc
-            limit 10
-            """, params);
-
-        List<ChartItemVo> inTrend = chart("""
-            select date(log.created_at) as name,
-                   coalesce(sum(abs(log.change_amount)), 0) as value
-            from consumable_stock_log log
-            join lab_consumable c on c.id = log.consumable_id
-            join lab l on l.id = c.lab_id
-            where c.deleted = 0 and l.deleted = 0 and l.department_id = :departmentId
-              and log.change_type = 'IN'
-              and log.created_at >= :startDate and log.created_at < date_add(:endDate, interval 1 day)
-              and (:labId is null or c.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            group by date(log.created_at)
-            order by date(log.created_at) asc
-            """, params);
-        List<ChartItemVo> outTrend = chart("""
-            select date(log.created_at) as name,
-                   coalesce(sum(abs(log.change_amount)), 0) as value
-            from consumable_stock_log log
-            join lab_consumable c on c.id = log.consumable_id
-            join lab l on l.id = c.lab_id
-            where c.deleted = 0 and l.deleted = 0 and l.department_id = :departmentId
-              and log.change_type = 'OUT'
-              and log.created_at >= :startDate and log.created_at < date_add(:endDate, interval 1 day)
-              and (:labId is null or c.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            group by date(log.created_at)
-            order by date(log.created_at) asc
-            """, params);
-        List<RankItemVo> labUsageRanking = ranks("""
-            select l.id, l.lab_name as name, coalesce(nullif(l.lab_type, ''), '未分类') as secondary,
-                   coalesce(sum(abs(log.change_amount)), 0) as value
-            from lab l
-            left join lab_consumable c on c.lab_id = l.id and c.deleted = 0
-            left join consumable_stock_log log on log.consumable_id = c.id
-                and log.change_type = 'OUT'
-                and log.created_at >= :startDate and log.created_at < date_add(:endDate, interval 1 day)
-            where l.deleted = 0 and l.department_id = :departmentId
-              and (:labId is null or l.id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            group by l.id, l.lab_name, l.lab_type
-            order by value desc, l.id asc
-            limit 10
-            """, params);
+        long totalTypeCount = adminStatisticsMapper.countConsumableTypes(departmentId, query.getLabId(), trimToNull(query.getLabType()));
+        long lowStockCount = adminStatisticsMapper.countLowStockConsumablesByQuery(departmentId, query.getLabId(), trimToNull(query.getLabType()));
+        long inQuantity = adminStatisticsMapper.sumConsumableInQuantity(
+            departmentId, query.getLabId(), trimToNull(query.getLabType()), range.startDate(), range.endDate()
+        );
+        long outQuantity = adminStatisticsMapper.sumConsumableOutQuantity(
+            departmentId, query.getLabId(), trimToNull(query.getLabType()), range.startDate(), range.endDate()
+        );
+        List<RankItemVo> consumptionRanking = rankRows(adminStatisticsMapper.selectConsumableConsumptionRanking(
+            departmentId, query.getLabId(), trimToNull(query.getLabType()), range.startDate(), range.endDate()
+        ));
+        List<RankItemVo> warningList = rankRows(adminStatisticsMapper.selectConsumableWarningList(
+            departmentId, query.getLabId(), trimToNull(query.getLabType())
+        ));
+        List<ChartItemVo> inTrend = chartRows(adminStatisticsMapper.selectConsumableInTrend(
+            departmentId, query.getLabId(), trimToNull(query.getLabType()), range.startDate(), range.endDate()
+        ));
+        List<ChartItemVo> outTrend = chartRows(adminStatisticsMapper.selectConsumableOutTrend(
+            departmentId, query.getLabId(), trimToNull(query.getLabType()), range.startDate(), range.endDate()
+        ));
+        List<RankItemVo> labUsageRanking = namedRankRows(
+            adminStatisticsMapper.selectConsumableLabUsageRanking(
+                departmentId, query.getLabId(), trimToNull(query.getLabType()), range.startDate(), range.endDate()
+            ),
+            this::labTypeLabel
+        );
 
         return new ConsumableStatsVo(
             totalTypeCount,
@@ -661,190 +310,36 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
     public CreditStatsVo credit(AdminStatisticsQuery query) {
         Long departmentId = requireAdminDepartmentId();
         DateRange range = monthRange(query);
-        MapSqlParameterSource params = queryParams(departmentId, range, query);
 
-        long lateCount = violationCount(params, 2);
-        long noShowCount = violationCount(params, 1);
-        BigDecimal averageCreditScore = decimal("""
-            select avg(credit_score) from sys_user
-            where deleted = 0 and department_id = :departmentId
-            """, params);
-        long lowCreditUserCount = count("""
-            select count(*) from sys_user
-            where deleted = 0 and department_id = :departmentId and credit_score < :lowCreditScore
-            """, params.addValue("lowCreditScore", LOW_CREDIT_SCORE));
-        List<ChartItemVo> distribution = namedChart("""
-            select v.violation_type as name, count(*) as value
-            from user_violation_record v
-            join sys_user u on u.id = v.user_id
-            left join lab_reservation r on r.id = v.reservation_id
-            left join (
-                select s.reservation_id, min(s.reservation_date) as first_date
-                from lab_reservation_slot s
-                where s.slot_status = 1
-                group by s.reservation_id
-            ) slot on slot.reservation_id = v.reservation_id
-            where u.deleted = 0
-              and u.department_id = :departmentId
-              and coalesce(slot.first_date, date(r.created_at)) between :startDate and :endDate
-            group by v.violation_type
-            """, params, this::violationTypeLabel);
-        List<RankItemVo> lowCreditUsers = ranks("""
-            select u.id, u.real_name as name, u.user_no as secondary, u.credit_score as value
-            from sys_user u
-            where u.deleted = 0 and u.department_id = :departmentId and u.credit_score < :lowCreditScore
-            order by u.credit_score asc, u.id asc
-            limit 10
-            """, params);
-        List<RankItemVo> violationRanking = ranks("""
-            select u.id, u.real_name as name, u.user_no as secondary, count(v.id) as value
-            from sys_user u
-            join user_violation_record v on v.user_id = u.id
-            left join lab_reservation r on r.id = v.reservation_id
-            left join (
-                select s.reservation_id, min(s.reservation_date) as first_date
-                from lab_reservation_slot s
-                where s.slot_status = 1
-                group by s.reservation_id
-            ) slot on slot.reservation_id = v.reservation_id
-            where u.deleted = 0
-              and u.department_id = :departmentId
-              and coalesce(slot.first_date, date(r.created_at)) between :startDate and :endDate
-            group by u.id, u.real_name, u.user_no
-            order by value desc, u.id asc
-            limit 10
-            """, params);
-        List<ChartItemVo> violationTrend = chart("""
-            select coalesce(slot.first_date, date(r.created_at)) as name, count(*) as value
-            from user_violation_record v
-            join sys_user u on u.id = v.user_id
-            left join lab_reservation r on r.id = v.reservation_id
-            left join (
-                select s.reservation_id, min(s.reservation_date) as first_date
-                from lab_reservation_slot s
-                where s.slot_status = 1
-                group by s.reservation_id
-            ) slot on slot.reservation_id = v.reservation_id
-            where u.deleted = 0
-              and u.department_id = :departmentId
-              and coalesce(slot.first_date, date(r.created_at)) between :startDate and :endDate
-            group by coalesce(slot.first_date, date(r.created_at))
-            order by coalesce(slot.first_date, date(r.created_at)) asc
-            """, params);
-        List<ChartItemVo> lateTrend = chart("""
-            select coalesce(slot.first_date, date(r.created_at)) as name, count(*) as value
-            from user_violation_record v
-            join sys_user u on u.id = v.user_id
-            left join lab_reservation r on r.id = v.reservation_id
-            left join (
-                select s.reservation_id, min(s.reservation_date) as first_date
-                from lab_reservation_slot s
-                where s.slot_status = 1
-                group by s.reservation_id
-            ) slot on slot.reservation_id = v.reservation_id
-            where u.deleted = 0
-              and u.department_id = :departmentId
-              and coalesce(slot.first_date, date(r.created_at)) between :startDate and :endDate
-              and v.violation_type = 2
-            group by coalesce(slot.first_date, date(r.created_at))
-            order by coalesce(slot.first_date, date(r.created_at)) asc
-            """, params);
-        List<ChartItemVo> noShowTrend = chart("""
-            select coalesce(slot.first_date, date(r.created_at)) as name, count(*) as value
-            from user_violation_record v
-            join sys_user u on u.id = v.user_id
-            left join lab_reservation r on r.id = v.reservation_id
-            left join (
-                select s.reservation_id, min(s.reservation_date) as first_date
-                from lab_reservation_slot s
-                where s.slot_status = 1
-                group by s.reservation_id
-            ) slot on slot.reservation_id = v.reservation_id
-            where u.deleted = 0
-              and u.department_id = :departmentId
-              and coalesce(slot.first_date, date(r.created_at)) between :startDate and :endDate
-              and v.violation_type = 1
-            group by coalesce(slot.first_date, date(r.created_at))
-            order by coalesce(slot.first_date, date(r.created_at)) asc
-            """, params);
-        List<ChartItemVo> creditScoreDistribution = chart("""
-            select case
-                     when u.credit_score < 60 then '60以下'
-                     when u.credit_score < 70 then '60-69'
-                     when u.credit_score < 80 then '70-79'
-                     when u.credit_score < 90 then '80-89'
-                     else '90及以上'
-                   end as name,
-                   count(*) as value
-            from sys_user u
-            where u.deleted = 0 and u.department_id = :departmentId
-            group by name
-            order by value desc, name asc
-            """, params);
-        List<ChartItemVo> roleViolationDistribution = chart("""
-            select case
-                     when exists (
-                       select 1 from sys_user_role ur
-                       join sys_role role on role.id = ur.role_id
-                       where ur.user_id = u.id and role.role_code in ('TEACHER', 'ROLE_TEACHER')
-                     ) then '教师'
-                     else '学生'
-                   end as name,
-                   count(*) as value
-            from user_violation_record v
-            join sys_user u on u.id = v.user_id
-            left join lab_reservation r on r.id = v.reservation_id
-            left join (
-                select s.reservation_id, min(s.reservation_date) as first_date
-                from lab_reservation_slot s
-                where s.slot_status = 1
-                group by s.reservation_id
-            ) slot on slot.reservation_id = v.reservation_id
-            where u.deleted = 0
-              and u.department_id = :departmentId
-              and coalesce(slot.first_date, date(r.created_at)) between :startDate and :endDate
-            group by name
-            """, params);
-        List<ChartItemVo> reservationTypeDistribution = namedChart("""
-            select r.reservation_type as name, count(*) as value
-            from user_violation_record v
-            join sys_user u on u.id = v.user_id
-            join lab_reservation r on r.id = v.reservation_id
-            left join (
-                select s.reservation_id, min(s.reservation_date) as first_date
-                from lab_reservation_slot s
-                where s.slot_status = 1
-                group by s.reservation_id
-            ) slot on slot.reservation_id = v.reservation_id
-            where u.deleted = 0
-              and u.department_id = :departmentId
-              and coalesce(slot.first_date, date(r.created_at)) between :startDate and :endDate
-            group by r.reservation_type
-            """, params, this::reservationTypeLabel);
-        List<ChartItemVo> timeSegmentDistribution = chart("""
-            select case
-                     when hour(coalesce(slot.first_start_at, r.created_at)) < 12 then '??'
-                     when hour(coalesce(slot.first_start_at, r.created_at)) < 18 then '??'
-                     else '??'
-                   end as name,
-                   count(*) as value
-            from user_violation_record v
-            join sys_user u on u.id = v.user_id
-            left join lab_reservation r on r.id = v.reservation_id
-            left join (
-                select s.reservation_id,
-                       min(timestamp(s.reservation_date, p.start_time)) as first_start_at,
-                       min(s.reservation_date) as first_date
-                from lab_reservation_slot s
-                join class_period p on p.id = s.period_id
-                where s.slot_status = 1
-                group by s.reservation_id
-            ) slot on slot.reservation_id = v.reservation_id
-            where u.deleted = 0
-              and u.department_id = :departmentId
-              and coalesce(slot.first_date, date(r.created_at)) between :startDate and :endDate
-            group by name
-            """, params);
+        long lateCount = adminStatisticsMapper.countViolationsByType(departmentId, range.startDate(), range.endDate(), 2);
+        long noShowCount = adminStatisticsMapper.countViolationsByType(departmentId, range.startDate(), range.endDate(), 1);
+        BigDecimal averageCreditScore = defaultDecimal(adminStatisticsMapper.selectAverageCreditScore(departmentId));
+        long lowCreditUserCount = adminStatisticsMapper.countLowCreditUsers(departmentId, LOW_CREDIT_SCORE);
+        List<ChartItemVo> distribution = namedChartRows(
+            adminStatisticsMapper.selectViolationTypeDistribution(departmentId, range.startDate(), range.endDate()),
+            this::violationTypeLabel
+        );
+        List<RankItemVo> lowCreditUsers = rankRows(adminStatisticsMapper.selectLowCreditUsers(departmentId, LOW_CREDIT_SCORE));
+        List<RankItemVo> violationRanking = rankRows(adminStatisticsMapper.selectViolationRanking(departmentId, range.startDate(), range.endDate()));
+        List<ChartItemVo> violationTrend = chartRows(adminStatisticsMapper.selectViolationTrend(departmentId, range.startDate(), range.endDate()));
+        List<ChartItemVo> lateTrend = chartRows(adminStatisticsMapper.selectLateTrend(departmentId, range.startDate(), range.endDate()));
+        List<ChartItemVo> noShowTrend = chartRows(adminStatisticsMapper.selectNoShowTrend(departmentId, range.startDate(), range.endDate()));
+        List<ChartItemVo> creditScoreDistribution = namedChartRows(
+            adminStatisticsMapper.selectCreditScoreDistribution(departmentId),
+            this::creditScoreRangeLabel
+        );
+        List<ChartItemVo> roleViolationDistribution = namedChartRows(
+            adminStatisticsMapper.selectRoleViolationDistribution(departmentId, range.startDate(), range.endDate()),
+            this::roleLabel
+        );
+        List<ChartItemVo> reservationTypeDistribution = namedChartRows(
+            adminStatisticsMapper.selectCreditReservationTypeDistribution(departmentId, range.startDate(), range.endDate()),
+            this::reservationTypeLabel
+        );
+        List<ChartItemVo> timeSegmentDistribution = namedChartRows(
+            adminStatisticsMapper.selectCreditTimeSegmentDistribution(departmentId, range.startDate(), range.endDate()),
+            this::timeSegmentLabel
+        );
 
         return new CreditStatsVo(
             lateCount,
@@ -871,210 +366,253 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         validateLab(query.getLabId(), departmentId);
         String exportType = query.getExportType();
         if (exportType == null || exportType.isBlank()) {
-            throw new BusinessException("请选择导出类型");
+            throw new BusinessException("导出类型不能为空");
         }
 
         ExportData exportData = switch (exportType) {
             case "reservation" -> reservationExport(departmentId, range, query);
+            case "labUsage" -> labUsageExport(query);
+            case "device" -> deviceExport(query);
             case "experimentReport" -> experimentReportExport(departmentId, range, query);
             case "consumable" -> consumableExport(departmentId, range, query);
             case "creditViolation" -> creditViolationExport(departmentId, range, query);
             default -> throw new BusinessException("不支持的导出类型");
         };
-        if (exportData.rows().size() > EXPORT_LIMIT) {
-            throw new BusinessException("单次导出最多支持 " + EXPORT_LIMIT + " 条，请缩小筛选范围");
-        }
 
-        String filename = "统计分析-" + exportData.title() + "-" + LocalDate.now().format(FILE_DATE_FORMATTER) + ".xlsx";
+        String filename = exportData.title() + "_" + LocalDateTime.now().format(FILE_DATE_FORMATTER) + ".xlsx";
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + URLEncoder.encode(filename, StandardCharsets.UTF_8));
 
-        try (SXSSFWorkbook workbook = new SXSSFWorkbook(100)) {
+        try (SXSSFWorkbook workbook = new SXSSFWorkbook()) {
             writeSheet(workbook, exportData);
             workbook.write(response.getOutputStream());
             workbook.dispose();
         } catch (IOException ex) {
-            throw new BusinessException("导出 Excel 失败");
+            throw new BusinessException("导出失败，请稍后重试");
         }
     }
 
     private ExportData reservationExport(Long departmentId, DateRange range, AdminStatisticsQuery query) {
-        MapSqlParameterSource params = queryParams(departmentId, range, query).addValue("limit", EXPORT_LIMIT + 1);
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
-            select r.reservation_no as reservationNo,
-                   l.lab_name as labName,
-                   u.real_name as applicantName,
-                   case when exists (
-                       select 1 from sys_user_role ur join sys_role role on role.id = ur.role_id
-                       where ur.user_id = u.id and role.role_code in ('TEACHER', 'ROLE_TEACHER')
-                   ) then '教师' else '学生' end as applicantRole,
-                   r.reservation_type as reservationType,
-                   r.status as status,
-                   min(s.reservation_date) as reservationDate,
-                   concat(min(date_format(p.start_time, '%H:%i')), ' - ', max(date_format(p.end_time, '%H:%i'))) as timeRange,
-                   r.created_at as createdAt,
-                   audit.created_at as auditedAt
-            from lab_reservation r
-            join lab l on l.id = r.lab_id
-            join sys_user u on u.id = r.applicant_user_id
-            join lab_reservation_slot s on s.reservation_id = r.id
-            join class_period p on p.id = s.period_id
-            left join (
-                select reservation_id, max(created_at) as created_at
-                from reservation_audit_log
-                where audit_action in (2, 3)
-                group by reservation_id
-            ) audit on audit.reservation_id = r.id
-            where l.deleted = 0
-              and l.department_id = :departmentId
-              and s.slot_status = 1
-              and s.reservation_date between :startDate and :endDate
-              and (:labId is null or r.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-              and (:status is null or r.status = :status)
-              and (:reservationType is null or r.reservation_type = :reservationType)
-            group by r.id, r.reservation_no, l.lab_name, u.real_name, applicantRole, r.reservation_type, r.status, r.created_at, audit.created_at
-            order by min(s.reservation_date) desc, r.id desc
-            limit :limit
-            """, params);
+        ensureExportWithinLimit(reservationMapper.countExport(
+            departmentId,
+            range.startDate(),
+            range.endDate(),
+            trimToNull(query.getLabType()),
+            query.getLabId(),
+            query.getStatus(),
+            query.getReservationType()
+        ));
+        List<ReservationExportVo> rows = reservationMapper.selectExportList(
+            departmentId,
+            range.startDate(),
+            range.endDate(),
+            trimToNull(query.getLabType()),
+            query.getLabId(),
+            query.getStatus(),
+            query.getReservationType(),
+            EXPORT_LIMIT
+        );
         List<List<Object>> data = rows.stream()
-            .map(row -> List.of(
-                value(row, "reservationNo"),
-                value(row, "labName"),
-                value(row, "applicantName"),
-                value(row, "applicantRole"),
-                reservationTypeLabel(row.get("reservationType")),
-                reservationStatusLabel(row.get("status")),
-                value(row, "reservationDate"),
-                value(row, "timeRange"),
-                value(row, "createdAt"),
-                value(row, "auditedAt")
+            .map(row -> List.<Object>of(
+                cell(row.getReservationNo()),
+                cell(row.getLabName()),
+                cell(row.getLabType()),
+                cell(row.getApplicantName()),
+                cell(row.getUserNo()),
+                cell(row.getUserRole()),
+                reservationTypeLabel(row.getReservationType()),
+                reservationStatusLabel(row.getStatus()),
+                cell(row.getStartTime()),
+                cell(row.getEndTime()),
+                yesNo(row.getLateViolation()),
+                yesNo(row.getNoShowViolation()),
+                cell(row.getCreatedAt()),
+                cell(row.getApproverName()),
+                cell(row.getAuditedAt())
             ))
             .toList();
-        return new ExportData("预约数据", List.of("预约编号", "实验室", "申请人", "角色", "预约类型", "状态", "预约日期", "时间段", "创建时间", "审核时间"), data);
+        return new ExportData(
+            "预约数据",
+            List.of(
+                "预约编号", "实验室名称", "实验室类型", "预约人姓名", "学号/工号",
+                "用户角色", "预约类型", "预约状态", "开始时间", "结束时间",
+                "是否迟到", "是否爽约", "创建时间", "审核人", "审核时间"
+            ),
+            data
+        );
     }
 
     private ExportData experimentReportExport(Long departmentId, DateRange range, AdminStatisticsQuery query) {
-        MapSqlParameterSource params = queryParams(departmentId, range, query).addValue("limit", EXPORT_LIMIT + 1);
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
-            select r.report_no as reportNo,
-                   lr.reservation_no as reservationNo,
-                   l.lab_name as labName,
-                   stu.real_name as studentName,
-                   r.status as status,
-                   r.submitted_at as submittedAt,
-                   tea.real_name as teacherName,
-                   r.reviewed_at as reviewedAt
-            from lab_experiment_report r
-            left join lab_reservation lr on lr.id = r.reservation_id
-            join lab l on l.id = r.lab_id
-            join sys_user stu on stu.id = r.student_id
-            join sys_user tea on tea.id = r.teacher_id
-            where r.deleted = 0
-              and r.department_id = :departmentId
-              and r.experiment_date between :startDate and :endDate
-              and (:labId is null or r.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            order by r.updated_at desc, r.id desc
-            limit :limit
-            """, params);
+        ensureExportWithinLimit(experimentReportMapper.countExport(
+            departmentId,
+            range.startDate(),
+            range.endDate(),
+            trimToNull(query.getLabType()),
+            query.getLabId(),
+            query.getStatus(),
+            query.getReservationType()
+        ));
+        List<ExperimentReportExportVo> rows = experimentReportMapper.selectExportList(
+            departmentId,
+            range.startDate(),
+            range.endDate(),
+            trimToNull(query.getLabType()),
+            query.getLabId(),
+            query.getStatus(),
+            query.getReservationType(),
+            EXPORT_LIMIT
+        );
         List<List<Object>> data = rows.stream()
-            .map(row -> List.of(
-                value(row, "reportNo"),
-                value(row, "reservationNo"),
-                value(row, "labName"),
-                value(row, "studentName"),
-                reportStatusLabel(row.get("status")),
-                value(row, "submittedAt"),
-                value(row, "teacherName"),
-                value(row, "reviewedAt")
+            .map(row -> List.<Object>of(
+                cell(row.getReportNo()),
+                cell(row.getReservationNo()),
+                cell(row.getLabName()),
+                cell(preferText(row.getTitle(), row.getExperimentName())),
+                cell(row.getSubmitterName()),
+                cell(row.getUserNo()),
+                cell(row.getSubmittedAt()),
+                reportStatusLabel(row.getStatus()),
+                cell(row.getReviewerName()),
+                cell(row.getReviewedAt()),
+                "",
+                cell(row.getTeacherComment()),
+                ""
             ))
             .toList();
-        return new ExportData("实验报告数据", List.of("报告编号", "关联预约", "实验室", "提交人", "状态", "提交时间", "审核人", "审核时间"), data);
+        return new ExportData(
+            "实验报告数据",
+            List.of(
+                "报告编号", "预约编号", "实验室名称", "实验名称/报告标题",
+                "提交人姓名", "学号/工号", "提交时间", "审核状态",
+                "审核人", "审核时间", "得分", "评价", "备注"
+            ),
+            data
+        );
+    }
+
+    private ExportData labUsageExport(AdminStatisticsQuery query) {
+        LabUsageStatsVo stats = labUsage(query);
+        List<List<Object>> data = new ArrayList<>();
+        data.add(List.of("汇总指标", "实验室使用率", "当前筛选范围内的预约使用率", formatPercent(stats.getUsageRate()), ""));
+        data.add(List.of("汇总指标", "总占用节次数", "当前筛选范围内已占用节次数", cell(stats.getTotalOccupiedSlots()), ""));
+        data.add(List.of("汇总指标", "高频实验室数量", "当前筛选范围内有预约的实验室数量", cell(stats.getHighUsageLabCount()), ""));
+        data.add(List.of("汇总指标", "空闲实验室数量", "当前筛选范围内无预约的实验室数量", cell(stats.getIdleLabCount()), ""));
+        appendChartRows(data, "时间段使用热度", stats.getTimeHeat(), "时间段使用次数");
+        appendRankRows(data, "实验室类型使用率", stats.getTypeUsageRates(), "实验室类型", true);
+        appendRankRows(data, "高频实验室", stats.getHighUsageLabs(), "实验室", true);
+        appendRankRows(data, "空闲实验室", stats.getIdleLabs(), "实验室", true);
+        return new ExportData(
+            "实验室使用统计",
+            List.of("分类", "名称", "说明", "数值", "占比/比率"),
+            data
+        );
     }
 
     private ExportData consumableExport(Long departmentId, DateRange range, AdminStatisticsQuery query) {
-        MapSqlParameterSource params = queryParams(departmentId, range, query).addValue("limit", EXPORT_LIMIT + 1);
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
-            select c.consumable_name as consumableName,
-                   l.lab_name as labName,
-                   c.specification as specification,
-                   c.stock_quantity as stockQuantity,
-                   c.warning_threshold as warningThreshold,
-                   coalesce(sum(case when log.change_type = 'IN' then abs(log.change_amount) else 0 end), 0) as inQuantity,
-                   coalesce(sum(case when log.change_type = 'OUT' then abs(log.change_amount) else 0 end), 0) as outQuantity,
-                   case when c.stock_quantity <= c.warning_threshold then '库存预警' else '正常' end as stockStatus
-            from lab_consumable c
-            join lab l on l.id = c.lab_id
-            left join consumable_stock_log log on log.consumable_id = c.id
-                and log.created_at >= :startDate and log.created_at < date_add(:endDate, interval 1 day)
-            where c.deleted = 0
-              and l.deleted = 0
-              and l.department_id = :departmentId
-              and (:labId is null or c.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            group by c.id, c.consumable_name, l.lab_name, c.specification, c.stock_quantity, c.warning_threshold
-            order by c.id desc
-            limit :limit
-            """, params);
+        ensureExportWithinLimit(consumableMapper.countExport(
+            departmentId,
+            range.startDate(),
+            range.endDate(),
+            trimToNull(query.getLabType()),
+            query.getLabId()
+        ));
+        List<ConsumableExportVo> rows = consumableMapper.selectExportList(
+            departmentId,
+            range.startDate(),
+            range.endDate(),
+            trimToNull(query.getLabType()),
+            query.getLabId(),
+            EXPORT_LIMIT
+        );
         List<List<Object>> data = rows.stream()
-            .map(row -> List.of(
-                value(row, "consumableName"),
-                value(row, "labName"),
-                value(row, "specification"),
-                value(row, "stockQuantity"),
-                value(row, "warningThreshold"),
-                value(row, "inQuantity"),
-                value(row, "outQuantity"),
-                value(row, "stockStatus")
+            .map(row -> List.<Object>of(
+                cell(row.getConsumableName()),
+                cell(row.getLabName()),
+                cell(row.getLabType()),
+                cell(row.getStockQuantity()),
+                cell(row.getWarningThreshold()),
+                cell(row.getUnit()),
+                cell(row.getInQuantity()),
+                cell(row.getOutQuantity()),
+                cell(row.getLastInTime()),
+                cell(row.getLastOutTime()),
+                yesNo(row.getLowStock())
             ))
             .toList();
-        return new ExportData("耗材统计数据", List.of("耗材名称", "实验室", "规格", "当前库存", "预警阈值", "本月入库", "本月出库", "库存状态"), data);
+        return new ExportData(
+            "耗材统计数据",
+            List.of(
+                "耗材名称", "所属实验室", "实验室类型", "当前库存", "预警阈值",
+                "单位", "统计期入库数量", "统计期出库数量", "最近入库时间",
+                "最近出库时间", "是否低库存"
+            ),
+            data
+        );
+    }
+
+    private ExportData deviceExport(AdminStatisticsQuery query) {
+        DeviceStatsVo stats = devices(query);
+        List<List<Object>> data = new ArrayList<>();
+        data.add(List.of("汇总指标", "设备总数", "当前筛选范围内设备总量", cell(stats.getTotalCount()), ""));
+        data.add(List.of("汇总指标", "正常设备数", "状态为正常的设备数量", cell(stats.getNormalCount()), ""));
+        data.add(List.of("汇总指标", "维修中设备数", "状态为维修中的设备数量", cell(stats.getRepairingCount()), ""));
+        data.add(List.of("汇总指标", "停用设备数", "状态为停用的设备数量", cell(stats.getDisabledCount()), ""));
+        data.add(List.of("汇总指标", "报修数量", "当前筛选范围内报修记录数量", cell(stats.getRepairOrderCount()), ""));
+        appendChartRows(data, "设备状态分布", stats.getStatusDistribution(), "设备状态");
+        appendChartRows(data, stats.getCategoryLabel() + "分布", stats.getCategoryDistribution(), stats.getCategoryLabel());
+        appendChartRows(data, "报修趋势", stats.getRepairTrend(), "报修日期");
+        appendRankRows(data, "实验室设备数量", stats.getLabDeviceCounts(), "实验室", true);
+        return new ExportData(
+            "设备统计",
+            List.of("分类", "名称", "说明", "数值", "占比/比率"),
+            data
+        );
     }
 
     private ExportData creditViolationExport(Long departmentId, DateRange range, AdminStatisticsQuery query) {
-        MapSqlParameterSource params = queryParams(departmentId, range, query).addValue("limit", EXPORT_LIMIT + 1);
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
-            select u.real_name as realName,
-                   u.user_no as userNo,
-                   case when exists (
-                       select 1 from sys_user_role ur join sys_role role on role.id = ur.role_id
-                       where ur.user_id = u.id and role.role_code in ('TEACHER', 'ROLE_TEACHER')
-                   ) then '??' else '??' end as userRole,
-                   v.violation_type as violationType,
-                   v.score_change as scoreChange,
-                   coalesce(slot.first_date, date(r.created_at)) as createdAt,
-                   u.credit_score as creditScore,
-                   v.remark as remark
-            from user_violation_record v
-            join sys_user u on u.id = v.user_id
-            left join lab_reservation r on r.id = v.reservation_id
-            left join (
-                select s.reservation_id, min(s.reservation_date) as first_date
-                from lab_reservation_slot s
-                where s.slot_status = 1
-                group by s.reservation_id
-            ) slot on slot.reservation_id = v.reservation_id
-            where u.deleted = 0
-              and u.department_id = :departmentId
-              and coalesce(slot.first_date, date(r.created_at)) between :startDate and :endDate
-            order by coalesce(slot.first_date, date(r.created_at)) desc, v.id desc
-            limit :limit
-            """, params);
+        ensureExportWithinLimit(violationMapper.countExport(
+            departmentId,
+            range.startDate(),
+            range.endDate(),
+            trimToNull(query.getLabType()),
+            query.getLabId(),
+            query.getStatus(),
+            query.getReservationType()
+        ));
+        List<CreditViolationExportVo> rows = violationMapper.selectExportList(
+            departmentId,
+            range.startDate(),
+            range.endDate(),
+            trimToNull(query.getLabType()),
+            query.getLabId(),
+            query.getStatus(),
+            query.getReservationType(),
+            EXPORT_LIMIT
+        );
         List<List<Object>> data = rows.stream()
-            .map(row -> List.of(
-                value(row, "realName"),
-                value(row, "userNo"),
-                value(row, "userRole"),
-                violationTypeLabel(row.get("violationType")),
-                value(row, "scoreChange"),
-                value(row, "createdAt"),
-                value(row, "creditScore"),
-                value(row, "remark")
+            .map(row -> List.<Object>of(
+                cell(row.getRealName()),
+                cell(row.getUserNo()),
+                cell(row.getUserRole()),
+                cell(row.getCreditScore()),
+                violationTypeLabel(row.getViolationType()),
+                cell(row.getScoreChange()),
+                cell(row.getViolationTime()),
+                cell(row.getReservationNo()),
+                "",
+                cell(row.getTotalViolationCount()),
+                cell(row.getRemark())
             ))
             .toList();
-        return new ExportData("??????", List.of("????", "???", "??", "????", "??", "????", "?????", "??"), data);
+        return new ExportData(
+            "信用违规数据",
+            List.of(
+                "用户姓名", "学号/工号", "用户角色", "当前信用分", "违规类型",
+                "扣分", "违规时间", "对应预约编号", "处理状态", "累计违规次数", "备注"
+            ),
+            data
+        );
     }
 
     private void writeSheet(SXSSFWorkbook workbook, ExportData exportData) {
@@ -1083,18 +621,20 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         Font headerFont = workbook.createFont();
         headerFont.setBold(true);
         headerStyle.setFont(headerFont);
+
         Row header = sheet.createRow(0);
         for (int i = 0; i < exportData.headers().size(); i++) {
             Cell cell = header.createCell(i);
             cell.setCellValue(exportData.headers().get(i));
             cell.setCellStyle(headerStyle);
-            sheet.setColumnWidth(i, 4200);
+            sheet.setColumnWidth(i, 5200);
         }
+
         for (int rowIndex = 0; rowIndex < exportData.rows().size(); rowIndex++) {
             Row row = sheet.createRow(rowIndex + 1);
             List<Object> values = exportData.rows().get(rowIndex);
             for (int columnIndex = 0; columnIndex < values.size(); columnIndex++) {
-                row.createCell(columnIndex).setCellValue(Objects.toString(values.get(columnIndex), ""));
+                row.createCell(columnIndex).setCellValue(cell(values.get(columnIndex)));
             }
         }
     }
@@ -1111,12 +651,8 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         if (labId == null) {
             return;
         }
-        long exists = count("""
-            select count(*) from lab
-            where id = :labId and department_id = :departmentId and deleted = 0
-            """, params(departmentId).addValue("labId", labId));
-        if (exists == 0) {
-            throw new BusinessException(403, "无权访问该实验室数据");
+        if (adminStatisticsMapper.countAccessibleLab(departmentId, labId) == 0) {
+            throw new BusinessException(403, "实验室不存在或无权访问");
         }
     }
 
@@ -1139,68 +675,13 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         return new DateRange(startDate, endDate);
     }
 
-    private MapSqlParameterSource params(Long departmentId) {
-        return new MapSqlParameterSource().addValue("departmentId", departmentId);
-    }
-
-    private MapSqlParameterSource queryParams(Long departmentId, DateRange range, AdminStatisticsQuery query) {
-        return params(departmentId)
-            .addValue("startDate", range.startDate())
-            .addValue("endDate", range.endDate())
-            .addValue("labId", query.getLabId())
-            .addValue("labType", trimToNull(query.getLabType()))
-            .addValue("status", query.getStatus())
-            .addValue("reservationType", query.getReservationType());
-    }
-
-    private long count(String sql, MapSqlParameterSource params) {
-        Number value = jdbcTemplate.queryForObject(sql, params, Number.class);
-        return value == null ? 0L : value.longValue();
-    }
-
-    private BigDecimal decimal(String sql, MapSqlParameterSource params) {
-        BigDecimal value = jdbcTemplate.queryForObject(sql, params, BigDecimal.class);
-        return value == null ? BigDecimal.ZERO : value.setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private long countByDeviceStatus(MapSqlParameterSource params, int status) {
-        return count("""
-            select count(*) from lab_device d join lab l on l.id = d.lab_id
-            where d.deleted = 0 and l.deleted = 0 and l.department_id = :departmentId
-              and (:labId is null or d.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-              and d.status = :deviceStatus
-            """, new MapSqlParameterSource(params.getValues()).addValue("deviceStatus", status));
-    }
-
-    private long violationCount(MapSqlParameterSource params, int violationType) {
-        return count("""
-            select count(*)
-            from user_violation_record v
-            join sys_user u on u.id = v.user_id
-            left join lab_reservation r on r.id = v.reservation_id
-            left join (
-                select s.reservation_id, min(s.reservation_date) as first_date
-                from lab_reservation_slot s
-                where s.slot_status = 1
-                group by s.reservation_id
-            ) slot on slot.reservation_id = v.reservation_id
-            where u.deleted = 0
-              and u.department_id = :departmentId
-              and coalesce(slot.first_date, date(r.created_at)) between :startDate and :endDate
-              and v.violation_type = :violationType
-            """, new MapSqlParameterSource(params.getValues()).addValue("violationType", violationType));
-    }
-
-    private List<ChartItemVo> chart(String sql, MapSqlParameterSource params) {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, params);
+    private List<ChartItemVo> chartRows(List<Map<String, Object>> rows) {
         return withRates(rows.stream()
             .map(row -> new ChartItemVo(Objects.toString(row.get("name"), ""), number(row.get("value")), BigDecimal.ZERO))
             .toList());
     }
 
-    private List<ChartItemVo> namedChart(String sql, MapSqlParameterSource params, LabelResolver resolver) {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, params);
+    private List<ChartItemVo> namedChartRows(List<Map<String, Object>> rows, LabelResolver resolver) {
         return withRates(rows.stream()
             .map(row -> new ChartItemVo(resolver.resolve(row.get("name")), number(row.get("value")), BigDecimal.ZERO))
             .toList());
@@ -1216,8 +697,7 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
             .toList();
     }
 
-    private List<RankItemVo> ranks(String sql, MapSqlParameterSource params) {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, params);
+    private List<RankItemVo> rankRows(List<Map<String, Object>> rows) {
         long total = rows.stream().mapToLong(row -> number(row.get("value"))).sum();
         return rows.stream()
             .map(row -> new RankItemVo(
@@ -1230,78 +710,44 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
             .toList();
     }
 
+    private List<RankItemVo> namedRankRows(List<Map<String, Object>> rows, LabelResolver resolver) {
+        long total = rows.stream().mapToLong(row -> number(row.get("value"))).sum();
+        return rows.stream()
+            .map(row -> new RankItemVo(
+                number(row.get("id")),
+                Objects.toString(row.get("name"), ""),
+                resolver.resolve(row.get("secondary")),
+                number(row.get("value")),
+                total == 0 ? BigDecimal.ZERO : rate(number(row.get("value")), total)
+            ))
+            .toList();
+    }
+
     private BigDecimal labUsageRate(Long departmentId, Long labId, String labType, LocalDate startDate, LocalDate endDate) {
-        long occupied = count("""
-            select count(*)
-            from lab_reservation_slot s
-            join lab_reservation r on r.id = s.reservation_id
-            join lab l on l.id = s.lab_id
-            where l.deleted = 0
-              and l.department_id = :departmentId
-              and r.status in (2, 5)
-              and s.slot_status = 1
-              and s.reservation_date between :startDate and :endDate
-              and (:labId is null or s.lab_id = :labId)
-              and (:labType is null or l.lab_type = :labType)
-            """, params(departmentId).addValue("labId", labId).addValue("labType", trimToNull(labType)).addValue("startDate", startDate).addValue("endDate", endDate));
+        long occupied = adminStatisticsMapper.countLabUsageOccupiedSlots(departmentId, labId, trimToNull(labType), startDate, endDate);
         long totalOpenSlots = totalOpenSlots(departmentId, labId, startDate, endDate, trimToNull(labType));
         return totalOpenSlots == 0 ? BigDecimal.ZERO : rate(occupied, totalOpenSlots);
     }
 
     private List<RankItemVo> labTypeRates(Long departmentId, Long labId, String selectedLabType, LocalDate startDate, LocalDate endDate) {
-        List<Map<String, Object>> labTypes = jdbcTemplate.queryForList("""
-            select coalesce(nullif(lab_type, ''), '未分类') as labType
-            from lab
-            where deleted = 0
-              and department_id = :departmentId
-              and (:labId is null or id = :labId)
-              and (:selectedLabType is null or lab_type = :selectedLabType)
-            group by coalesce(nullif(lab_type, ''), '未分类')
-            order by labType asc
-            """, params(departmentId).addValue("labId", labId).addValue("selectedLabType", trimToNull(selectedLabType)));
-        List<RankItemVo> result = new ArrayList<>();
-        for (Map<String, Object> row : labTypes) {
-            String labType = Objects.toString(row.get("labType"), "未分类");
-            MapSqlParameterSource p = params(departmentId)
-                .addValue("labId", labId)
-                .addValue("labType", labType)
-                .addValue("startDate", startDate)
-                .addValue("endDate", endDate);
-            long occupied = count("""
-                select count(*)
-                from lab_reservation_slot s
-                join lab_reservation r on r.id = s.reservation_id
-                join lab l on l.id = s.lab_id
-                where l.deleted = 0
-                  and l.department_id = :departmentId
-                  and coalesce(nullif(l.lab_type, ''), '未分类') = :labType
-                  and r.status in (2, 5)
-                  and s.slot_status = 1
-                  and s.reservation_date between :startDate and :endDate
-                  and (:labId is null or s.lab_id = :labId)
-                """, p);
-            long total = totalOpenSlots(departmentId, labId, startDate, endDate, labType);
-            result.add(new RankItemVo(null, labType, "预约使用率", occupied, total == 0 ? BigDecimal.ZERO : rate(occupied, total)));
-        }
-        return result.stream()
+        List<Map<String, Object>> labTypes = adminStatisticsMapper.selectUsageLabTypes(departmentId, labId, trimToNull(selectedLabType));
+        return labTypes.stream()
+            .map(row -> {
+                String labType = Objects.toString(row.get("labType"), "UNCLASSIFIED");
+                long occupied = adminStatisticsMapper.countLabTypeOccupied(departmentId, labId, labType, startDate, endDate);
+                long total = totalOpenSlots(departmentId, labId, startDate, endDate, labType);
+                return new RankItemVo(null, labTypeLabel(labType), "预约使用率", occupied, total == 0 ? BigDecimal.ZERO : rate(occupied, total));
+            })
             .sorted((left, right) -> right.getRate().compareTo(left.getRate()))
             .toList();
     }
 
     private long totalOpenSlots(Long departmentId, Long labId, LocalDate startDate, LocalDate endDate, String labType) {
-        MapSqlParameterSource p = params(departmentId).addValue("labId", labId).addValue("labType", labType);
         Map<Integer, Long> openSlotsByWeekday = new LinkedHashMap<>();
-        jdbcTemplate.query("""
-            select os.weekday as weekday, count(*) as value
-            from lab_open_slot os
-            join lab l on l.id = os.lab_id
-            where l.deleted = 0
-              and l.department_id = :departmentId
-              and os.status = 1
-              and (:labId is null or os.lab_id = :labId)
-              and (:labType is null or coalesce(nullif(l.lab_type, ''), '未分类') = :labType)
-            group by os.weekday
-            """, p, (RowCallbackHandler) rs -> openSlotsByWeekday.put(rs.getInt("weekday"), rs.getLong("value")));
+        for (Map<String, Object> row : adminStatisticsMapper.selectOpenSlotWeekdayCounts(departmentId, labId, labType)) {
+            openSlotsByWeekday.put((int) number(row.get("weekday")), number(row.get("value")));
+        }
+
         long total = 0L;
         for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
             total += openSlotsByWeekday.getOrDefault(date.getDayOfWeek().getValue(), 0L);
@@ -1309,16 +755,15 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         if (total > 0) {
             return total;
         }
-        long labCount = count("""
-            select count(*) from lab
-            where deleted = 0
-              and department_id = :departmentId
-              and (:labId is null or id = :labId)
-              and (:labType is null or coalesce(nullif(lab_type, ''), '未分类') = :labType)
-            """, p);
-        long periodCount = count("select count(*) from class_period where status = 1", new MapSqlParameterSource());
+
+        long labCount = adminStatisticsMapper.countOpenSlotLabCount(departmentId, labId, labType);
+        long periodCount = adminStatisticsMapper.countActiveClassPeriods();
         long days = endDate.toEpochDay() - startDate.toEpochDay() + 1;
         return labCount * periodCount * Math.max(days, 0L);
+    }
+
+    private BigDecimal defaultDecimal(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value.setScale(2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal rate(long value, long total) {
@@ -1337,14 +782,56 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         return 0L;
     }
 
-    private Object value(Map<String, Object> row, String key) {
-        Object value = row.get(key);
-        if (value instanceof Date date) {
-            return date.toLocalDate();
+    private String cell(Object value) {
+        if (value == null) {
+            return "";
         }
-        return value == null ? "" : value;
+        if (value instanceof LocalDateTime dateTime) {
+            return dateTime.format(CELL_TIME_FORMATTER);
+        }
+        if (value instanceof LocalDate date) {
+            return date.toString();
+        }
+        if (value instanceof Date sqlDate) {
+            return sqlDate.toLocalDate().toString();
+        }
+        return Objects.toString(value, "");
     }
 
+    private String yesNo(Number value) {
+        return value != null && value.intValue() > 0 ? "是" : "否";
+    }
+
+    private String preferText(String primary, String fallback) {
+        String normalizedPrimary = trimToNull(primary);
+        return normalizedPrimary != null ? normalizedPrimary : Objects.toString(fallback, "");
+    }
+
+
+    private void appendChartRows(List<List<Object>> target, String section, List<ChartItemVo> items, String notePrefix) {
+        for (ChartItemVo item : items) {
+            target.add(List.of(section, item.getName(), notePrefix, cell(item.getValue()), formatPercent(item.getRate())));
+        }
+    }
+
+    private void appendRankRows(List<List<Object>> target, String section, List<RankItemVo> items, String notePrefix, boolean includeSecondary) {
+        for (RankItemVo item : items) {
+            String note = includeSecondary && trimToNull(item.getSecondary()) != null
+                ? notePrefix + " / " + item.getSecondary()
+                : notePrefix;
+            target.add(List.of(section, item.getName(), note, cell(item.getValue()), formatPercent(item.getRate())));
+        }
+    }
+    private void ensureExportWithinLimit(long count) {
+        if (count > EXPORT_LIMIT) {
+            throw new BusinessException("单次导出最多支持 " + EXPORT_LIMIT + " 条，请缩小筛选范围");
+        }
+    }
+
+
+    private String formatPercent(BigDecimal value) {
+        return value == null ? "" : value.setScale(2, RoundingMode.HALF_UP).toPlainString() + "%";
+    }
     private String reservationStatusLabel(Object value) {
         int status = (int) number(value);
         return switch (status) {
@@ -1367,6 +854,20 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         };
     }
 
+    private String roleLabel(Object value) {
+        String role = Objects.toString(value, "");
+        return switch (role) {
+            case "TEACHER" -> "教师";
+            case "STUDENT" -> "学生";
+            default -> role;
+        };
+    }
+
+    private String labTypeLabel(Object value) {
+        String labType = Objects.toString(value, "");
+        return "UNCLASSIFIED".equals(labType) ? "未分类" : labType;
+    }
+
     private String deviceStatusLabel(int status) {
         return switch (status) {
             case 1 -> "正常";
@@ -1374,6 +875,11 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
             case 3 -> "停用";
             default -> "异常";
         };
+    }
+
+    private String deviceCategoryLabel(Object value) {
+        String label = Objects.toString(value, "");
+        return "OTHER_BRAND".equals(label) ? "其他品牌" : label;
     }
 
     private String reportStatusLabel(Object value) {
@@ -1398,6 +904,28 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         };
     }
 
+    private String creditScoreRangeLabel(Object value) {
+        String label = Objects.toString(value, "");
+        return switch (label) {
+            case "LT60" -> "60分以下";
+            case "60_69" -> "60-69";
+            case "70_79" -> "70-79";
+            case "80_89" -> "80-89";
+            case "GTE90" -> "90分及以上";
+            default -> label;
+        };
+    }
+
+    private String timeSegmentLabel(Object value) {
+        String label = Objects.toString(value, "");
+        return switch (label) {
+            case "MORNING" -> "上午";
+            case "AFTERNOON" -> "下午";
+            case "EVENING" -> "晚间";
+            default -> label;
+        };
+    }
+
     private String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
@@ -1413,3 +941,4 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         String resolve(Object value);
     }
 }
+

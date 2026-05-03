@@ -3,7 +3,7 @@
     <BasePanel :title="panelTitle" panel-class="device-panel">
       <div class="toolbar device-toolbar">
         <div class="toolbar-top">
-          <div class="tab-strip">
+          <div v-if="showRepairTab" class="tab-strip">
             <button type="button" class="tab-btn" :class="{ active: activeTab === 'inventory' }" @click="activeTab = 'inventory'">
               设备台账
             </button>
