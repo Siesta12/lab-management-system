@@ -60,7 +60,7 @@
           class="credit-record-row"
           @click="openViolationDetail(item)"
         >
-          <td>{{ item.createdAt || '--' }}</td>
+          <td>{{ formatDateTime(item.createdAt) }}</td>
           <td>{{ violationTypeText(item.violationType) }}</td>
           <td :class="scoreChangeClass(item.scoreChange)">{{ scoreChangeText(item.scoreChange) }}</td>
           <td>{{ remarkPreview(item.remark) }}</td>
@@ -98,13 +98,13 @@
       <div class="detail-stack">
         <div class="detail-card">
           <h4>{{ violationTypeText(selectedViolation.violationType) }}</h4>
-          <p>{{ selectedViolation.createdAt || '--' }}</p>
+          <p>{{ formatDateTime(selectedViolation.createdAt) }}</p>
         </div>
 
         <div class="detail-list">
           <div><strong>分值变化</strong><span :class="scoreChangeClass(selectedViolation.scoreChange)">{{ scoreChangeText(selectedViolation.scoreChange) }}</span></div>
           <div><strong>记录类型</strong><span>{{ violationTypeText(selectedViolation.violationType) }}</span></div>
-          <div><strong>记录时间</strong><span>{{ selectedViolation.createdAt || '--' }}</span></div>
+          <div><strong>记录时间</strong><span>{{ formatDateTime(selectedViolation.createdAt) }}</span></div>
         </div>
 
         <div class="detail-section">
@@ -182,6 +182,13 @@ function remarkPreview(remark: string): string {
     return '暂无说明';
   }
   return remark.length > 20 ? `${remark.slice(0, 20)}...` : remark;
+}
+
+function formatDateTime(value?: string): string {
+  if (!value) {
+    return '--';
+  }
+  return value.replace('T', ' ');
 }
 
 async function loadProfile(): Promise<void> {

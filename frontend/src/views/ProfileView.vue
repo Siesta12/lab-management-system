@@ -9,13 +9,13 @@
           <p>{{ identityLabel }}：{{ profile.userNo }}</p>
         </div>
 
-        <div class="profile-credit-card" :class="creditTone">
+        <div v-if="showCreditMetrics" class="profile-credit-card" :class="creditTone">
           <span>信用分</span>
           <strong>{{ profile.creditScore }}</strong>
           <small>{{ creditHint }}</small>
         </div>
 
-        <div class="profile-violation-card">
+        <div v-if="showCreditMetrics" class="profile-violation-card">
           <span>违纪次数</span>
           <strong>{{ profile.violationCount }}</strong>
           <small>{{ violationHint }}</small>
@@ -112,7 +112,7 @@
           </div>
 
           <div class="action-note">
-            邮箱、姓名、{{ identityLabel }}、信用分等核心资料当前不开放在个人资料页修改。
+            邮箱、姓名、{{ identityLabel }}{{ showCreditMetrics ? '、信用分' : '' }}等核心资料当前不开放在个人资料页修改。
           </div>
         </article>
       </aside>
@@ -218,6 +218,7 @@ const passwordForm = reactive({
 });
 
 const identityLabel = computed(() => (primaryRole.value === 'STUDENT' ? '学号' : '工号'));
+const showCreditMetrics = computed(() => primaryRole.value !== 'TEACHER');
 const roleLabel = computed(() => {
   if (primaryRole.value === 'STUDENT') return '学生';
   if (primaryRole.value === 'TEACHER') return '教师';

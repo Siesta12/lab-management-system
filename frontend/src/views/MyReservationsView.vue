@@ -83,17 +83,29 @@
         </div>
 
         <div class="cancel-rule-card">
-          <p class="cancel-confirm-text">确认后将立即释放该时段，请留意取消时机对信用分的影响。</p>
-          <div class="cancel-rule-grid">
-            <div class="cancel-rule-item safe">
+          <p v-if="cancelRuleLoading" class="cancel-confirm-text">正在判断当前取消规则，请稍候...</p>
+          <p v-else-if="hasClassStarted" class="cancel-confirm-text danger-text">
+            当前课程已经开始，不能取消预约，请按原预约使用。
+          </p>
+          <p v-else-if="isTeacher && isCancellationWithinThirtyMinutes" class="cancel-confirm-text warning-text">
+            距离开课不足 30 分钟，不建议取消预约，请谨慎确认。
+          </p>
+          <p v-else class="cancel-confirm-text">确认后将立即释放该时段，请留意取消时机对信用分的影响。</p>
+          <div v-if="!cancelRuleLoading" class="cancel-rule-grid">
+            <div v-if="isStudent" class="cancel-rule-item safe">
               <span>提前取消</span>
               <strong>30 分钟以上</strong>
               <small>不扣分</small>
             </div>
-            <div class="cancel-rule-item warning">
+            <div v-if="isStudent" class="cancel-rule-item warning">
               <span>临近取消</span>
               <strong>30 分钟内</strong>
               <small>扣 3 分</small>
+            </div>
+            <div v-if="isTeacher && isCancellationWithinThirtyMinutes && !hasClassStarted" class="cancel-rule-item warning">
+              <span>临近开课</span>
+              <strong>不足 30 分钟</strong>
+              <small>不建议取消</small>
             </div>
             <div class="cancel-rule-item danger">
               <span>开始后</span>
@@ -104,9 +116,15 @@
         </div>
       </div>
 
-      <div class="dialog-actions cancel-confirm-actions">
-        <button type="button" class="ghost-btn cancel-secondary-btn" @click="closeCancelConfirm">再想想</button>
-        <button type="button" class="primary-btn cancel-primary-btn" :disabled="canceling" @click="confirmCancel">
+      <div v-if="!cancelRuleLoading" class="dialog-actions cancel-confirm-actions">
+        <button v-if="!hasClassStarted" type="button" class="ghost-btn cancel-secondary-btn" @click="closeCancelConfirm">再想想</button>
+        <button
+          v-if="!hasClassStarted"
+          type="button"
+          class="primary-btn cancel-primary-btn"
+          :disabled="canceling"
+          @click="confirmCancel"
+        >
           {{ canceling ? '取消中...' : '确认取消' }}
         </button>
       </div>
@@ -138,7 +156,6 @@
       <div v-else-if="selectedReservation" class="detail-stack">
         <div class="detail-card">
           <h4>{{ labName(selectedReservation.labId) }}</h4>
-          <p>{{ selectedReservation.reservationNo }}</p>
         </div>
 
         <div class="detail-list">
@@ -181,12 +198,12 @@ import { useRoute } from 'vue-router';
 import { getPrimaryRole } from '../access';
 import { fetchReservationAuditLogs } from '../api/reservationAuditLogs';
 import { cancelReservation, fetchMyReservations, fetchReservationById } from '../api/reservations';
-import { fetchLabs } from '../api/labs';
+import { fetchLabs, fetchLabSchedule } from '../api/labs';
 import BasePanel from '../components/BasePanel.vue';
 import BaseTable from '../components/BaseTable.vue';
 import { useGlobalToast } from '../composables/useGlobalToast';
 import { useAuthStore } from '../stores/auth';
-import type { LabDto, PageData, ReservationAuditLogDto, ReservationDto } from '../types';
+import type { LabDto, PageData, ReservationAuditLogDto, ReservationDto, ReservationSlotDto } from '../types';
 import { getBadgeClass } from '../utils/format';
 import { reservationTypeLabel } from '../utils/reservation';
 
@@ -209,6 +226,8 @@ const detailVisible = ref(false);
 const detailLoading = ref(false);
 const cancelConfirmVisible = ref(false);
 const cancelTarget = ref<ReservationDto | null>(null);
+const cancelRuleLoading = ref(false);
+const cancelLeadMinutes = ref<number | null>(null);
 const canceling = ref(false);
 const reservationTypeFilter = ref<'all' | 'course' | 'research' | 'personal'>('all');
 const currentPage = ref(1);
@@ -217,7 +236,12 @@ let detailRequestVersion = 0;
 
 const primaryRole = computed(() => getPrimaryRole(auth.currentUser.value?.roleCodes));
 const isStudent = computed(() => primaryRole.value === 'STUDENT');
+const isTeacher = computed(() => primaryRole.value === 'TEACHER');
 const totalPages = computed(() => Math.max(Math.ceil((reservationState.value.total || 0) / pageSize.value), 1));
+const hasClassStarted = computed(() => cancelLeadMinutes.value !== null && cancelLeadMinutes.value <= 0);
+const isCancellationWithinThirtyMinutes = computed(
+  () => cancelLeadMinutes.value !== null && cancelLeadMinutes.value > 0 && cancelLeadMinutes.value < 30,
+);
 
 const typeTabs = [
   { value: 'all', label: '全部预约' },
@@ -282,6 +306,53 @@ function auditActionText(action: number): string {
 
 function canCancel(item: ReservationDto): boolean {
   return item.status === 1 || item.status === 2;
+}
+
+function sortReservationSlots(slots: ReservationSlotDto[] | undefined): ReservationSlotDto[] {
+  return [...(slots ?? [])].sort((left, right) => {
+    const dateCompare = left.reservationDate.localeCompare(right.reservationDate);
+    if (dateCompare !== 0) {
+      return dateCompare;
+    }
+    return (left.periodNo || left.periodId || 0) - (right.periodNo || right.periodId || 0);
+  });
+}
+
+function firstReservationSlot(item: ReservationDto): ReservationSlotDto | undefined {
+  return sortReservationSlots(item.slots)[0];
+}
+
+function parseReservationStartTime(reservationDate: string, startTime: string): Date | null {
+  const normalizedTime = startTime.length === 5 ? `${startTime}:00` : startTime;
+  const value = new Date(`${reservationDate}T${normalizedTime}`);
+  return Number.isNaN(value.getTime()) ? null : value;
+}
+
+async function loadCancelRuleState(item: ReservationDto): Promise<void> {
+  const slot = firstReservationSlot(item);
+  if (!slot?.reservationDate) {
+    cancelLeadMinutes.value = null;
+    return;
+  }
+
+  try {
+    const schedule = await fetchLabSchedule(item.labId, auth.token.value, slot.reservationDate);
+    const period = schedule.periods.find((entry) => entry.id === slot.periodId);
+    if (!period?.startTime) {
+      cancelLeadMinutes.value = null;
+      return;
+    }
+
+    const startAt = parseReservationStartTime(slot.reservationDate, period.startTime);
+    if (!startAt) {
+      cancelLeadMinutes.value = null;
+      return;
+    }
+
+    cancelLeadMinutes.value = Math.floor((startAt.getTime() - Date.now()) / 60000);
+  } catch {
+    cancelLeadMinutes.value = null;
+  }
 }
 
 async function loadReservations(pageNum = currentPage.value): Promise<void> {
@@ -351,22 +422,28 @@ function closeDetailDialog(): void {
   detailVisible.value = false;
 }
 
-function openCancelConfirm(item: ReservationDto): void {
+async function openCancelConfirm(item: ReservationDto): Promise<void> {
   cancelTarget.value = item;
+  cancelLeadMinutes.value = null;
+  cancelRuleLoading.value = true;
   detailVisible.value = false;
   cancelConfirmVisible.value = true;
+  await loadCancelRuleState(item);
+  cancelRuleLoading.value = false;
 }
 
 function openCancelFromDetail(): void {
   if (!selectedReservation.value || canceling.value) {
     return;
   }
-  openCancelConfirm(selectedReservation.value);
+  void openCancelConfirm(selectedReservation.value);
 }
 
 function resetCancelConfirmState(): void {
   cancelConfirmVisible.value = false;
   cancelTarget.value = null;
+  cancelRuleLoading.value = false;
+  cancelLeadMinutes.value = null;
 }
 
 function closeCancelConfirm(): void {
@@ -377,7 +454,7 @@ function closeCancelConfirm(): void {
 }
 
 async function confirmCancel(): Promise<void> {
-  if (!cancelTarget.value) {
+  if (!cancelTarget.value || hasClassStarted.value) {
     return;
   }
   const id = cancelTarget.value.id;

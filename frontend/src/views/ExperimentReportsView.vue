@@ -6,10 +6,10 @@
           <input
             v-model.trim="keyword"
             class="toolbar-input"
-            placeholder="搜索实验名称"
+            placeholder="搜索实验名称或学生等"
             @keyup.enter="loadReports(1)"
           />
-          <select v-model.number="statusFilter" class="toolbar-select">
+          <select v-model.number="statusFilter" class="toolbar-select" @change="loadReports(1)">
             <option :value="0">全部状态</option>
             <option :value="1">草稿</option>
             <option :value="2">待审核</option>
@@ -245,6 +245,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { getPrimaryRole } from '../access';
 import {
   createExperimentReportDraft,
@@ -273,6 +274,7 @@ import type {
 } from '../types';
 
 const auth = useAuthStore();
+const route = useRoute();
 const { showToast } = useGlobalToast();
 const role = computed(() => getPrimaryRole(auth.currentUser.value?.roleCodes));
 const isStudent = computed(() => role.value === 'STUDENT');
@@ -326,8 +328,17 @@ const detailSections = computed(() => [
 ]);
 
 onMounted(async () => {
+  applyStatusQuery();
   await Promise.all([loadOptions(), loadReports(1)]);
 });
+
+watch(
+  () => route.query.status,
+  () => {
+    applyStatusQuery();
+    void loadReports(1);
+  },
+);
 
 watch(
   () => form.labId,
@@ -377,6 +388,11 @@ function resetFilters(): void {
   keyword.value = '';
   statusFilter.value = 0;
   void loadReports(1);
+}
+
+function applyStatusQuery(): void {
+  const status = Number(route.query.status);
+  statusFilter.value = [1, 2, 3, 4].includes(status) ? status : 0;
 }
 
 function statusText(status: number): string {
@@ -532,7 +548,7 @@ async function handleSubmit(report: ExperimentReportDto): Promise<void> {
   saving.value = true;
   try {
     selectedReport.value = await submitExperimentReport(report.id, auth.token.value);
-    showToast('success', '报告已提交，耗材已自动出库');
+    showToast('success', '报告已提交');
     await loadReports(reportState.value.pageNum);
   } catch (error) {
     showToast('error', error instanceof Error ? error.message : '提交报告失败');

@@ -4,7 +4,7 @@
       <div class="toolbar device-toolbar">
         <div class="toolbar-top">
           <div v-if="showRepairTab" class="tab-strip">
-            <button type="button" class="tab-btn" :class="{ active: activeTab === 'inventory' }" @click="activeTab = 'inventory'">
+            <button type="button" class="tab-btn" :class="{ active: activeTab === 'inventory' }" @click="switchTab('inventory')">
               设备台账
             </button>
             <button
@@ -12,7 +12,7 @@
               type="button"
               class="tab-btn"
               :class="{ active: activeTab === 'repair' }"
-              @click="activeTab = 'repair'"
+              @click="switchTab('repair')"
             >
               设备报修
             </button>
@@ -559,6 +559,24 @@ function handleRepairLabTypeChange(): void {
   void loadRepairs(1);
 }
 
+function switchTab(tab: TabKey): void {
+  if (activeTab.value === tab) {
+    if (tab === 'repair') {
+      void loadRepairs(1);
+    } else {
+      void loadDevices(1);
+    }
+    return;
+  }
+
+  activeTab.value = tab;
+  if (tab === 'repair') {
+    void loadRepairs(1);
+    return;
+  }
+  void loadDevices(1);
+}
+
 async function loadDevices(pageNum = 1): Promise<void> {
   if (deviceLoading.value) return;
   deviceLoading.value = true;
@@ -647,6 +665,7 @@ async function openDeviceDetail(device: DeviceDto): Promise<void> {
 
 function closeDeviceDetail(): void {
   deviceDetailVisible.value = false;
+  selectedDevice.value = null;
 }
 
 function openDeviceDialog(device?: DeviceDto | null, mode: DeviceDialogMode = 'create'): void {
@@ -745,18 +764,47 @@ function openRepairCreate(): void {
 
 function closeRepairCreate(): void {
   repairCreateVisible.value = false;
+  repairCreateContext.deviceName = '';
+  repairCreateContext.deviceCode = '';
+  repairCreateContext.labName = '';
+  repairForm.deviceId = 0;
+  repairForm.issueDescription = '';
+  repairForm.urgencyLevel = 1;
+}
+
+function closeAllDeviceDialogs(): void {
+  deviceDialogVisible.value = false;
+  repairDetailVisible.value = false;
+  selectedRepair.value = null;
+  closeRepairCreate();
+  closeDeviceDetail();
 }
 
 async function handleCreateRepair(): Promise<void> {
-  if (!auth.token.value || !repairForm.deviceId || !repairForm.issueDescription.trim()) {
+  const token = auth.token.value;
+  const payload: DeviceRepairCreatePayload = {
+    deviceId: repairForm.deviceId,
+    issueDescription: repairForm.issueDescription.trim(),
+    urgencyLevel: repairForm.urgencyLevel,
+  };
+
+  if (!token || !payload.deviceId || !payload.issueDescription) {
     showToast('error', '请先填写报修说明');
     return;
   }
+
   repairSaving.value = true;
+  closeAllDeviceDialogs();
+
   try {
-    await createDeviceRepair(repairForm, auth.token.value);
+    await createDeviceRepair(payload, token);
     showToast('success', '报修已提交');
-    closeRepairCreate();
+    if (isTeacher.value) {
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 1200);
+      return;
+    }
     await loadRepairs(1);
   } catch (error) {
     showToast('error', error instanceof Error ? error.message : '提交报修失败');
