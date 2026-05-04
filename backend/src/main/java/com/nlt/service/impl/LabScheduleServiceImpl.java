@@ -54,7 +54,6 @@ public class LabScheduleServiceImpl implements LabScheduleService {
     private final LabReservationSlotMapper labReservationSlotMapper;
     private final LabMaintenanceMapper labMaintenanceMapper;
 
-    // For conflict checks and auto-reject during maintenance creation
     private final ReservationMapper reservationMapper;
     private final ReservationAuditLogMapper reservationAuditLogMapper;
 
@@ -62,7 +61,7 @@ public class LabScheduleServiceImpl implements LabScheduleService {
     public LabScheduleResponse getLabSchedule(Long labId, String startDate, Long currentUserId, List<String> currentRoleCodes) {
         LocalDate today = LocalDate.now();
         LocalDate start = startDate == null || startDate.isBlank() ? today : LocalDate.parse(startDate, DATE_FORMATTER);
-        // Strict: schedule is always "from today for 21 days".
+
         if (!start.equals(today)) {
             throw new BusinessException(400, "查询起始日期必须为今天 (" + today.format(DATE_FORMATTER) + ")");
         }

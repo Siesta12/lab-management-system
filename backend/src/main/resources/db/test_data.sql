@@ -60,7 +60,6 @@ ALTER TABLE `reservation_audit_log`
 ALTER TABLE `user_violation_record`
   AUTO_INCREMENT = 1;
 
--- 1. 学院
 INSERT INTO `department` (`id`, `department_name`, `department_code`, `leader_name`, `phone`, `status`, `deleted`)
 VALUES (1, '计算机学院', 'CS', '张明', '13810000001', 1, 0),
        (2, '生物学院', 'BIO', '李芳', '13810000002', 1, 0),
@@ -68,13 +67,11 @@ VALUES (1, '计算机学院', 'CS', '张明', '13810000001', 1, 0),
        (4, '物理学院', 'PHYS', '赵磊', '13810000004', 1, 0),
        (5, '自动化学院', 'AUTO', '陈宇', '13810000005', 1, 0);
 
--- 2. 角色
 INSERT INTO `sys_role` (`id`, `role_name`, `role_code`, `description`, `status`, `deleted`)
 VALUES (1, '学院管理员', 'ADMIN', 'Manage labs, devices, consumables, users, and audit flows', 1, 0),
        (2, '教师', 'TEACHER', 'Reserve labs and participate in audit flows', 1, 0),
        (3, '学生', 'STUDENT', 'Reserve labs and view own records', 1, 0);
 
--- 3. 用户：每学院1管理员 + 6名教师 + 35名学生，总计210
 INSERT INTO `sys_user` (`id`, `department_id`, `user_no`, `password`, `real_name`, `gender`, `phone`,
                         `email`, `credit_score`, `violation_count`, `status`, `deleted`, `last_login_at`, `created_at`,
                         `updated_at`)
@@ -499,7 +496,6 @@ VALUES (1, 1, 'admin_cs', '123456', '计算机学院管理员', 1, '13901000000'
        (210, 5, 'auto_student35', '123456', '徐磊', 1, '188050035', 'auto_student35@lab.com', 100, 0, 1, 0,
         '2026-04-28 12:42:00', '2026-05-08 09:47:55', '2026-05-08 10:26:41');
 
--- 4. 用户角色映射
 INSERT INTO `sys_user_role` (`id`, `user_id`, `role_id`)
 VALUES (1, 1, 1),
        (2, 2, 2),
@@ -712,7 +708,6 @@ VALUES (1, 1, 1),
        (209, 209, 3),
        (210, 210, 3);
 
--- 5. 实验室：每学院6种类型，每种4间，总计120；统一测试经纬度
 INSERT INTO `lab` (`id`, `department_id`, `lab_code`, `lab_name`, `lab_type`, `building_name`, `room_no`, `capacity`,
                    `manager_user_id`, `open_status`, `lab_status`, `description`, `usage_rule`, `latitude`, `longitude`,
                    `deleted`)
@@ -1077,7 +1072,6 @@ VALUES (1, 1, 'LAB-CS-0101', '程序设计实验室1', '程序设计实验室', 
         '自动化学院智能制造实验室，用于教学、科研与开放预约。', '按固定节次预约，进入实验室须遵守安全规范。', 45.713482,
         126.626419, 0);
 
--- 6. 固定节次
 INSERT INTO `class_period` (`id`, `period_no`, `period_name`, `start_time`, `end_time`, `sort_order`, `status`)
 VALUES (1, 1, '第1-2节', '08:00:00', '09:35:00', 1, 1),
        (2, 2, '第3-4节', '10:00:00', '11:35:00', 2, 1),
@@ -1085,7 +1079,6 @@ VALUES (1, 1, '第1-2节', '08:00:00', '09:35:00', 1, 1),
        (4, 4, '第7-8节', '16:00:00', '17:35:00', 4, 1),
        (5, 5, '第9-10节', '19:00:00', '20:35:00', 5, 1);
 
--- 7. 开放节次：每实验室7天×5节，共4200条
 INSERT INTO `lab_open_slot` (`id`, `lab_id`, `weekday`, `period_id`, `allow_student`, `allow_teacher`, `status`)
 VALUES (1, 1, 1, 1, 1, 1, 1),
        (2, 1, 1, 2, 1, 1, 1),
@@ -5296,7 +5289,6 @@ VALUES (4001, 115, 3, 1, 1, 1, 1),
        (4199, 120, 7, 4, 0, 1, 1),
        (4200, 120, 7, 5, 0, 1, 1);
 
--- 8. 设备：总计660条
 INSERT INTO `lab_device` (`id`, `lab_id`, `device_name`, `device_code`, `brand`, `model_no`, `quantity`,
                           `available_quantity`, `status`, `purchase_date`, `remark`, `deleted`)
 VALUES (1, 1, '台式机', 'D00101', '戴尔', 'M-001-01', 7, 7, 1, '2023-02-02', '设备测试数据', 0),
@@ -5964,7 +5956,6 @@ VALUES (601, 111, '传感器模块', 'D11101', '戴尔', 'M-111-01', 9, 9, 1, '2
        (659, 120, '投影仪', 'D12005', '思科', 'M-120-05', 17, 17, 1, '2023-05-25', '设备测试数据', 0),
        (660, 120, 'PLC主机', 'D12006', '罗克韦尔', 'M-120-06', 16, 16, 1, '2024-06-01', '设备测试数据', 0);
 
--- 9. 耗材：总计540条
 INSERT INTO `lab_consumable` (`id`, `lab_id`, `consumable_name`, `consumable_code`, `unit`, `stock_quantity`,
                               `warning_threshold`, `remark`, `deleted`)
 VALUES (1, 1, 'A4打印纸', 'C00101', '包', 51, 10, '耗材测试数据', 0),
@@ -6510,7 +6501,6 @@ VALUES (301, 73, '记录纸', 'C07301', '支', 20, 10, '耗材测试数据', 0),
        (539, 120, '记录纸', 'C12004', '支', 25, 10, '耗材测试数据', 0),
        (540, 120, '理线带', 'C12005', '卷', 53, 10, '耗材测试数据', 0);
 
--- 10. 耗材出入库日志：每个耗材1条初始化记录，共540条
 INSERT INTO `consumable_stock_log` (`id`, `consumable_id`, `change_type`, `change_amount`, `before_stock`,
                                     `after_stock`, `operator_user_id`, `remark`)
 VALUES (1, 1, 'IN', 8, 43, 51, 1, '初始化入库'),
@@ -7056,7 +7046,6 @@ VALUES (301, 301, 'IN', 14, 6, 20, 127, '初始化入库'),
        (539, 539, 'IN', 4, 21, 25, 169, '初始化入库'),
        (540, 540, 'IN', 20, 33, 53, 169, '初始化入库');
 
--- 11. 预约主表：总计360条
 INSERT INTO `lab_reservation` (`id`, `reservation_no`, `lab_id`, `applicant_user_id`, `approver_user_id`,
                                `reservation_type`, `priority_level`, `usage_purpose`, `course_or_project_name`,
                                `participant_count`, `contact_phone`, `status`, `reject_reason`, `check_in_time`,
@@ -7786,7 +7775,6 @@ VALUES (201, 'RES202604220201', 67, 113, NULL, 3, 3, '个人练习与预约', '�
        (360, 'RES202604220360', 120, 194, 169, 3, 3, '个人练习与预约', '自主实验练习', 5, '188050019', 5, NULL,
         '2026-05-13 10:05:00', '2026-05-13 11:30:00', '2026-04-24 08:00:00', '2026-04-24 08:20:00');
 
--- 12. 预约时段表：为非拒绝预约生成时段，共324条
 INSERT INTO `lab_reservation_slot` (`id`, `reservation_id`, `lab_id`, `reservation_date`, `weekday`, `period_id`,
                                     `slot_status`)
 VALUES (1, 1, 1, '2026-05-06', 3, 1, 1),
@@ -8116,7 +8104,6 @@ VALUES (301, 335, 112, '2026-05-12', 2, 3, 1),
        (323, 359, 120, '2026-05-06', 3, 1, 1),
        (324, 360, 120, '2026-05-13', 3, 2, 1);
 
--- 13. 实验室维护：共16条
 INSERT INTO `lab_maintenance` (`id`, `lab_id`, `maintenance_date`, `period_id`, `reason`, `status`, `operator_user_id`)
 VALUES (1, 13, '2026-05-09', 3, '设备检修', 1, 1),
        (2, 17, '2026-05-13', 2, '设备检修', 1, 1),
@@ -8135,7 +8122,6 @@ VALUES (1, 13, '2026-05-09', 3, '设备检修', 1, 1),
        (15, 117, '2026-05-05', 2, '设备检修', 1, 169),
        (16, 119, '2026-05-07', 4, '设备检修', 1, 169);
 
--- 14. 审核日志：提交/审核/取消/签到/签退，共864条
 INSERT INTO `reservation_audit_log` (`id`, `reservation_id`, `audit_user_id`, `audit_action`, `audit_comment`)
 VALUES (1, 1, 4, 1, '提交预约申请'),
        (2, 2, 37, 1, '提交预约申请'),
@@ -9004,7 +8990,6 @@ VALUES (801, 336, 175, 1, '提交预约申请'),
        (863, 360, 194, 5, '签到成功'),
        (864, 360, 194, 6, '签退完成');
 
--- 15. 违规记录：共29条
 INSERT INTO `user_violation_record` (`id`, `user_id`, `reservation_id`, `violation_type`, `score_change`, `remark`)
 VALUES (1, 7, 12, 2, -5, '迟到使用实验室'),
        (2, 28, 36, 2, -5, '迟到使用实验室'),

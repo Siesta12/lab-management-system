@@ -18,15 +18,6 @@ public class RoleServiceImpl implements RoleService {
 
     private final RoleMapper roleMapper;
 
-    /**
-     * 查询角色信息列表
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @param roleName 参数
-     * @param roleCode 参数
-     * @param status 状态值
-     * @return 分页数据
-     */
     @Override
     public PageData<RoleEntity> page(int pageNum, int pageSize, String roleName, String roleCode, Integer status) {
         int offset = (pageNum - 1) * pageSize;
@@ -38,11 +29,6 @@ public class RoleServiceImpl implements RoleService {
         );
     }
 
-    /**
-     * 新增角色信息
-     * @param request 请求参数
-     * @return 处理结果
-     */
     @Override
     public RoleEntity create(RoleSaveRequest request) {
         RoleEntity entity = new RoleEntity();
@@ -54,11 +40,6 @@ public class RoleServiceImpl implements RoleService {
         return getById(entity.getId());
     }
 
-    /**
-     * 查询角色信息
-     * @param id 主键ID
-     * @return 处理结果
-     */
     @Override
     public RoleEntity getById(Long id) {
         RoleEntity entity = roleMapper.selectById(id);
@@ -68,12 +49,6 @@ public class RoleServiceImpl implements RoleService {
         return entity;
     }
 
-    /**
-     * 更新角色信息
-     * @param id 主键ID
-     * @param request 请求参数
-     * @return 处理结果
-     */
     @Override
     public RoleEntity update(Long id, RoleSaveRequest request) {
         RoleEntity entity = getById(id);
@@ -82,20 +57,12 @@ public class RoleServiceImpl implements RoleService {
         return getById(id);
     }
 
-    /**
-     * 删除角色信息
-     * @param id 主键ID
-     */
     @Override
     public void delete(Long id) {
         getById(id);
         roleMapper.softDelete(id);
     }
 
-    /**
-     * 获取角色选项列表
-     * @return 数据列表
-     */
     @Override
     public List<OptionItem> options() {
         return roleMapper.selectOptions().stream()

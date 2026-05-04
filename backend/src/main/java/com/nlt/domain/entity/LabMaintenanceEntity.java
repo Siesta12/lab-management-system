@@ -26,4 +26,3 @@ public class LabMaintenanceEntity {
     private LocalDateTime updatedAt;
 }
 
-

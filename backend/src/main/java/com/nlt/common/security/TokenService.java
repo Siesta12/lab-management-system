@@ -36,14 +36,6 @@ public class TokenService {
         this.expirationMs = expirationMs;
     }
 
-    /**
-     * 生成登录令牌
-     *
-     * @param userId 用户ID
-     * @param userNo 学号/工号
-     * @param roleCodes 角色编码列表
-     * @return JWT
-     */
     public String generateToken(Long userId, String userNo, List<String> roleCodes) {
         if (userId == null) {
             throw new BusinessException(400, "用户ID不能为空");
@@ -65,12 +57,6 @@ public class TokenService {
                 .compact();
     }
 
-    /**
-     * 解析 token，返回全部 Claims
-     *
-     * @param token JWT
-     * @return Claims
-     */
     public Claims parseClaims(String token) {
         if (!StringUtils.hasText(token)) {
             throw new BusinessException(401, "无效的登录令牌");
@@ -87,12 +73,6 @@ public class TokenService {
         }
     }
 
-    /**
-     * 从 token 中解析用户ID
-     *
-     * @param token JWT
-     * @return 用户ID
-     */
     public Long parseUserId(String token) {
         Claims claims = parseClaims(token);
         try {
@@ -102,12 +82,6 @@ public class TokenService {
         }
     }
 
-    /**
-     * 从 token 中解析用户名
-     *
-     * @param token JWT
-     * @return 用户名
-     */
     public String parseUsername(String token) {
         Claims claims = parseClaims(token);
         Object userNo = claims.get("userNo");
@@ -117,12 +91,6 @@ public class TokenService {
         return userNo == null ? null : String.valueOf(userNo);
     }
 
-    /**
-     * 从 token 中解析角色编码列表
-     *
-     * @param token JWT
-     * @return 角色编码列表
-     */
     @SuppressWarnings("unchecked")
     public List<String> parseRoleCodes(String token) {
         Claims claims = parseClaims(token);
@@ -139,12 +107,6 @@ public class TokenService {
         return Collections.emptyList();
     }
 
-    /**
-     * 从请求头中提取 token
-     *
-     * @param request HTTP请求
-     * @return token
-     */
     public String resolveToken(HttpServletRequest request) {
         String authorization = request.getHeader(AUTHORIZATION_HEADER);
         if (!StringUtils.hasText(authorization)) {
@@ -159,39 +121,18 @@ public class TokenService {
         return trimmed;
     }
 
-    /**
-     * 从请求中获取当前登录用户ID
-     *
-     * @param request HTTP请求
-     * @return 用户ID
-     */
     public Long getCurrentUserId(HttpServletRequest request) {
         return parseUserId(resolveToken(request));
     }
 
-    /**
-     * 从请求中获取当前登录用户名
-     *
-     * @param request HTTP请求
-     * @return 用户名
-     */
     public String getCurrentUsername(HttpServletRequest request) {
         return parseUsername(resolveToken(request));
     }
 
-    /**
-     * 从请求中获取当前登录用户角色
-     *
-     * @param request HTTP请求
-     * @return 角色编码列表
-     */
     public List<String> getCurrentRoleCodes(HttpServletRequest request) {
         return parseRoleCodes(resolveToken(request));
     }
 
-    /**
-     * 获取 token 过期时间（毫秒）
-     */
     public long getExpirationMs() {
         return expirationMs;
     }

@@ -15,4 +15,3 @@ public class ScheduleDayItem {
     private List<ScheduleCellItem> cells;
 }
 
-

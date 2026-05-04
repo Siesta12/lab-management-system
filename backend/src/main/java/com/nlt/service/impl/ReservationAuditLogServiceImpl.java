@@ -15,14 +15,6 @@ public class ReservationAuditLogServiceImpl implements ReservationAuditLogServic
 
     private final ReservationAuditLogMapper reservationAuditLogMapper;
 
-    /**
-     * 查询预约审核日志列表
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @param reservationId 预约ID
-     * @param auditUserId 审核用户ID
-     * @return 分页数据
-     */
     @Override
     public PageData<ReservationAuditLogEntity> page(int pageNum, int pageSize, Long reservationId, Long auditUserId) {
         int offset = (pageNum - 1) * pageSize;
@@ -34,21 +26,11 @@ public class ReservationAuditLogServiceImpl implements ReservationAuditLogServic
         );
     }
 
-    /**
-     * 根据预约ID查询审核日志
-     * @param reservationId 预约ID
-     * @return 数据列表
-     */
     @Override
     public List<ReservationAuditLogEntity> byReservationId(Long reservationId) {
         return reservationAuditLogMapper.selectByReservationId(reservationId);
     }
 
-    /**
-     * 查询预约审核日志
-     * @param id 主键ID
-     * @return 审核日志实体
-     */
     @Override
     public ReservationAuditLogEntity getById(Long id) {
         ReservationAuditLogEntity entity = reservationAuditLogMapper.selectById(id);

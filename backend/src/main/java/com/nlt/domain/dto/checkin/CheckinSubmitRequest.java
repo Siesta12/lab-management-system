@@ -18,7 +18,7 @@ public class CheckinSubmitRequest {
     private String capturedAt;
 
     private String userAgent;
-    
+
     @Override
     public String toString() {
         return "CheckinSubmitRequest{" +

@@ -19,15 +19,6 @@ public class ViolationController {
     private final ViolationService violationService;
     private final TokenService tokenService;
 
-    /**
-     * 分页查询违规记录
-     * @param pageNum 页码
-     * @param pageSize 每页大小
-     * @param userId 用户ID
-     * @param reservationId 预约ID
-     * @param violationType 违规类型
-     * @return 违规记录分页数据
-     */
     @GetMapping
     public ApiResponse<PageData<ViolationRecordEntity>> page(@RequestParam(defaultValue = "1") int pageNum,
         @RequestParam(defaultValue = "10") int pageSize,
@@ -37,23 +28,11 @@ public class ViolationController {
         return ApiResponse.success(violationService.page(pageNum, pageSize, userId, reservationId, violationType));
     }
 
-    /**
-     * 创建违规记录
-     * @param request 请求参数
-     * @return 创建的违规记录
-     */
     @PostMapping
     public ApiResponse<ViolationRecordEntity> create(@Valid @RequestBody ViolationSaveRequest request) {
         return ApiResponse.created(violationService.create(request));
     }
 
-    /**
-     * 分页查询当前用户的违规记录
-     * @param pageNum 页码
-     * @param pageSize 每页大小
-     * @param servletRequest HTTP请求对象
-     * @return 违规记录分页数据
-     */
     @GetMapping("/mine")
     public ApiResponse<PageData<ViolationRecordEntity>> mine(@RequestParam(defaultValue = "1") int pageNum,
         @RequestParam(defaultValue = "10") int pageSize,
@@ -65,21 +44,11 @@ public class ViolationController {
         );
     }
 
-    /**
-     * 根据ID查询违规记录
-     * @param id 违规记录ID
-     * @return 违规记录详情
-     */
     @GetMapping("/{id}")
     public ApiResponse<ViolationRecordEntity> getById(@PathVariable Long id) {
         return ApiResponse.success(violationService.getById(id));
     }
 
-    /**
-     * 删除违规记录
-     * @param id 违规记录ID
-     * @return 操作结果
-     */
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         violationService.delete(id);
@@ -87,4 +56,3 @@ public class ViolationController {
     }
 
 }
-

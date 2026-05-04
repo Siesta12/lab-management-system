@@ -17,4 +17,3 @@ public class DailyScheduleResponse {
     private List<DailyScheduleLabItem> labs;
 }
 
-

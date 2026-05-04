@@ -844,8 +844,6 @@ const reservationDetailsComplete = computed(() => {
   return true;
 });
 
-
-
 function buildLocation(lab: LabDto): string {
   return [lab.buildingName, lab.roomNo].filter(Boolean).join(' / ') || '位置未知';
 }
@@ -1060,7 +1058,7 @@ function rowTitle(lab: LabDto): string | undefined {
 
 function closeDetailModal(): void {
   detailVisible.value = false;
-  // Reset state so next open starts clean.
+
   selectedLab.value = null;
   selectedDevices.value = [];
   selectedConsumables.value = [];
@@ -1170,10 +1168,10 @@ function isBlocked(date: string, periodId: number): boolean {
 function toggleSelection(date: string, periodId: number): void {
   const idx = selectedKeys.value.findIndex((k) => k.date === date && k.periodId === periodId);
   if (idx >= 0) {
-    // 如果点击的是已选中的时间段，则取消选择
+
     selectedKeys.value = [];
   } else {
-    // 如果点击的是新的时间段，则先清空已选择的，再添加新的
+
     selectedKeys.value = [{ date, periodId }];
   }
 }
@@ -1373,8 +1371,6 @@ async function handleCreateReservation(): Promise<void> {
     submittingReservation.value = false;
   }
 }
-
-
 
 async function handleRecommend(): Promise<void> {
   if (!selectedLab.value || !auth.token.value) return;
@@ -1632,7 +1628,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* 表格样式优化 */
+
 .table-wrap table {
   font-size: 13px;
 }
@@ -2163,8 +2159,6 @@ onMounted(async () => {
   align-items: center;
   gap: 10px;
 }
-
-
 
 .legend {
   display: flex;

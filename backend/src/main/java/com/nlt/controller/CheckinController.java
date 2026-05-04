@@ -46,7 +46,7 @@ public class CheckinController {
                 }
             }
         } catch (Exception ignored) {
-            // Fall back to code lookup below.
+
         }
 
         var page = labService.page(1, 1, null, null, identifier, null, null, null, null);

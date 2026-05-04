@@ -4,9 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * 签到模块统一返回对象。
- */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

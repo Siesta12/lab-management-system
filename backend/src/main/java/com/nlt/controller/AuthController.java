@@ -21,31 +21,17 @@ public class AuthController {
 
     private final AuthService authService;
 
-    /**
-     * 用户登录
-     * @param request 请求参数
-     * @return 响应结果
-     */
     @PostMapping("/login")
     public ApiResponse<LoginResponseData> login(@Valid @RequestBody LoginRequest request) {
         return ApiResponse.success(authService.login(request));
     }
 
-    /**
-     * 用户退出登录
-     * @return 响应结果
-     */
     @PostMapping("/logout")
     public ApiResponse<Void> logout(HttpServletRequest request) {
         authService.logout(request);
         return ApiResponse.success();
     }
 
-    /**
-     * 获取当前登录用户信息
-     * @param request 请求参数
-     * @return 响应结果
-     */
     @GetMapping("/me")
     public ApiResponse<CurrentUserData> me(HttpServletRequest request) {
         return ApiResponse.success(authService.currentUser(request));

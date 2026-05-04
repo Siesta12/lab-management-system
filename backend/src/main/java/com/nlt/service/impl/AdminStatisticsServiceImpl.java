@@ -807,7 +807,6 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
         return normalizedPrimary != null ? normalizedPrimary : Objects.toString(fallback, "");
     }
 
-
     private void appendChartRows(List<List<Object>> target, String section, List<ChartItemVo> items, String notePrefix) {
         for (ChartItemVo item : items) {
             target.add(List.of(section, item.getName(), notePrefix, cell(item.getValue()), formatPercent(item.getRate())));
@@ -827,7 +826,6 @@ public class AdminStatisticsServiceImpl implements AdminStatisticsService {
             throw new BusinessException("单次导出最多支持 " + EXPORT_LIMIT + " 条，请缩小筛选范围");
         }
     }
-
 
     private String formatPercent(BigDecimal value) {
         return value == null ? "" : value.setScale(2, RoundingMode.HALF_UP).toPlainString() + "%";

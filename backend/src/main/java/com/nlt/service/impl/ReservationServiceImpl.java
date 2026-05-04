@@ -652,10 +652,6 @@ public class ReservationServiceImpl implements ReservationService {
         }
     }
 
-    /**
-     * 课程开始前 30 分钟内不允许提交预约。
-     * 这一步会直接拦截真正的预约提交。
-     */
     private void validateReservationLeadTime(List<SlotKey> requestedSlots) {
         Map<Long, LocalTime> periodStartMap = classPeriodMapper.selectActiveList().stream()
             .collect(Collectors.toMap(ClassPeriodEntity::getId, ClassPeriodEntity::getStartTime, (left, right) -> left));
@@ -672,9 +668,6 @@ public class ReservationServiceImpl implements ReservationService {
         }
     }
 
-    /**
-     * 如果今天的节次已经进入不可预约窗口，则在课表里直接显示为不可约。
-     */
     private boolean isWithinReservationCutoff(LocalDate targetDate, ClassPeriodEntity period) {
         if (!LocalDate.now().equals(targetDate) || period.getStartTime() == null) {
             return false;

@@ -26,4 +26,3 @@ public class LabMaintenanceItem {
     private Long operatorUserId;
 }
 
-

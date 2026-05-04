@@ -1,6 +1,6 @@
 <template>
   <section class="profile-page">
-    <!-- 顶部用户卡片：学生展示信用信息，教师和管理员保持简洁资料概览 -->
+
     <article v-if="profile" class="profile-hero-card">
       <div class="profile-hero-main" :class="{ compact: !showCreditMetrics }">
         <div class="profile-identity">
@@ -23,7 +23,6 @@
       </div>
     </article>
 
-    <!-- 主内容区：左侧信息分组，右侧轻量操作区 -->
     <section class="profile-content-grid">
       <div class="profile-info-column">
         <article class="info-card">

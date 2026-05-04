@@ -5,9 +5,6 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import lombok.Data;
 
-/**
- * 当前可签到预约候选数据。
- */
 @Data
 public class ReservationCheckCandidateVo {
 

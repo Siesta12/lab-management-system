@@ -26,4 +26,3 @@ public class LabReservationSlotEntity {
     private LocalDateTime updatedAt;
 }
 
-

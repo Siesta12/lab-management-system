@@ -442,7 +442,6 @@ function genderLabel(gender?: number): string {
   return '--';
 }
 
-
 function getStatusBadgeClass(status: number): string {
   return status === 1 ? 'badge success' : 'badge danger';
 }
@@ -732,7 +731,7 @@ async function handleSubmit(): Promise<void> {
     await updateUser(userForm.id, buildUpdatePayload(), auth.token.value);
     await refreshUsersAfterSuccess('用户信息已更新');
   } catch (error) {
-    // 失败时不要关闭弹窗，也不要 resetForm，保留用户已经填写的内容。
+
     showToast('error', getErrorMessage(error, '保存用户失败。'), 2600);
   } finally {
     saving.value = false;

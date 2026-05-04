@@ -8,10 +8,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class BackendApplication {
 
-    /**
-     * 应用程序入口
-     * @param args 参数
-     */
     public static void main(String[] args) {
         SpringApplication.run(BackendApplication.class, args);
     }

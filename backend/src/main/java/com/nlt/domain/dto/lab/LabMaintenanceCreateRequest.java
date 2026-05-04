@@ -19,4 +19,3 @@ public class LabMaintenanceCreateRequest {
     private String reason;
 }
 
-

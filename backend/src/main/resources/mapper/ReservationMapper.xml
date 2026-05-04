@@ -461,7 +461,6 @@
                  p.sort_order asc
     </select>
 
-    <!-- Statistics: all date-range filters use slot.reservation_date -->
     <select id="countByReservationType" resultType="map">
         select r.reservation_type as name, count(distinct r.id) as count
         from lab_reservation r
@@ -518,7 +517,6 @@
         order by count desc, l.id asc
     </select>
 
-    <!-- "Time distribution" becomes "period distribution" -->
     <select id="countByTimeDistribution" resultType="map">
         select p.period_name as name, count(*) as count
         from lab_reservation_slot s

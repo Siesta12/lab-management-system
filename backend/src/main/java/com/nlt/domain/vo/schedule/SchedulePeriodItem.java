@@ -18,4 +18,3 @@ public class SchedulePeriodItem {
     private String endTime;
 }
 
-

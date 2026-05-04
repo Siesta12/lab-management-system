@@ -194,7 +194,6 @@ export async function downloadStatisticsExport(query: StatisticsQuery, token: st
       const body = (await response.json()) as { message?: string };
       message = body.message || message;
     } catch {
-      // Keep HTTP fallback message.
     }
     throw new ApiError(response.status, message);
   }

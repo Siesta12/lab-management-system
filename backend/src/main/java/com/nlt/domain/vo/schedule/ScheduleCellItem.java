@@ -9,7 +9,7 @@ public class ScheduleCellItem {
 
     private Long periodId;
 
-    private String status; // FREE / RESERVED / PENDING / PENDING_SELF / PENDING_OTHERS / MAINTENANCE / CLOSED
+    private String status;
 
     private Long reservationId;
 

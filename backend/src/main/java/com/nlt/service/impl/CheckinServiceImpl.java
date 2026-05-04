@@ -171,10 +171,6 @@ public class CheckinServiceImpl implements CheckinService {
         return handledCount;
     }
 
-    /**
-     * 按实验室和日期查找可签到预约，只允许学生进入签到链路。
-     * 教师预约不需要签到，也不会进入爽约与信誉分处理。
-     */
     private ReservationCheckCandidateVo resolveCheckInCandidate(Long labId, LocalDateTime now) {
         List<ReservationCheckCandidateVo> reservations =
             reservationMapper.selectCheckInCandidatesByLab(labId, now.toLocalDate());

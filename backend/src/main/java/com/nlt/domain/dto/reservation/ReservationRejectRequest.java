@@ -12,4 +12,3 @@ public class ReservationRejectRequest {
     private String auditComment;
 }
 
-

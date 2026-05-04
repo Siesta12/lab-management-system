@@ -16,15 +16,6 @@ public class ViolationServiceImpl implements ViolationService {
 
     private final ViolationMapper violationMapper;
 
-    /**
-     * 查询违规记录列表
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @param userId 用户ID
-     * @param reservationId 预约ID
-     * @param violationType 违规类型
-     * @return 分页数据
-     */
     @Override
     public PageData<ViolationRecordEntity> page(int pageNum, int pageSize, Long userId, Long reservationId, Integer violationType) {
         int offset = (pageNum - 1) * pageSize;
@@ -36,11 +27,6 @@ public class ViolationServiceImpl implements ViolationService {
         );
     }
 
-    /**
-     * 新增违规记录
-     * @param request 请求参数
-     * @return 处理结果
-     */
     @Override
     public ViolationRecordEntity create(ViolationSaveRequest request) {
         ViolationRecordEntity entity = new ViolationRecordEntity();
@@ -49,11 +35,6 @@ public class ViolationServiceImpl implements ViolationService {
         return getById(entity.getId());
     }
 
-    /**
-     * 查询违规记录
-     * @param id 主键ID
-     * @return 处理结果
-     */
     @Override
     public ViolationRecordEntity getById(Long id) {
         ViolationRecordEntity entity = violationMapper.selectById(id);
@@ -63,13 +44,6 @@ public class ViolationServiceImpl implements ViolationService {
         return entity;
     }
 
-    /**
-     * 查询当前用户预约信息列表
-     * @param userId 用户ID
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @return 分页数据
-     */
     @Override
     public PageData<ViolationRecordEntity> mine(Long userId, int pageNum, int pageSize, Integer violationType, Integer scoreDirection) {
         int offset = (pageNum - 1) * pageSize;
@@ -81,10 +55,6 @@ public class ViolationServiceImpl implements ViolationService {
         );
     }
 
-    /**
-     * 删除违规记录
-     * @param id 主键ID
-     */
     @Override
     public void delete(Long id) {
         getById(id);

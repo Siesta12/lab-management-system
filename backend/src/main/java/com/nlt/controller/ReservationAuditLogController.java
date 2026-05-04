@@ -14,14 +14,6 @@ public class ReservationAuditLogController {
 
     private final ReservationAuditLogService reservationAuditLogService;
 
-    /**
-     * 查询预约审核日志列表
-     * @param pageNum 页码
-     * @param pageSize 每页条数
-     * @param reservationId 预约ID
-     * @param auditUserId 审核人ID
-     * @return 响应结果
-     */
     @GetMapping("/reservation-audit-logs")
     public ApiResponse<PageData<ReservationAuditLogEntity>> page(@RequestParam(defaultValue = "1") int pageNum,
         @RequestParam(defaultValue = "10") int pageSize,
@@ -30,21 +22,11 @@ public class ReservationAuditLogController {
         return ApiResponse.success(reservationAuditLogService.page(pageNum, pageSize, reservationId, auditUserId));
     }
 
-    /**
-     * 根据预约ID查询审核日志
-     * @param id 预约ID
-     * @return 响应结果
-     */
     @GetMapping("/reservations/{id}/audit-logs")
     public ApiResponse<List<ReservationAuditLogEntity>> byReservation(@PathVariable Long id) {
         return ApiResponse.success(reservationAuditLogService.byReservationId(id));
     }
 
-    /**
-     * 查询预约审核日志详情
-     * @param id 主键ID
-     * @return 响应结果
-     */
     @GetMapping("/reservation-audit-logs/{id}")
     public ApiResponse<ReservationAuditLogEntity> getById(@PathVariable Long id) {
         return ApiResponse.success(reservationAuditLogService.getById(id));
