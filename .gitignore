@@ -1,46 +1,23 @@
-﻿# IDE
-.idea/
-*.iml
-*.ipr
-*.iws
-.vscode/
-
 # OS
 .DS_Store
 Thumbs.db
 Desktop.ini
 
+# IDE / Editor
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
 # Logs
 *.log
+*.out
+*.err
 logs/
-
-# Maven / Java / Spring Boot
-.m2/
-backend/target/
-backend/.mvn-local-settings.xml
-backend/.idea/
-backend/*.log
-backend/hs_err_pid*
-backend/replay_pid*
-
-# Frontend / Node / Vue
-frontend/node_modules/
-frontend/dist/
-frontend/.idea/
-frontend/.vite/
-frontend/*.log
-frontend/npm-debug.log*
-frontend/yarn-debug.log*
-frontend/yarn-error.log*
-frontend/pnpm-debug.log*
-
-# Backend static bundle assets
-backend/src/main/resources/static/assets/
-
-# Env files
-.env
-.env.*
-!.env.example
 
 # Temporary files
 *.tmp
@@ -48,3 +25,35 @@ backend/src/main/resources/static/assets/
 *.swp
 *.swo
 *~
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local dependency caches
+.m2/
+
+# Java / Maven / Spring Boot
+backend/target/
+backend/*.log
+backend/hs_err_pid*
+backend/replay_pid*
+backend/.mvn-local-settings.xml
+
+# Frontend / Node / Vite
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/vite-dev.log
+frontend/vite-dev.err.log
+
+# Generated frontend bundle synced into backend
+backend/src/main/resources/static/
+!backend/src/main/resources/static/.gitkeep
+backend/target/classes/static/
