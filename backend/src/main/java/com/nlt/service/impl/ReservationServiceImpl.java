@@ -15,6 +15,7 @@ import com.nlt.domain.entity.LabOpenSlotEntity;
 import com.nlt.domain.entity.LabReservationSlotEntity;
 import com.nlt.domain.entity.ReservationAuditLogEntity;
 import com.nlt.domain.entity.ReservationEntity;
+import com.nlt.domain.entity.UserEntity;
 import com.nlt.domain.entity.ViolationRecordEntity;
 import com.nlt.domain.vo.reservation.ReservationApplyResponse;
 import com.nlt.domain.vo.reservation.ReservationConflictReservationVo;
@@ -63,6 +64,7 @@ public class ReservationServiceImpl implements ReservationService {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int RESERVATION_CUTOFF_MINUTES = 0;
+    private static final int MIN_RESERVATION_CREDIT_SCORE = 60;
     private static final String LAB_CONFLICT_REJECT_REASON = "实验室冲突";
 
     private final ReservationMapper reservationMapper;
@@ -149,6 +151,7 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     public ReservationApplyResponse apply(ReservationCreateRequest request, Long currentUserId) {
         requireLogin(currentUserId);
+        validateCreditScoreAllowed(currentUserId);
         loadAndValidateLab(request.getLabId());
         validateStudentReservationType(currentUserId, request.getReservationType());
 
@@ -191,6 +194,7 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     public ReservationDetailVo create(ReservationCreateRequest request, Long currentUserId) {
         requireLogin(currentUserId);
+        validateCreditScoreAllowed(currentUserId);
         loadAndValidateLab(request.getLabId());
         validateStudentReservationType(currentUserId, request.getReservationType());
 
@@ -441,6 +445,17 @@ public class ReservationServiceImpl implements ReservationService {
         List<String> roleCodes = userRoleMapper.selectRoleCodesByUserId(currentUserId);
         if (hasRole(roleCodes, "STUDENT") && (reservationType == null || reservationType != 3)) {
             throw new BusinessException(400, "学生仅支持个人预约");
+        }
+    }
+
+    private void validateCreditScoreAllowed(Long currentUserId) {
+        UserEntity user = userMapper.selectById(currentUserId);
+        if (user == null) {
+            throw new BusinessException(401, "用户未登录");
+        }
+        Integer creditScore = user.getCreditScore();
+        if (creditScore != null && creditScore < MIN_RESERVATION_CREDIT_SCORE) {
+            throw new BusinessException(400, "信用分低于60分，暂不可预约实验室");
         }
     }
 
