@@ -7,11 +7,11 @@ export function getBadgeClass(status: string): string {
     return 'badge success';
   }
 
-  if (['维护', '待审核', '预警', '待处理', '处理中', '维修中'].includes(status)) {
+  if (['维护', '待审核', '预警', '待处理', '已提交报修', '处理中', '维修中'].includes(status)) {
     return 'badge warning';
   }
 
-  if (['关闭', '禁用', '已驳回', '已取消', '停用'].includes(status)) {
+  if (['关闭', '禁用', '已驳回', '已拒绝', '已取消', '停用'].includes(status)) {
     return 'badge danger';
   }
 

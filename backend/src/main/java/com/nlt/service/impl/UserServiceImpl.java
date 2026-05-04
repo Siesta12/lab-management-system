@@ -95,11 +95,17 @@ public class UserServiceImpl implements UserService {
         if (userNo == null) {
             throw new BusinessException(400, "学号/工号不能为空");
         }
+        String phone = normalizeText(request.getPhone());
+        String email = normalizeText(request.getEmail());
         ensureUserNoAvailable(userNo, null);
+        ensurePhoneAvailable(phone, null);
+        ensureEmailAvailable(email, null);
 
         UserEntity entity = new UserEntity();
         BeanUtils.copyProperties(request, entity);
         entity.setUserNo(userNo);
+        entity.setPhone(phone);
+        entity.setEmail(email);
         entity.setCreditScore(100);
         entity.setViolationCount(0);
         entity.setNormalReservationStreak(0);
@@ -109,7 +115,7 @@ public class UserServiceImpl implements UserService {
         try {
             userMapper.insert(entity);
         } catch (DuplicateKeyException ex) {
-            throw new BusinessException(400, "学号/工号已存在");
+            throw new BusinessException(400, resolveDuplicateKeyMessage(ex));
         }
         rebuildUserRoles(entity.getId(), request.getRoleIds());
         return getById(entity.getId());
@@ -136,9 +142,17 @@ public class UserServiceImpl implements UserService {
             userNo = entity.getUserNo();
         }
         ensureUserNoAvailable(userNo, id);
+        ensurePhoneAvailable(normalizeText(request.getPhone()), id);
+        ensureEmailAvailable(normalizeText(request.getEmail()), id);
         BeanUtils.copyProperties(request, entity);
         entity.setUserNo(userNo);
-        userMapper.update(entity);
+        entity.setPhone(normalizeText(entity.getPhone()));
+        entity.setEmail(normalizeText(entity.getEmail()));
+        try {
+            userMapper.update(entity);
+        } catch (DuplicateKeyException ex) {
+            throw new BusinessException(400, resolveDuplicateKeyMessage(ex));
+        }
         rebuildUserRoles(id, request.getRoleIds());
         return getById(id);
     }
@@ -328,9 +342,33 @@ public class UserServiceImpl implements UserService {
 
     private void ensureUserNoAvailable(String userNo, Long currentUserId) {
         UserEntity existing = userMapper.selectByUserNo(userNo);
-        if (existing != null && (currentUserId == null || !existing.getId().equals(currentUserId))) {
+        if (isTakenByAnotherUser(existing, currentUserId)) {
             throw new BusinessException(400, "学号/工号已存在");
         }
+    }
+
+    private void ensurePhoneAvailable(String phone, Long currentUserId) {
+        if (phone == null) {
+            return;
+        }
+        UserEntity existing = userMapper.selectByPhone(phone);
+        if (isTakenByAnotherUser(existing, currentUserId)) {
+            throw new BusinessException(400, "手机号已存在");
+        }
+    }
+
+    private void ensureEmailAvailable(String email, Long currentUserId) {
+        if (email == null) {
+            return;
+        }
+        UserEntity existing = userMapper.selectByEmail(email);
+        if (isTakenByAnotherUser(existing, currentUserId)) {
+            throw new BusinessException(400, "邮箱已存在");
+        }
+    }
+
+    private boolean isTakenByAnotherUser(UserEntity existing, Long currentUserId) {
+        return existing != null && (currentUserId == null || !existing.getId().equals(currentUserId));
     }
 
     private List<UserImportRowDto> parseImportRows(MultipartFile file) throws IOException {
@@ -495,6 +533,31 @@ public class UserServiceImpl implements UserService {
 
     private String normalizeUserNo(String userNo) {
         return userNo == null ? null : userNo.trim();
+    }
+
+    private String normalizeText(String text) {
+        if (text == null) {
+            return null;
+        }
+        String trimmed = text.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String resolveDuplicateKeyMessage(DuplicateKeyException ex) {
+        String message = ex.getMessage();
+        if (message != null) {
+            String lowerMessage = message.toLowerCase(Locale.ROOT);
+            if (lowerMessage.contains("uk_sys_user_phone_deleted") || lowerMessage.contains("phone")) {
+                return "手机号已存在";
+            }
+            if (lowerMessage.contains("uk_sys_user_email_deleted") || lowerMessage.contains("email")) {
+                return "邮箱已存在";
+            }
+            if (lowerMessage.contains("uk_sys_user_user_no_deleted") || lowerMessage.contains("user_no")) {
+                return "学号/工号已存在";
+            }
+        }
+        return "数据已存在或发生冲突";
     }
 
     private String resolveDuplicateReason(UserImportRowDto row) {

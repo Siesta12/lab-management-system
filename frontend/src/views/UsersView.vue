@@ -1,23 +1,30 @@
-﻿<template>
-  <section class="content-grid users-page">    <BasePanel title="用户管理" panel-class="users-panel">
+<template>
+  <section class="content-grid users-page">
+    <BasePanel panel-class="users-panel">
       <div class="toolbar">
-        <div class="toolbar-filters">
-          <input v-model="keyword" class="toolbar-input" placeholder="搜索学号/工号或姓名" />
-          <select v-model="filters.roleCode" class="toolbar-select">
-            <option :value="null">全部角色</option>
-            <option value="TEACHER">教师</option>
-            <option value="STUDENT">学生</option>
-          </select>
-          <select v-model="filters.status" class="toolbar-select">
-            <option :value="null">全部状态</option>
-            <option :value="1">启用</option>
-            <option :value="0">禁用</option>
-          </select>
+        <div class="toolbar-top">
+          <div class="toolbar-title">用户管理</div>
         </div>
-        <div class="toolbar-actions">
-          <button type="button" class="ghost-btn" @click="handleReset">重置筛选</button>
-          <button type="button" class="ghost-btn" @click="openImportDialog">批量导入</button>
-          <button type="button" class="primary-btn" @click="openCreateDialog">新增用户</button>
+        <div class="toolbar-row">
+          <div class="toolbar-filters">
+            <input v-model="keyword" class="toolbar-input" placeholder="搜索学号/工号或姓名"/>
+            <select v-model="filters.roleCode" class="toolbar-select">
+              <option :value="null">全部角色</option>
+              <option value="TEACHER">教师</option>
+              <option value="STUDENT">学生</option>
+            </select>
+            <select v-model="filters.status" class="toolbar-select">
+              <option :value="null">全部状态</option>
+              <option :value="1">启用</option>
+              <option :value="0">禁用</option>
+            </select>
+          </div>
+          <div class="toolbar-actions">
+            <button type="button" class="ghost-btn toolbar-ghost-btn" @click="loadUsers">查询</button>
+            <button type="button" class="ghost-btn toolbar-ghost-btn" @click="handleReset">重置</button>
+            <button type="button" class="ghost-btn" @click="openImportDialog">批量导入</button>
+            <button type="button" class="primary-btn" @click="openCreateDialog">新增用户</button>
+          </div>
         </div>
       </div>
 
@@ -64,7 +71,8 @@
           上一页
         </button>
         <span class="pagination-text">第 {{ pageNum }} / {{ totalPages }} 页</span>
-        <button type="button" class="ghost-btn small-btn" :disabled="pageNum >= totalPages" @click="changePage(pageNum + 1)">
+        <button type="button" class="ghost-btn small-btn" :disabled="pageNum >= totalPages"
+                @click="changePage(pageNum + 1)">
           下一页
         </button>
       </div>
@@ -72,7 +80,7 @@
   </section>
 
   <teleport to="body">
-    <div v-if="dialogVisible" class="dialog-mask" @click.self="closeDialog">
+    <div v-if="userDialogVisible" class="dialog-mask" @click.self="closeDialog">
       <div class="dialog-card">
         <div class="dialog-head">
           <div class="dialog-head-left">
@@ -121,21 +129,33 @@
           <form class="user-form" @submit.prevent="handleSubmit">
             <label>
               <span>学号 / 工号</span>
-              <input v-model.trim="userForm.userNo" :disabled="dialogMode === 'edit'" placeholder="请输入学号或工号" />
+              <input
+                v-model.trim="userForm.userNo"
+                :disabled="dialogMode === 'edit'"
+                :class="{ 'readonly-field': dialogMode === 'edit' }"
+                placeholder="请输入学号或工号"
+              />
             </label>
             <label v-if="dialogMode === 'create'">
               <span>初始密码</span>
-              <input v-model.trim="userForm.password" type="password" placeholder="请设置初始密码" />
+              <input v-model.trim="userForm.password" type="password" placeholder="请设置初始密码"/>
             </label>
             <label>
               <span>真实姓名</span>
-              <input v-model.trim="userForm.realName" placeholder="请输入真实姓名" />
+              <input v-model.trim="userForm.realName" placeholder="请输入真实姓名"/>
             </label>
             <label>
               <span>所属部门</span>
-              <select v-model="userForm.departmentId">
-                <option :value="null">请选择部门</option>
-                <option v-for="dept in departmentOptions" :key="dept.value" :value="dept.value">{{ dept.label }}</option>
+              <select
+                v-model="userForm.departmentId"
+                :disabled="isDepartmentLocked"
+                :class="{ 'readonly-field': isDepartmentLocked }"
+              >
+                <option v-if="!isDepartmentLocked" :value="null">请选择部门</option>
+                <option v-for="dept in visibleDepartmentOptions" :key="dept.value" :value="dept.value">{{
+                    dept.label
+                  }}
+                </option>
               </select>
             </label>
             <label>
@@ -155,11 +175,11 @@
             </label>
             <label>
               <span>手机号码</span>
-              <input v-model.trim="userForm.phone" placeholder="请输入手机号码" />
+              <input v-model.trim="userForm.phone" placeholder="请输入手机号码"/>
             </label>
             <label>
               <span>邮箱</span>
-              <input v-model.trim="userForm.email" placeholder="请输入邮箱地址" />
+              <input v-model.trim="userForm.email" placeholder="请输入邮箱地址"/>
             </label>
             <label>
               <span>账号状态</span>
@@ -176,6 +196,44 @@
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    </div>
+  </teleport>
+
+  <teleport to="body">
+    <div v-if="deleteConfirmVisible && deleteTarget" class="dialog-mask" @click.self="closeDeleteConfirm">
+      <div class="dialog-card delete-confirm-dialog">
+        <div class="delete-confirm-head">
+          <span class="delete-confirm-badge">删除确认</span>
+          <h3>确认删除当前用户？</h3>
+          <p>
+            删除后将无法恢复，
+            <strong>{{ deleteTarget.realName }}</strong>
+            的账号数据会被移除。
+          </p>
+        </div>
+
+        <div class="delete-confirm-preview">
+          <div>
+            <span>学号 / 工号</span>
+            <strong>{{ deleteTarget.userNo }}</strong>
+          </div>
+          <div>
+            <span>所属部门</span>
+            <strong>{{ departmentLabel(deleteTarget.departmentId) }}</strong>
+          </div>
+          <div>
+            <span>角色</span>
+            <strong>{{ roleLabel(deleteTarget.roleIds) }}</strong>
+          </div>
+        </div>
+
+        <div class="delete-confirm-actions">
+          <button type="button" class="ghost-btn" :disabled="deleting" @click="closeDeleteConfirm">取消</button>
+          <button type="button" class="danger-chip delete-confirm-btn" :disabled="deleting" @click="confirmDelete">
+            {{ deleting ? '删除中...' : '确认删除' }}
+          </button>
         </div>
       </div>
     </div>
@@ -259,34 +317,37 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import {computed, onMounted, onUnmounted, reactive, ref, watch} from 'vue';
 import BasePanel from '../components/BasePanel.vue';
 import BaseTable from '../components/BaseTable.vue';
-import { useGlobalToast } from '../composables/useGlobalToast';
-import { fetchDepartmentOptions } from '../api/departments';
-import { createUser, deleteUser, downloadImportTemplate, fetchUsers, importUsers, updateUser } from '../api/users';
-import { fetchRoleOptions } from '../api/roles';
-import { useAuthStore } from '../stores/auth';
-import type { OptionItem, UserImportResult, UserVO } from '../types';
+import {useGlobalToast} from '../composables/useGlobalToast';
+import {fetchDepartmentOptions} from '../api/departments';
+import {createUser, deleteUser, downloadImportTemplate, fetchUsers, importUsers, updateUser} from '../api/users';
+import {fetchRoleOptions} from '../api/roles';
+import {useAuthStore} from '../stores/auth';
+import type {OptionItem, UserImportResult, UserVO} from '../types';
 
 type DialogMode = 'create' | 'edit';
 
 const auth = useAuthStore();
-const { showToast } = useGlobalToast();
+const {showToast} = useGlobalToast();
 const users = ref<UserVO[]>([]);
 const total = ref(0);
 const pageNum = ref(1);
 const pageSize = ref(10);
 const loading = ref(false);
 const message = ref('');
-const dialogVisible = ref(false);
 const dialogMode = ref<DialogMode>('create');
+const userDialogVisible = ref(false);
 const saving = ref(false);
+const deleteConfirmVisible = ref(false);
+const deleting = ref(false);
 const importDialogVisible = ref(false);
 const importSubmitting = ref(false);
 const importFileInput = ref<HTMLInputElement | null>(null);
 const importFile = ref<File | null>(null);
 const importResult = ref<UserImportResult | null>(null);
+const deleteTarget = ref<UserVO | null>(null);
 const departmentOptions = ref<OptionItem[]>([]);
 const roleOptions = ref<OptionItem[]>([]);
 const keyword = ref('');
@@ -327,6 +388,16 @@ const userForm = reactive<{
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
 const previewInitial = computed(() => (userForm.realName.trim().slice(0, 1) || userForm.userNo.trim().slice(0, 1) || 'U'));
+const currentDepartmentId = computed<number | null>(() => auth.currentUser.value?.departmentId ?? null);
+const isCreateDepartmentLocked = computed(() => dialogMode.value === 'create' && currentDepartmentId.value != null);
+const isEditDepartmentLocked = computed(() => dialogMode.value === 'edit');
+const isDepartmentLocked = computed(() => isCreateDepartmentLocked.value || isEditDepartmentLocked.value);
+const visibleDepartmentOptions = computed(() => {
+  if (!isCreateDepartmentLocked.value) {
+    return departmentOptions.value;
+  }
+  return departmentOptions.value.filter((item) => item.value === currentDepartmentId.value);
+});
 const selectedRoleId = computed<number | null>({
   get: () => userForm.roleIds[0] ?? null,
   set: (value) => {
@@ -349,6 +420,7 @@ const departmentSummary = computed(() => {
 const importFileName = computed(() => importFile.value?.name ?? '未选择文件');
 
 let queryTimer: number | null = null;
+
 function departmentLabel(departmentId?: number): string {
   if (!departmentId) {
     return '--';
@@ -460,7 +532,8 @@ function changePage(nextPage: number): void {
 function openCreateDialog(): void {
   resetForm();
   dialogMode.value = 'create';
-  dialogVisible.value = true;
+  userForm.departmentId = currentDepartmentId.value;
+  userDialogVisible.value = true;
 }
 
 function openImportDialog(): void {
@@ -487,11 +560,31 @@ function openEditDialog(user: UserVO): void {
   userForm.status = user.status ?? 1;
   userForm.creditScore = user.creditScore ?? 0;
   userForm.violationCount = user.violationCount ?? 0;
-  dialogVisible.value = true;
+  userDialogVisible.value = true;
 }
 
 function closeDialog(): void {
-  dialogVisible.value = false;
+  if (saving.value) {
+    return;
+  }
+  userDialogVisible.value = false;
+}
+
+function closeDialogAfterSuccess(): void {
+  userDialogVisible.value = false;
+  resetForm();
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function closeDeleteConfirm(): void {
+  if (deleting.value) {
+    return;
+  }
+  deleteConfirmVisible.value = false;
+  deleteTarget.value = null;
 }
 
 function pickImportFile(): void {
@@ -553,73 +646,94 @@ async function handleImportSubmit(): Promise<void> {
   }
 }
 
-async function handleSubmit(): Promise<void> {
+function validateUserForm(): boolean {
   if (!userForm.userNo.trim() && dialogMode.value === 'create') {
     showToast('error', '请先填写学号/工号。', 2400);
-    return;
+    return false;
   }
   if (!userForm.password.trim() && dialogMode.value === 'create') {
     showToast('error', '请先填写初始密码。', 2400);
-    return;
+    return false;
   }
   if (!userForm.realName.trim()) {
     showToast('error', '请先填写真实姓名。', 2400);
-    return;
+    return false;
+  }
+  if (userForm.departmentId == null) {
+    showToast('error', '请选择所属部门。', 2400);
+    return false;
   }
   if (userForm.roleIds.length === 0) {
     showToast('error', '请至少选择一个角色。', 2400);
+    return false;
+  }
+  if (userForm.gender == null) {
+    showToast('error', '请选择性别。', 2400);
+    return false;
+  }
+  return true;
+}
+
+function buildCreatePayload() {
+  return {
+    departmentId: userForm.departmentId ?? undefined,
+    userNo: userForm.userNo.trim(),
+    password: userForm.password.trim(),
+    realName: userForm.realName.trim(),
+    gender: userForm.gender ?? undefined,
+    phone: userForm.phone.trim() || undefined,
+    email: userForm.email.trim() || undefined,
+    status: userForm.status,
+    roleIds: [...userForm.roleIds],
+  };
+}
+
+function buildUpdatePayload() {
+  return {
+    realName: userForm.realName.trim(),
+    gender: userForm.gender ?? undefined,
+    phone: userForm.phone.trim() || undefined,
+    email: userForm.email.trim() || undefined,
+    status: userForm.status,
+    roleIds: [...userForm.roleIds],
+  };
+}
+
+async function refreshUsersAfterSuccess(successMessage: string): Promise<void> {
+  closeDialogAfterSuccess();
+  showToast('success', successMessage, 2400);
+
+  try {
+    await loadUsers();
+  } catch {
+    message.value = `${successMessage}，但列表刷新失败，请手动刷新页面。`;
+  }
+}
+
+async function handleSubmit(): Promise<void> {
+  if (!validateUserForm() || saving.value) {
     return;
   }
 
   saving.value = true;
+
   try {
     if (dialogMode.value === 'create') {
-      await createUser(
-        {
-          departmentId: userForm.departmentId ?? undefined,
-          userNo: userForm.userNo.trim(),
-          password: userForm.password.trim(),
-          realName: userForm.realName.trim(),
-          gender: userForm.gender ?? undefined,
-          phone: userForm.phone.trim() || undefined,
-          email: userForm.email.trim() || undefined,
-          status: userForm.status,
-          roleIds: [...userForm.roleIds],
-        },
-        auth.token.value,
-      );
-    } else if (userForm.id != null) {
-      await updateUser(
-        userForm.id,
-        {
-          departmentId: userForm.departmentId ?? undefined,
-          realName: userForm.realName.trim(),
-          userNo: userForm.userNo.trim() || undefined,
-          gender: userForm.gender ?? undefined,
-          phone: userForm.phone.trim() || undefined,
-          email: userForm.email.trim() || undefined,
-          status: userForm.status,
-          roleIds: [...userForm.roleIds],
-        },
-        auth.token.value,
-      );
+      await createUser(buildCreatePayload(), auth.token.value);
+      await refreshUsersAfterSuccess('用户创建成功');
+      return;
     }
 
-    message.value = '';
-    if (dialogMode.value === 'create') {
-      console.log("用户创建成功，准备刷新列表...");
-      showToast('success', '用户创建成功', 2400);
-    } else {
-      showToast('success', '用户信息已更新', 2400);
+    if (userForm.id == null) {
+      showToast('error', '缺少用户 ID，无法更新。', 2600);
+      return;
     }
-    try {
-      await loadUsers();
-    } catch {
-      message.value = '操作已完成，列表刷新失败，请手动刷新页面。';
-    }
-    dialogVisible.value = false;
+
+    await updateUser(userForm.id, buildUpdatePayload(), auth.token.value);
+    await refreshUsersAfterSuccess('用户信息已更新');
   } catch (error) {
-    showToast('error', error instanceof Error ? error.message : '保存用户失败。', 2600);
+    // 失败时不要关闭弹窗，也不要 resetForm，保留用户已经填写的内容。
+    showToast('error', getErrorMessage(error, '保存用户失败。'), 2600);
   } finally {
     saving.value = false;
   }
@@ -629,7 +743,7 @@ function handleDeleteCurrent(): Promise<void> {
   if (userForm.id == null) {
     return Promise.resolve();
   }
-  return handleDelete({
+  handleDelete({
     id: userForm.id,
     userNo: userForm.userNo,
     realName: userForm.realName,
@@ -642,14 +756,24 @@ function handleDeleteCurrent(): Promise<void> {
     creditScore: userForm.creditScore,
     violationCount: userForm.violationCount,
   } as UserVO);
+  return Promise.resolve();
 }
-async function handleDelete(user: UserVO): Promise<void> {
-  const confirmed = window.confirm(`确定删除用户「${user.realName}」吗？`);
-  if (!confirmed) {
+
+function handleDelete(user: UserVO): void {
+  if (deleting.value) {
     return;
   }
+  deleteTarget.value = user;
+  deleteConfirmVisible.value = true;
+}
+
+async function confirmDelete(): Promise<void> {
+  if (!deleteTarget.value || deleting.value) {
+    return;
+  }
+  deleting.value = true;
   try {
-    await deleteUser(user.id, auth.token.value);
+    await deleteUser(deleteTarget.value.id, auth.token.value);
     message.value = '';
     showToast('success', '用户已删除。', 2400);
     try {
@@ -657,9 +781,14 @@ async function handleDelete(user: UserVO): Promise<void> {
     } catch {
       message.value = '删除已完成，列表刷新失败，请手动刷新页面。';
     }
+    deleteConfirmVisible.value = false;
+    deleteTarget.value = null;
     closeDialog();
+    resetForm();
   } catch (error) {
     showToast('error', error instanceof Error ? error.message : '删除用户失败。', 2600);
+  } finally {
+    deleting.value = false;
   }
 }
 
@@ -690,69 +819,54 @@ onUnmounted(() => {
 }
 
 .toolbar {
-  gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
+}
+
+.toolbar-top {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
 }
 
 .toolbar-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-}
-
-.toolbar-actions {
-  display: flex;
-  flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
 }
 
 .toolbar-input,
 .toolbar-select {
-  min-width: 0;
+  border: 1px solid #dbe4ee;
   border-radius: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.32);
-  background: rgba(255, 255, 255, 0.88);
-  padding: 10px 14px;
-  font-size: 0.94rem;
-  color: var(--ink, #1b2b49);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  background: #fff;
+  color: #0f172a;
+  height: 42px;
+  padding: 0 14px;
+  width: 100%;
+  min-width: 0;
 }
 
 .toolbar-input {
-  flex: 1.25;
-  min-width: 200px;
+  width: 240px;
 }
 
 .toolbar-select {
-  flex: 0 0 156px;
+  width: 150px;
 }
 
-.toolbar-select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, #64748b 50%),
-    linear-gradient(135deg, #64748b 50%, transparent 50%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.96));
-  background-position:
-    calc(100% - 16px) calc(50% - 3px),
-    calc(100% - 10px) calc(50% - 3px),
-    0 0;
-  background-size:
-    6px 6px,
-    6px 6px,
-    100% 100%;
-  background-repeat: no-repeat;
-  padding-right: 34px;
-}
-
-.toolbar-input:focus,
-.toolbar-select:focus {
-  outline: none;
-  border-color: rgba(56, 102, 219, 0.55);
-  box-shadow: 0 0 0 4px rgba(56, 102, 219, 0.12);
+.toolbar-title {
+  color: #0f172a;
+  font-size: 28px;
+  line-height: 1.15;
+  font-weight: 700;
 }
 
 .user-row {
@@ -763,12 +877,14 @@ onUnmounted(() => {
   background: rgba(56, 102, 219, 0.04);
 }
 
-.toolbar-actions .ghost-btn,
-.toolbar-actions .primary-btn {
-  min-height: 42px;
-  padding: 10px 14px;
-  border-radius: 16px;
-  font-size: 0.92rem;
+.toolbar-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.toolbar-actions .ghost-btn {
+  min-width: 86px;
 }
 
 .cell-text {
@@ -885,9 +1001,8 @@ onUnmounted(() => {
 .dialog-mask {
   position: fixed;
   inset: 0;
-  background:
-    radial-gradient(circle at top, rgba(37, 99, 235, 0.12), transparent 36%),
-    rgba(15, 23, 42, 0.44);
+  background: radial-gradient(circle at top, rgba(37, 99, 235, 0.12), transparent 36%),
+  rgba(15, 23, 42, 0.44);
   backdrop-filter: blur(10px);
   display: flex;
   justify-content: center;
@@ -901,14 +1016,12 @@ onUnmounted(() => {
   width: min(1040px, 100%);
   max-height: min(88vh, 920px);
   overflow: auto;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 255, 0.98)),
-    #fff;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 255, 0.98)),
+  #fff;
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 32px;
-  box-shadow:
-    0 32px 80px rgba(15, 23, 42, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  box-shadow: 0 32px 80px rgba(15, 23, 42, 0.24),
+  inset 0 1px 0 rgba(255, 255, 255, 0.92);
   padding: 22px;
   animation: dialog-enter 0.22s ease;
 }
@@ -919,10 +1032,9 @@ onUnmounted(() => {
   inset: 0 0 auto;
   height: 110px;
   border-radius: 32px 32px 0 0;
-  background:
-    radial-gradient(circle at 12% 18%, rgba(56, 102, 219, 0.16), transparent 24%),
-    radial-gradient(circle at 92% 12%, rgba(15, 140, 127, 0.12), transparent 20%),
-    linear-gradient(180deg, rgba(240, 246, 255, 0.94), rgba(255, 255, 255, 0));
+  background: radial-gradient(circle at 12% 18%, rgba(56, 102, 219, 0.16), transparent 24%),
+  radial-gradient(circle at 92% 12%, rgba(15, 140, 127, 0.12), transparent 20%),
+  linear-gradient(180deg, rgba(240, 246, 255, 0.94), rgba(255, 255, 255, 0));
   pointer-events: none;
 }
 
@@ -1083,34 +1195,19 @@ onUnmounted(() => {
   padding: 10px 14px;
   font-size: 0.92rem;
   color: var(--ink, #1b2b49);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    0 8px 18px rgba(15, 23, 42, 0.03);
-  transition:
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    background 0.18s ease,
-    transform 0.18s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85),
+  0 8px 18px rgba(15, 23, 42, 0.03);
+  transition: border-color 0.18s ease,
+  box-shadow 0.18s ease,
+  background 0.18s ease,
+  transform 0.18s ease;
 }
 
 .user-form select {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, #64748b 50%),
-    linear-gradient(135deg, #64748b 50%, transparent 50%),
-    linear-gradient(180deg, rgba(250, 252, 255, 0.98), rgba(245, 248, 255, 0.98));
-  background-position:
-    calc(100% - 18px) calc(50% - 2px),
-    calc(100% - 12px) calc(50% - 2px),
-    0 0;
-  background-size:
-    6px 6px,
-    6px 6px,
-    100% 100%;
-  background-repeat: no-repeat;
-  padding-right: 38px;
+  background-image: none;
 }
 
 .user-form input:focus,
@@ -1118,10 +1215,19 @@ onUnmounted(() => {
   outline: none;
   border-color: rgba(56, 102, 219, 0.55);
   background: #fff;
-  box-shadow:
-    0 0 0 4px rgba(56, 102, 219, 0.12),
-    0 16px 28px rgba(56, 102, 219, 0.08);
+  box-shadow: 0 0 0 4px rgba(56, 102, 219, 0.12),
+  0 16px 28px rgba(56, 102, 219, 0.08);
   transform: translateY(-1px);
+}
+
+.user-form .readonly-field:disabled {
+  background: rgba(226, 232, 240, 0.58);
+  border-color: rgba(148, 163, 184, 0.3);
+  color: rgba(71, 85, 105, 0.95);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 1;
+  -webkit-text-fill-color: rgba(71, 85, 105, 0.95);
 }
 
 .dialog-actions {
@@ -1140,6 +1246,92 @@ onUnmounted(() => {
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.delete-confirm-dialog {
+  width: min(520px, 92vw);
+  display: grid;
+  gap: 18px;
+}
+
+.delete-confirm-dialog::before {
+  display: none;
+}
+
+.delete-confirm-head {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+}
+
+.delete-confirm-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #111827;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.delete-confirm-head h3 {
+  margin: 0;
+  color: var(--ink, #1b2b49);
+  font-size: 1.5rem;
+}
+
+.delete-confirm-head p {
+  margin: 0;
+  color: #5b6d8d;
+  line-height: 1.6;
+}
+
+.delete-confirm-head strong {
+  color: #dc2626;
+}
+
+.delete-confirm-preview {
+  display: grid;
+  gap: 10px;
+}
+
+.delete-confirm-preview div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.delete-confirm-preview span {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.delete-confirm-preview strong {
+  color: var(--ink, #1b2b49);
+  text-align: right;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.delete-confirm-btn {
+  min-width: 116px;
+  justify-content: center;
 }
 
 .pagination-wrap {
@@ -1335,11 +1527,6 @@ onUnmounted(() => {
 }
 
 @media (max-width: 960px) {
-  .toolbar-input,
-  .toolbar-select {
-    width: auto;
-  }
-
   .toolbar-actions {
     justify-content: flex-start;
   }
@@ -1361,11 +1548,3 @@ onUnmounted(() => {
   }
 }
 </style>
-
-
-
-
-
-
-
-

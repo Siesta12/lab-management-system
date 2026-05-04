@@ -157,6 +157,10 @@ const riskReservations = computed(() =>
   }),
 );
 
+const rejectedReservations = computed(() =>
+  sortedReservations.value.filter((item) => item.status === 3),
+);
+
 const pendingItems = computed<PendingItem[]>(() => {
   const items: PendingItem[] = [];
 
@@ -193,6 +197,21 @@ const pendingItems = computed<PendingItem[]>(() => {
       detail: item.checkInTime
         ? '你已经签到，可以继续关注后续使用安排。'
         : '当前预约尚未签到，若已到场请尽快完成签到，避免爽约风险。',
+      tone: 'danger',
+      to: reservationDetailLink(item),
+    });
+  }
+
+  if (rejectedReservations.value.length) {
+    const item = rejectedReservations.value[0];
+    const slot = firstSlot(item);
+    items.push({
+      key: 'rejected',
+      title: '预约被拒绝',
+      summary: `${getLabName(item.labId)} · ${slot?.reservationDate ?? '--'}`,
+      detail: item.rejectReason
+        ? `拒绝原因：${item.rejectReason}`
+        : '该预约已被拒绝，请查看预约详情并根据原因调整后重新申请。',
       tone: 'danger',
       to: reservationDetailLink(item),
     });

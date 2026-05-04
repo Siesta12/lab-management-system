@@ -1,41 +1,43 @@
 <template>
   <section class="content-grid">
     <BasePanel panel-class="reservation-panel">
-      <div class="reservation-header-row">
-        <div class="reservation-header-copy">
-          <h3>{{ viewMode === 'conflict' ? '冲突调度工作台' : '预约审核列表' }}</h3>
+      <div class="toolbar">
+        <div class="toolbar-top">
+          <div class="toolbar-title">{{ viewMode === 'conflict' ? '冲突调度工作台' : '预约审核列表' }}</div>
         </div>
+        <div class="toolbar-row">
+          <div class="toolbar-filters">
+            <select v-model="statusFilter" class="toolbar-select" @change="handleStatusChange">
+              <option value="">全部状态</option>
+              <option value="1">待审核</option>
+              <option value="2">已通过</option>
+              <option value="3">已驳回</option>
+              <option value="4">已取消</option>
+              <option value="5">已完成</option>
+            </select>
 
-        <div class="reservation-header-actions">
-          <select v-model="statusFilter" class="reservation-status-select" @change="handleStatusChange">
-            <option value="">全部状态</option>
-            <option value="1">待审核</option>
-            <option value="2">已通过</option>
-            <option value="3">已驳回</option>
-            <option value="4">已取消</option>
-            <option value="5">已完成</option>
-          </select>
-
-          <div class="mode-switch">
-            <button
-              type="button"
-              class="ghost-btn"
-              :class="{ active: viewMode === 'list' }"
-              @click="switchMode('list')"
-            >
-              预约列表
-            </button>
-            <button
-              type="button"
-              class="ghost-btn"
-              :class="{ active: viewMode === 'conflict' }"
-              @click="switchMode('conflict')"
-            >
-              冲突预约
-            </button>
+            <div class="mode-switch">
+              <button
+                type="button"
+                class="ghost-btn"
+                :class="{ active: viewMode === 'list' }"
+                @click="switchMode('list')"
+              >
+                预约列表
+              </button>
+              <button
+                type="button"
+                class="ghost-btn"
+                :class="{ active: viewMode === 'conflict' }"
+                @click="switchMode('conflict')"
+              >
+                冲突预约
+              </button>
+            </div>
           </div>
-
-          <button type="button" class="ghost-btn" @click="loadPage">刷新</button>
+          <div class="toolbar-actions">
+            <button type="button" class="ghost-btn toolbar-ghost-btn" @click="loadPage">刷新</button>
+          </div>
         </div>
       </div>
 
@@ -168,7 +170,7 @@
                 <div class="rank-title">
                   <strong>{{ item.applicantName }}</strong>
                   <span :class="applicantRoleTagClass(item.applicantRole)">{{ applicantRoleLabel(item.applicantRole) }}</span>
-                  <span :class="typeClass(item.reservationType)">{{ typeLabel(item.reservationType) }}</span>
+                  <span :class="typeClass(item.reservationType)">{{ typeLabel(item.reservationType, item.applicantRole) }}</span>
                   <span v-if="item.isRecommended" class="recommend-pill">系统推荐</span>
                   <span v-if="item.priorityRank === 1" class="priority-pill">最高优先级</span>
                 </div>
@@ -208,7 +210,7 @@
                 {{ selectedRow.applicantRole === 'teacher' ? '教师' : '学生' }}
               </span>
               <span :class="typeClass(selectedRow.reservationType)">
-                {{ typeLabel(selectedRow.reservationType) }}
+                {{ typeLabel(selectedRow.reservationType, selectedRow.applicantRole) }}
               </span>
               <span :class="statusClass(selected.status)">{{ statusText(selected.status) }}</span>
               <span v-if="selectedRow.hasConflict" class="status-tag status-conflict">冲突待审核</span>
@@ -239,7 +241,7 @@
           </ul>
         </div>
 
-        <div class="detail-section">
+        <div v-if="canAuditSelected" class="detail-section">
           <h5>审核操作</h5>
           <div class="stack-form">
             <label class="wide">
@@ -251,10 +253,10 @@
               <input v-model="rejectReason" placeholder="例如：与更高优先级预约冲突" />
             </label>
             <div class="button-row">
-              <button type="button" class="primary-btn wide" :disabled="selected.status !== 1" @click="handleApprove">
+              <button type="button" class="primary-btn wide" @click="handleApprove">
                 通过
               </button>
-              <button type="button" class="ghost-btn wide" :disabled="selected.status !== 1" @click="handleReject">
+              <button type="button" class="ghost-btn wide" @click="handleReject">
                 驳回
               </button>
             </div>
@@ -263,11 +265,19 @@
 
         <div class="detail-section">
           <h5>审核日志</h5>
-          <ul class="bullet-list compact-list">
-            <li v-for="log in logs" :key="log.id">
-              {{ log.createdAt }} / {{ auditActionText(log.auditAction) }} / {{ log.auditComment || '无备注' }}
-            </li>
-          </ul>
+          <div v-if="logs.length" class="audit-timeline">
+            <div v-for="log in logs" :key="log.id" class="audit-log-card">
+              <span :class="auditActionDotClass(log.auditAction)"></span>
+              <div class="audit-log-content">
+                <div class="audit-log-head">
+                  <span :class="auditActionBadgeClass(log.auditAction)">{{ auditActionText(log.auditAction) }}</span>
+                  <time>{{ formatAuditTime(log.createdAt) }}</time>
+                </div>
+                <p>{{ log.auditComment || '无备注' }}</p>
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty-audit-log">暂无审核日志</div>
         </div>
       </div>
     </div>
@@ -279,6 +289,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BasePanel from '../components/BasePanel.vue';
 import BaseTable from '../components/BaseTable.vue';
+import { useGlobalToast } from '../composables/useGlobalToast';
 import { fetchReservationAuditLogs } from '../api/reservationAuditLogs';
 import {
   approveReservation,
@@ -309,6 +320,7 @@ import {
 } from '../utils/adminReservations';
 
 const auth = useAuthStore();
+const { showToast } = useGlobalToast();
 const route = useRoute();
 const router = useRouter();
 
@@ -348,6 +360,7 @@ const currentPage = computed(() => (viewMode.value === 'conflict' ? conflictPage
 const currentPageCount = computed(() =>
   Math.max(1, Math.ceil((viewMode.value === 'conflict' ? conflictState.value.total : state.value.total) / pageSize)),
 );
+const canAuditSelected = computed(() => selected.value?.status === 1);
 const selectedRow = computed<ReservationRowViewModel | null>(() => {
   const selectedId = selected.value?.id;
   if (!selectedId || !selected.value) {
@@ -360,11 +373,12 @@ const selectedRow = computed<ReservationRowViewModel | null>(() => {
   }
 
   const reservationType = getDecisionType(selected.value.reservationType);
-  const applicantRole = getApplicantRole(selected.value.reservationType);
   const user = userMap.value.get(selected.value.applicantUserId);
+  const applicantRole = getApplicantRole(selected.value.reservationType, user);
   const conflictEntry = conflictGroups.value
     .flatMap((group) => group.reservations)
     .find((item) => item.id === selectedId);
+  const priorityText = applicantRole === 'teacher' && reservationType === 'personal' ? '教师个人优先' : priorityLabel(reservationType);
   const firstSlot = selected.value.slots?.[0];
   const timeDetail = (selected.value.slots ?? []).map((slot) => `${slot.reservationDate} ${slot.periodName}`).join('，');
 
@@ -384,8 +398,8 @@ const selectedRow = computed<ReservationRowViewModel | null>(() => {
     status: selected.value.status,
     hasConflict: Boolean(conflictEntry),
     isRecommended: Boolean(conflictEntry?.isRecommended),
-    priorityLabel: priorityLabel(reservationType),
-    rankReason: conflictEntry ? conflictEntry.rankReason : `${priorityLabel(reservationType)}，当前无同组冲突`,
+    priorityLabel: priorityText,
+    rankReason: conflictEntry ? conflictEntry.rankReason : `${priorityText}，当前无同组冲突`,
     usagePurpose: selected.value.usagePurpose,
     courseOrProjectName: selected.value.courseOrProjectName,
   };
@@ -416,6 +430,27 @@ function auditActionText(action: number): string {
   if (action === 5) return '签到/完成';
   if (action === 6) return '签退';
   return '状态变更';
+}
+
+function auditActionBadgeClass(action: number): string {
+  if (action === 2) return 'audit-action-badge audit-action-approved';
+  if (action === 3 || action === 4) return 'audit-action-badge audit-action-rejected';
+  if (action === 5 || action === 6) return 'audit-action-badge audit-action-completed';
+  return 'audit-action-badge audit-action-neutral';
+}
+
+function auditActionDotClass(action: number): string {
+  if (action === 2) return 'audit-log-dot audit-log-dot-approved';
+  if (action === 3 || action === 4) return 'audit-log-dot audit-log-dot-rejected';
+  if (action === 5 || action === 6) return 'audit-log-dot audit-log-dot-completed';
+  return 'audit-log-dot audit-log-dot-neutral';
+}
+
+function formatAuditTime(value?: string): string {
+  if (!value) {
+    return '时间待补充';
+  }
+  return value.replace('T', ' ');
 }
 
 async function loadPage(): Promise<void> {
@@ -456,10 +491,18 @@ async function loadPage(): Promise<void> {
 }
 
 function handleStatusChange(): void {
-  if (viewMode.value === 'list') {
-    listPage.value = 1;
-    void loadPage();
+  if (viewMode.value !== 'list') {
+    return;
   }
+  listPage.value = 1;
+  const query: Record<string, string> = { ...(route.query as Record<string, string>) };
+  if (statusFilter.value) {
+    query.status = statusFilter.value;
+  } else {
+    delete query.status;
+  }
+  query.view = 'list';
+  void router.replace({ query });
 }
 
 function changePage(page: number): void {
@@ -474,21 +517,57 @@ function changePage(page: number): void {
 async function switchMode(mode: 'list' | 'conflict'): Promise<void> {
   if (viewMode.value === mode) return;
   closeDetailDialog();
-  viewMode.value = mode;
   if (mode === 'list') {
     listPage.value = 1;
   } else {
     conflictPage.value = 1;
   }
-  await loadPage();
 
   const query: Record<string, string> = { ...(route.query as Record<string, string>) };
   if (mode === 'conflict') {
     query.view = 'conflict';
   } else {
-    delete query.view;
+    query.view = 'list';
+  }
+  if (mode === 'list' && statusFilter.value) {
+    query.status = statusFilter.value;
+  } else if (mode === 'conflict') {
+    delete query.status;
   }
   await router.replace({ query });
+}
+
+function parseRouteViewMode(): 'list' | 'conflict' {
+  return route.query.view === 'conflict' ? 'conflict' : 'list';
+}
+
+function parseRouteStatusFilter(): string {
+  const status = typeof route.query.status === 'string' ? route.query.status : '';
+  return ['1', '2', '3', '4', '5'].includes(status) ? status : '';
+}
+
+async function syncRouteState(): Promise<void> {
+  const nextViewMode = parseRouteViewMode();
+  const nextStatusFilter = nextViewMode === 'list' ? parseRouteStatusFilter() : '';
+  const viewChanged = viewMode.value !== nextViewMode;
+  const statusChanged = statusFilter.value !== nextStatusFilter;
+
+  viewMode.value = nextViewMode;
+  statusFilter.value = nextStatusFilter;
+
+  if (viewChanged) {
+    closeDetailDialog();
+  }
+
+  if (nextViewMode === 'conflict') {
+    if (viewChanged) {
+      conflictPage.value = 1;
+    }
+  } else if (viewChanged || statusChanged) {
+    listPage.value = 1;
+  }
+
+  await loadPage();
 }
 
 async function openReservationDialog(id: number): Promise<void> {
@@ -543,6 +622,7 @@ async function handleApprove(): Promise<void> {
     await approveReservation(selected.value.id, auth.token.value, auditComment.value || undefined);
     closeDetailDialog();
     await loadPage();
+    showToast('success', '审核通过成功', 2400);
   } catch (error) {
     message.value = error instanceof Error ? error.message : '审核失败。';
   }
@@ -551,30 +631,28 @@ async function handleApprove(): Promise<void> {
 async function handleReject(): Promise<void> {
   if (!selected.value) return;
   if (!rejectReason.value.trim()) {
-    message.value = '驳回原因不能为空。';
+    showToast('error', '请先填写驳回原因', 2400);
     return;
   }
   try {
     await rejectReservation(selected.value.id, auth.token.value, rejectReason.value.trim(), auditComment.value || undefined);
     closeDetailDialog();
     await loadPage();
+    showToast('success', '驳回成功', 2400);
   } catch (error) {
     message.value = error instanceof Error ? error.message : '驳回失败。';
   }
 }
 
 watch(
-  () => route.query,
+  () => [route.query.view, route.query.status],
   () => {
-    const view = typeof route.query.view === 'string' ? route.query.view : '';
-    viewMode.value = view === 'conflict' ? 'conflict' : 'list';
+    void syncRouteState();
   },
 );
 
 onMounted(async () => {
-  const view = typeof route.query.view === 'string' ? route.query.view : '';
-  viewMode.value = view === 'conflict' ? 'conflict' : 'list';
-  await loadPage();
+  await syncRouteState();
 });
 </script>
 
@@ -584,26 +662,45 @@ onMounted(async () => {
   padding-bottom: 18px;
 }
 
-.reservation-header-row {
+.toolbar {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 14px;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 18px;
 }
 
-.reservation-header-copy h3 {
-  margin: 0;
-  font-size: var(--page-title-size);
-  line-height: var(--page-title-line-height);
+.toolbar-top {
+  display: flex;
+  justify-content: flex-start;
 }
 
-.reservation-header-actions {
+.toolbar-row {
   display: flex;
-  align-items: center;
-  gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-title {
+  color: #0f172a;
+  font-size: var(--page-title-size);
+  line-height: var(--page-title-line-height);
+  font-weight: 700;
+}
+
+.toolbar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .mode-switch {
@@ -615,16 +712,6 @@ onMounted(async () => {
   background: #edf3ff;
   color: #2f63ff;
   border-color: #bdd0ff;
-}
-
-.reservation-status-select {
-  min-width: 160px;
-  padding: 10px 40px 10px 14px;
-  border: 1px solid rgba(148, 163, 184, 0.34);
-  border-radius: 999px;
-  background-color: rgba(255, 255, 255, 0.9);
-  color: #0f172a;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 8px 20px rgba(15, 23, 42, 0.04);
 }
 
 .reservation-table :deep(table) {
@@ -959,6 +1046,130 @@ onMounted(async () => {
   line-height: 1.8;
 }
 
+.audit-timeline {
+  display: grid;
+  gap: 10px;
+}
+
+.audit-log-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
+}
+
+.audit-log-card::before {
+  content: "";
+  position: absolute;
+  top: 32px;
+  bottom: -12px;
+  left: 22px;
+  width: 1px;
+  background: rgba(203, 213, 225, 0.7);
+}
+
+.audit-log-card:last-child::before {
+  display: none;
+}
+
+.audit-log-dot {
+  position: relative;
+  z-index: 1;
+  width: 14px;
+  height: 14px;
+  margin-top: 5px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.95);
+}
+
+.audit-log-dot-neutral {
+  background: #3b82f6;
+}
+
+.audit-log-dot-approved {
+  background: #10b981;
+}
+
+.audit-log-dot-rejected {
+  background: #ef4444;
+}
+
+.audit-log-dot-completed {
+  background: #64748b;
+}
+
+.audit-log-content {
+  display: grid;
+  gap: 8px;
+}
+
+.audit-log-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.audit-log-head time {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.audit-log-content p {
+  margin: 0;
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.audit-action-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.audit-action-neutral {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+}
+
+.audit-action-approved {
+  background: rgba(16, 185, 129, 0.14);
+  color: #047857;
+}
+
+.audit-action-rejected {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.audit-action-completed {
+  background: rgba(100, 116, 139, 0.12);
+  color: #334155;
+}
+
+.empty-audit-log {
+  padding: 18px;
+  border: 1px dashed rgba(148, 163, 184, 0.45);
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.76);
+  color: #64748b;
+  text-align: center;
+  font-weight: 600;
+}
+
 .stack-form {
   display: grid;
   gap: 12px;
@@ -1044,7 +1255,7 @@ onMounted(async () => {
 }
 
 @media (max-width: 920px) {
-  .reservation-header-row,
+  .toolbar-row,
   .detail-overview-grid {
     grid-template-columns: 1fr;
     display: grid;

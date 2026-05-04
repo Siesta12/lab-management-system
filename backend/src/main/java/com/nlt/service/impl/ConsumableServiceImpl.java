@@ -16,7 +16,6 @@ import com.nlt.mapper.LabMapper;
 import com.nlt.service.ConsumableService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -24,6 +23,9 @@ import org.springframework.util.StringUtils;
 @Service
 @RequiredArgsConstructor
 public class ConsumableServiceImpl implements ConsumableService {
+
+    private static final String CONSUMABLE_CODE_PREFIX = "C";
+    private static final int CONSUMABLE_CODE_DIGITS = 5;
 
     private final ConsumableMapper consumableMapper;
     private final ConsumableStockLogMapper consumableStockLogMapper;
@@ -33,14 +35,14 @@ public class ConsumableServiceImpl implements ConsumableService {
 
     @Override
     public PageData<ConsumableEntity> page(int pageNum, int pageSize, Long labId, String labType, String consumableName,
-        String consumableCode, Integer status) {
+        String consumableCode, Integer status, Boolean warningOnly) {
         int offset = (pageNum - 1) * pageSize;
         Long departmentId = currentUserScopeService.requireCurrentDepartmentId();
         return new PageData<>(
             consumableMapper.selectPage(offset, pageSize, labId, trimToNull(labType), trimToNull(consumableName), trimToNull(consumableCode),
-                departmentId, status),
+                departmentId, status, Boolean.TRUE.equals(warningOnly)),
             consumableMapper.countPage(labId, trimToNull(labType), trimToNull(consumableName), trimToNull(consumableCode), departmentId,
-                status),
+                status, Boolean.TRUE.equals(warningOnly)),
             pageNum,
             pageSize
         );
@@ -54,11 +56,13 @@ public class ConsumableServiceImpl implements ConsumableService {
     }
 
     @Override
+    @Transactional
     public ConsumableEntity create(ConsumableSaveRequest request) {
         ensureAdmin();
         ensureLabAccessible(request.getLabId());
         ConsumableEntity entity = new ConsumableEntity();
-        BeanUtils.copyProperties(request, entity);
+        applyEditableFields(entity, request);
+        entity.setConsumableCode(generateNextConsumableCode());
         applyDefaults(entity);
         consumableMapper.insert(entity);
         return getById(entity.getId());
@@ -79,7 +83,7 @@ public class ConsumableServiceImpl implements ConsumableService {
         ensureAdmin();
         ConsumableEntity entity = getById(id);
         ensureLabAccessible(request.getLabId());
-        BeanUtils.copyProperties(request, entity);
+        applyEditableFields(entity, request);
         applyDefaults(entity);
         consumableMapper.update(entity);
         return getById(id);
@@ -107,14 +111,15 @@ public class ConsumableServiceImpl implements ConsumableService {
         ensureAdmin();
         ConsumableEntity entity = getById(id);
         int beforeStock = entity.getStockQuantity();
-        int afterStock = request.getStockQuantity();
+        String changeType = normalizeChangeType(request.getChangeType());
+        int afterStock = resolveAfterStock(beforeStock, changeType, request);
         if (afterStock < 0) {
             throw new BusinessException(400, "库存数量不能为负数");
         }
         consumableMapper.updateStock(id, afterStock);
         ConsumableStockLogEntity logEntity = new ConsumableStockLogEntity();
         logEntity.setConsumableId(id);
-        logEntity.setChangeType((request.getChangeType() == null || request.getChangeType().isBlank()) ? "ADJUST" : request.getChangeType());
+        logEntity.setChangeType(changeType);
         logEntity.setChangeAmount(afterStock - beforeStock);
         logEntity.setBeforeStock(beforeStock);
         logEntity.setAfterStock(afterStock);
@@ -136,6 +141,61 @@ public class ConsumableServiceImpl implements ConsumableService {
             pageNum,
             pageSize
         );
+    }
+
+    private void applyEditableFields(ConsumableEntity entity, ConsumableSaveRequest request) {
+        entity.setLabId(request.getLabId());
+        entity.setConsumableName(trimRequired(request.getConsumableName(), "耗材名称不能为空"));
+        entity.setUnit(trimRequired(request.getUnit(), "单位不能为空"));
+        entity.setStockQuantity(request.getStockQuantity());
+        entity.setWarningThreshold(request.getWarningThreshold());
+        entity.setStatus(request.getStatus());
+        entity.setRemark(trimToNull(request.getRemark()));
+    }
+
+    private String generateNextConsumableCode() {
+        String latestCode = consumableMapper.selectLatestConsumableCodeForUpdate();
+        int nextNumber = 1;
+        if (StringUtils.hasText(latestCode) && latestCode.length() > 1) {
+            try {
+                nextNumber = Integer.parseInt(latestCode.substring(1)) + 1;
+            } catch (NumberFormatException ignored) {
+                nextNumber = 1;
+            }
+        }
+        return CONSUMABLE_CODE_PREFIX + String.format("%0" + CONSUMABLE_CODE_DIGITS + "d", nextNumber);
+    }
+
+    private String normalizeChangeType(String rawType) {
+        String normalized = trimToNull(rawType);
+        if (normalized == null) {
+            return "ADJUST";
+        }
+        String upper = normalized.toUpperCase();
+        if (!"IN".equals(upper) && !"OUT".equals(upper) && !"ADJUST".equals(upper)) {
+            throw new BusinessException(400, "库存变更类型无效");
+        }
+        return upper;
+    }
+
+    private int resolveAfterStock(int beforeStock, String changeType, ConsumableStockUpdateRequest request) {
+        if ("ADJUST".equals(changeType)) {
+            if (request.getTargetStock() == null) {
+                throw new BusinessException(400, "请填写调整后库存");
+            }
+            return request.getTargetStock();
+        }
+
+        if (request.getQuantity() == null) {
+            throw new BusinessException(400, "请填写变更数量");
+        }
+        if (request.getQuantity() <= 0) {
+            throw new BusinessException(400, "变更数量必须大于 0");
+        }
+
+        return "IN".equals(changeType)
+            ? beforeStock + request.getQuantity()
+            : beforeStock - request.getQuantity();
     }
 
     private void applyDefaults(ConsumableEntity entity) {
@@ -181,5 +241,13 @@ public class ConsumableServiceImpl implements ConsumableService {
 
     private String trimToNull(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private String trimRequired(String value, String message) {
+        String normalized = trimToNull(value);
+        if (normalized == null) {
+            throw new BusinessException(400, message);
+        }
+        return normalized;
     }
 }

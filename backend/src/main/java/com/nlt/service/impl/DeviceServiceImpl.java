@@ -3,24 +3,28 @@ package com.nlt.service.impl;
 import com.nlt.common.api.PageData;
 import com.nlt.common.exception.BusinessException;
 import com.nlt.common.security.CurrentUserScopeService;
-import com.nlt.domain.dto.device.DeviceSaveRequest;
+import com.nlt.domain.dto.device.DeviceCreateRequest;
+import com.nlt.domain.dto.device.DeviceUpdateRequest;
 import com.nlt.domain.entity.DeviceEntity;
 import com.nlt.domain.entity.LabEntity;
 import com.nlt.domain.vo.common.OptionItem;
 import com.nlt.mapper.DeviceMapper;
+import com.nlt.mapper.DeviceRepairMapper;
 import com.nlt.mapper.LabMapper;
 import com.nlt.service.DeviceService;
 import java.time.LocalDate;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class DeviceServiceImpl implements DeviceService {
 
     private final DeviceMapper deviceMapper;
+    private final DeviceRepairMapper deviceRepairMapper;
     private final LabMapper labMapper;
     private final CurrentUserScopeService currentUserScopeService;
 
@@ -37,10 +41,11 @@ public class DeviceServiceImpl implements DeviceService {
     }
 
     @Override
-    public DeviceEntity create(DeviceSaveRequest request) {
+    public DeviceEntity create(DeviceCreateRequest request) {
         ensureAdmin();
         ensureLabAccessible(request.getLabId());
         DeviceEntity entity = toEntity(request);
+        entity.setDeviceCode(nextDeviceCode());
         deviceMapper.insert(entity);
         return getById(entity.getId());
     }
@@ -64,12 +69,14 @@ public class DeviceServiceImpl implements DeviceService {
     }
 
     @Override
-    public DeviceEntity update(Long id, DeviceSaveRequest request) {
+    public DeviceEntity update(Long id, DeviceUpdateRequest request) {
         ensureAdmin();
         DeviceEntity current = getById(id);
         ensureLabAccessible(request.getLabId());
         DeviceEntity entity = toEntity(request);
+        ensureDeviceStatusEditable(id, entity.getStatus());
         entity.setId(id);
+        entity.setDeviceCode(current.getDeviceCode());
         if (request.getAvailableQuantity() == null) {
             entity.setAvailableQuantity(current.getAvailableQuantity());
         }
@@ -88,19 +95,29 @@ public class DeviceServiceImpl implements DeviceService {
     public void updateStatus(Long id, Integer status) {
         ensureAdmin();
         getById(id);
+        ensureDeviceStatusEditable(id, status);
         deviceMapper.updateStatus(id, status);
     }
 
-    private DeviceEntity toEntity(DeviceSaveRequest request) {
+    private DeviceEntity toEntity(DeviceCreateRequest request) {
         DeviceEntity entity = new DeviceEntity();
         BeanUtils.copyProperties(request, entity);
-        if (request.getPurchaseDate() != null && !request.getPurchaseDate().isBlank()) {
-            entity.setPurchaseDate(LocalDate.parse(request.getPurchaseDate()));
+        normalizeDeviceEntity(entity, request.getPurchaseDate());
+        return entity;
+    }
+
+    private DeviceEntity toEntity(DeviceUpdateRequest request) {
+        DeviceEntity entity = new DeviceEntity();
+        BeanUtils.copyProperties(request, entity);
+        normalizeDeviceEntity(entity, request.getPurchaseDate());
+        return entity;
+    }
+
+    private void normalizeDeviceEntity(DeviceEntity entity, String purchaseDate) {
+        if (purchaseDate != null && !purchaseDate.isBlank()) {
+            entity.setPurchaseDate(LocalDate.parse(purchaseDate));
         }
-        if (entity.getQuantity() == null) {
-            entity.setQuantity(1);
-        }
-        if (entity.getQuantity() <= 0) {
+        if (entity.getQuantity() == null || entity.getQuantity() <= 0) {
             entity.setQuantity(1);
         }
         if (entity.getAvailableQuantity() == null) {
@@ -115,7 +132,16 @@ public class DeviceServiceImpl implements DeviceService {
         if (entity.getStatus() == null) {
             entity.setStatus(1);
         }
-        return entity;
+    }
+
+    private String nextDeviceCode() {
+        for (int i = 0; i < 5; i++) {
+            String candidate = "D" + System.currentTimeMillis();
+            if (deviceMapper.countByDeviceCode(candidate) == 0) {
+                return candidate;
+            }
+        }
+        throw new BusinessException(500, "设备编号生成失败，请稍后重试");
     }
 
     private void ensureLabAccessible(Long labId) {
@@ -132,6 +158,15 @@ public class DeviceServiceImpl implements DeviceService {
     private void ensureAdmin() {
         if (!currentUserScopeService.isAdmin()) {
             throw new BusinessException(403, "无权修改设备信息");
+        }
+    }
+
+    private void ensureDeviceStatusEditable(Long deviceId, Integer targetStatus) {
+        if (deviceId == null || targetStatus == null || targetStatus == 2) {
+            return;
+        }
+        if (deviceRepairMapper.countActiveByDeviceId(deviceId, null) > 0) {
+            throw new BusinessException(400, "当前设备存在未完成报修，设备状态只能保持为维修中");
         }
     }
 

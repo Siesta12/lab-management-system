@@ -10,6 +10,8 @@ import com.nlt.domain.vo.schedule.DailyScheduleLabItem;
 import com.nlt.domain.vo.schedule.DailyScheduleResponse;
 import com.nlt.domain.vo.schedule.LabMaintenanceItem;
 import com.nlt.domain.vo.schedule.LabScheduleResponse;
+import com.nlt.domain.entity.ReservationAuditLogEntity;
+import com.nlt.domain.entity.ReservationEntity;
 import com.nlt.domain.vo.schedule.ReservedSlotRow;
 import com.nlt.domain.vo.schedule.ReservedSlotRowWithLab;
 import com.nlt.domain.vo.schedule.ScheduleCellItem;
@@ -21,6 +23,7 @@ import com.nlt.mapper.LabMapper;
 import com.nlt.mapper.LabOpenSlotMapper;
 import com.nlt.mapper.LabReservationSlotMapper;
 import com.nlt.mapper.ReservationMapper;
+import com.nlt.mapper.ReservationAuditLogMapper;
 import com.nlt.service.LabScheduleService;
 import com.nlt.service.LabService;
 import java.time.LocalDate;
@@ -51,8 +54,9 @@ public class LabScheduleServiceImpl implements LabScheduleService {
     private final LabReservationSlotMapper labReservationSlotMapper;
     private final LabMaintenanceMapper labMaintenanceMapper;
 
-    // For conflict checks in maintenance creation
+    // For conflict checks and auto-reject during maintenance creation
     private final ReservationMapper reservationMapper;
+    private final ReservationAuditLogMapper reservationAuditLogMapper;
 
     @Override
     public LabScheduleResponse getLabSchedule(Long labId, String startDate, Long currentUserId, List<String> currentRoleCodes) {
@@ -275,17 +279,25 @@ public class LabScheduleServiceImpl implements LabScheduleService {
             throw new BusinessException(400, "节次ID不能为空");
         }
 
-        // Disallow maintenance if there is any effective reservation occupying the slot.
-        // We treat reservation status (1,2,5) as effective; slot_status=1 indicates occupied.
         Map<String, ReservedSlotRow> reserved = new HashMap<>();
         for (ReservedSlotRow row : labReservationSlotMapper.selectReservedSlots(labId, maintenanceDate, maintenanceDate)) {
             reserved.put(key(row.getReservationDate(), row.getPeriodId()), row);
         }
+
+        Map<Long, ReservedSlotRow> reservationsToReject = new HashMap<>();
         for (Long periodId : request.getPeriodIds()) {
-            if (reserved.containsKey(key(maintenanceDate, periodId))) {
-                throw new BusinessException(400, "该时段已有预约，无法设置维护（节次ID=" + periodId + "）");
+            ReservedSlotRow row = reserved.get(key(maintenanceDate, periodId));
+            if (row == null) {
+                continue;
             }
+            if (Objects.equals(row.getReservationStatus(), 1) || Objects.equals(row.getReservationStatus(), 2)) {
+                reservationsToReject.put(row.getReservationId(), row);
+                continue;
+            }
+            throw new BusinessException(400, "该时段当前状态不支持设置维护（节次ID=" + periodId + "）");
         }
+
+        rejectReservationsForMaintenance(reservationsToReject.keySet(), operatorUserId);
 
         List<LabMaintenanceEntity> list = request.getPeriodIds().stream().distinct().map(periodId -> {
             LabMaintenanceEntity entity = new LabMaintenanceEntity();
@@ -337,6 +349,36 @@ public class LabScheduleServiceImpl implements LabScheduleService {
 
     private String formatTime(LocalTime value) {
         return value == null ? null : value.format(TIME_FORMATTER);
+    }
+
+    private void rejectReservationsForMaintenance(Set<Long> reservationIds, Long operatorUserId) {
+        for (Long reservationId : reservationIds) {
+            ReservationEntity reservation = reservationMapper.selectById(reservationId);
+            if (reservation == null || reservation.getStatus() == null) {
+                continue;
+            }
+            if (!Objects.equals(reservation.getStatus(), 1) && !Objects.equals(reservation.getStatus(), 2)) {
+                continue;
+            }
+            reservation.setApproverUserId(operatorUserId);
+            reservation.setStatus(3);
+            reservation.setRejectReason("实验室维护");
+            reservationMapper.updateAuditResult(reservation);
+            labReservationSlotMapper.cancelByReservationId(reservationId);
+            insertAuditLog(reservationId, operatorUserId, 3, "实验室维护，自动驳回预约");
+        }
+    }
+
+    private void insertAuditLog(Long reservationId, Long operatorUserId, Integer action, String comment) {
+        if (reservationId == null || operatorUserId == null) {
+            return;
+        }
+        ReservationAuditLogEntity entity = new ReservationAuditLogEntity();
+        entity.setReservationId(reservationId);
+        entity.setAuditUserId(operatorUserId);
+        entity.setAuditAction(action);
+        entity.setAuditComment(comment);
+        reservationAuditLogMapper.insert(entity);
     }
 
     private void requireAdmin(List<String> roleCodes) {

@@ -1,10 +1,17 @@
 <template>
   <section class="card-grid metrics-grid">
-    <article v-for="card in cardsToShow" :key="card.label" class="metric-card" :class="card.tone">
+    <button
+      v-for="card in cardsToShow"
+      :key="card.label"
+      type="button"
+      class="metric-card metric-card-button"
+      :class="card.tone"
+      @click="handleMetricCardClick(card.label)"
+    >
       <span>{{ card.label }}</span>
       <strong>{{ card.value }}</strong>
       <small>{{ card.trend }}</small>
-    </article>
+    </button>
   </section>
 
   <section class="content-grid overview-stack">
@@ -140,6 +147,13 @@ const pagedTimelineItems = computed(() => {
   return timelineItems.value.slice(start, start + timelinePageSize);
 });
 
+const metricCardRouteMap: Record<string, { name: string; query?: Record<string, string> }> = {
+  开放实验室: { name: 'labs' },
+  待审核申请: { name: 'reservations', query: { view: 'list', status: '1' } },
+  低库存耗材: { name: 'consumables', query: { status: '2' } },
+  设备维护中: { name: 'devices', query: { tab: 'repair' } },
+};
+
 function openTimelineDialog(): void {
   timelinePage.value = 1;
   timelineDialogVisible.value = true;
@@ -150,7 +164,19 @@ function closeTimelineDialog(): void {
 }
 
 function goToReservations(view: 'pending' | 'conflict'): void {
-  void router.push({ name: 'reservations', query: { view } });
+  if (view === 'conflict') {
+    void router.push({ name: 'reservations', query: { view: 'conflict' } });
+    return;
+  }
+  void router.push({ name: 'reservations', query: { view: 'list', status: '1' } });
+}
+
+function handleMetricCardClick(label: string): void {
+  const target = metricCardRouteMap[label];
+  if (!target) {
+    return;
+  }
+  void router.push({ name: target.name, query: target.query });
 }
 
 function typeClass(typeLabel?: string): string {
@@ -197,6 +223,25 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.metric-card-button {
+  border: 0;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.metric-card-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+  filter: saturate(1.04);
+}
+
+.metric-card-button:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.28);
+  outline-offset: 2px;
+}
+
 .overview-stack {
   display: grid;
   gap: 16px;

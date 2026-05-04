@@ -131,11 +131,11 @@
               :key="item.type"
               class="export-choice-card"
               type="button"
-              :disabled="exporting"
+              :disabled="exportingType === item.type"
               @click="exportByType(item.type)"
             >
-              <span>{{ item.label }}</span>
-              <strong>{{ exporting ? '正在导出...' : item.action }}</strong>
+              <span class="export-choice-label">{{ item.label }}</span>
+              <strong class="export-choice-action">{{ exportingType === item.type ? '正在导出...' : item.action }}</strong>
               <small>{{ item.description }}</small>
               <em>{{ item.fields }}</em>
             </button>
@@ -145,16 +145,15 @@
 
         <template v-else-if="dialogView === 'overview'">
           <div class="dialog-summary-grid">
-            <button
+            <article
               v-for="metric in currentOverviewMetrics"
               :key="metric.label"
               class="dialog-summary-card"
-              type="button"
             >
               <span>{{ metric.label }}</span>
               <strong>{{ metric.value }}</strong>
               <small>{{ metric.note }}</small>
-            </button>
+            </article>
           </div>
 
           <div class="dialog-grid">
@@ -427,6 +426,7 @@ const auth = useAuthStore();
 const { showToast } = useGlobalToast();
 const loading = ref(false);
 const exporting = ref(false);
+const exportingType = ref<string | null>(null);
 const detailLoading = ref(false);
 const errorText = ref('');
 const activeRange = ref<RangeKey>('month');
@@ -474,11 +474,11 @@ const quickRanges: Array<{ label: string; value: RangeKey }> = [
 ];
 
 const exportChoices = [
-  { type: 'reservation', label: '预约统计 Excel 导出', action: '立即导出', description: '导出当前筛选下的预约统计明细。', fields: '字段摘要：预约编号、实验室、申请人、角色、类型、状态、时间' },
-  { type: 'labUsage', label: '实验室使用统计 Excel 导出', action: '立即导出', description: '导出使用率、热度、高频与空闲实验室统计。', fields: '字段摘要：汇总指标、类型使用率、时间段热度、高频/空闲实验室 Top' },
-  { type: 'device', label: '设备统计 Excel 导出', action: '立即导出', description: '导出设备状态、品牌分布、报修趋势和实验室设备分布。', fields: '字段摘要：设备汇总、状态分布、品牌分布、报修趋势、实验室设备 Top' },
-  { type: 'consumable', label: '耗材统计 Excel 导出', action: '立即导出', description: '导出库存、预警阈值、入库和出库统计。', fields: '字段摘要：耗材名称、实验室、库存、阈值、本月入库、本月出库' },
-  { type: 'creditViolation', label: '信用 / 违规统计 Excel 导出', action: '立即导出', description: '导出违规类型、扣分、发生时间和当前信用分。', fields: '字段摘要：姓名、学工号、角色、违规类型、扣分、时间、信用分' },
+  { type: 'reservation', label: '预约统计', action: '立即导出', description: '导出当前筛选下的预约统计明细。', fields: '字段摘要：预约编号、实验室、申请人、角色、类型、状态、时间' },
+  { type: 'labUsage', label: '实验室使用统计', action: '立即导出', description: '导出使用率、热度、高频与空闲实验室统计。', fields: '字段摘要：汇总指标、类型使用率、时间段热度、高频/空闲实验室 Top' },
+  { type: 'device', label: '设备统计', action: '立即导出', description: '导出设备状态、品牌分布、报修趋势和实验室设备分布。', fields: '字段摘要：设备汇总、状态分布、品牌分布、报修趋势、实验室设备 Top' },
+  { type: 'consumable', label: '耗材统计', action: '立即导出', description: '导出库存、预警阈值、入库和出库统计。', fields: '字段摘要：耗材名称、实验室、库存、阈值、本月入库、本月出库' },
+  { type: 'creditViolation', label: '信用 / 违规统计', action: '立即导出', description: '导出违规类型、扣分、发生时间和当前信用分。', fields: '字段摘要：姓名、学工号、角色、违规类型、扣分、时间、信用分' },
 ];
 
 const entryCards = computed<EntryCard[]>(() => {
@@ -1013,7 +1013,11 @@ function handleDialogHeaderAction(): void {
 }
 
 async function exportByType(type: string): Promise<void> {
+  if (exportingType.value === type) {
+    return;
+  }
   exporting.value = true;
+  exportingType.value = type;
   try {
     await downloadStatisticsExport({ ...buildQuery(), exportType: type }, auth.token.value || '');
     showToast('success', '导出已开始下载');
@@ -1021,6 +1025,7 @@ async function exportByType(type: string): Promise<void> {
     showToast('error', error instanceof Error ? error.message : '导出失败');
   } finally {
     exporting.value = false;
+    exportingType.value = null;
   }
 }
 
@@ -1333,6 +1338,13 @@ onUnmounted(() => {
   border-radius: 14px;
   background-color: #f8fbff;
   color: var(--text);
+}
+
+.statistics-filters select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: none;
 }
 
 .filter-actions {
@@ -1827,23 +1839,43 @@ onUnmounted(() => {
 
 .export-choice-card {
   display: grid;
-  gap: 8px;
-  padding: 18px;
+  gap: 10px;
+  padding: 20px 22px;
   border-radius: 18px;
   border: 1px solid var(--line);
-  background: rgba(248, 250, 252, 0.86);
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 34%),
+    rgba(248, 250, 252, 0.92);
   text-align: left;
   color: var(--text);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-.export-choice-card span {
-  color: var(--muted);
-  font-size: 13px;
+.export-choice-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(37, 99, 235, 0.24);
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.08);
 }
 
-.export-choice-card strong {
+.export-choice-card:disabled {
+  opacity: 1;
+}
+
+.export-choice-label {
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.export-choice-action {
+  width: fit-content;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
   color: var(--brand-deep);
-  font-size: 18px;
+  font-size: 16px;
+  line-height: 1.2;
 }
 
 .export-choice-card small,
@@ -1853,9 +1885,13 @@ onUnmounted(() => {
   line-height: 1.6;
 }
 
+.export-choice-card small {
+  font-size: 14px;
+}
+
 .export-choice-card em {
   font-style: normal;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .export-note {

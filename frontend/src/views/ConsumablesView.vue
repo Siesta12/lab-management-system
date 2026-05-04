@@ -1,41 +1,47 @@
 <template>
   <section class="consumables-page">
-    <BasePanel tag="耗材台账" title="库存与预警状态">
+    <BasePanel>
       <div class="toolbar">
-        <div class="toolbar-filters">
-          <select v-model="query.labType" class="toolbar-select" @change="handleLabTypeChange">
-            <option value="">全部类型</option>
-            <option v-for="type in labTypeOptions" :key="type" :value="type">{{ type }}</option>
-          </select>
-          <select v-model.number="query.labId" class="toolbar-select" @change="loadConsumables(1)">
-            <option :value="0">全部实验室</option>
-            <option v-for="lab in filteredLabOptions" :key="lab.value" :value="lab.value">{{ lab.label }}</option>
-          </select>
-          <input v-model.trim="query.keyword" class="toolbar-input" placeholder="搜索名称或编号" @keyup.enter="loadConsumables(1)" />
-          <select v-model.number="query.status" class="toolbar-select" @change="loadConsumables(1)">
-            <option :value="-1">全部状态</option>
-            <option :value="1">启用</option>
-            <option :value="0">停用</option>
-          </select>
+        <div class="toolbar-top">
+          <div class="toolbar-title">耗材管理</div>
         </div>
-        <div class="toolbar-actions">
-          <button type="button" class="ghost-btn" @click="loadConsumables(1)">查询</button>
-          <button type="button" class="primary-btn" @click="openCreate">新增耗材</button>
+        <div class="toolbar-row">
+          <div class="toolbar-filters">
+            <input v-model.trim="query.keyword" class="toolbar-input" placeholder="搜索名称或编号" @keyup.enter="loadConsumables(1)" />
+            <select v-model="query.labType" class="toolbar-select" @change="handleLabTypeChange">
+              <option value="">全部类型</option>
+              <option v-for="type in labTypeOptions" :key="type" :value="type">{{ type }}</option>
+            </select>
+            <select v-model.number="query.labId" class="toolbar-select" @change="loadConsumables(1)">
+              <option :value="0">全部实验室</option>
+              <option v-for="lab in filteredLabOptions" :key="lab.value" :value="lab.value">{{ lab.label }}</option>
+            </select>
+            <select v-model.number="query.status" class="toolbar-select" @change="loadConsumables(1)">
+              <option :value="-1">全部状态</option>
+              <option :value="1">启用</option>
+              <option :value="0">停用</option>
+              <option :value="2">低库存预警</option>
+            </select>
+          </div>
+          <div class="toolbar-actions">
+            <button type="button" class="ghost-btn toolbar-ghost-btn" @click="loadConsumables(1)">查询</button>
+            <button type="button" class="ghost-btn toolbar-ghost-btn" @click="handleReset">重置</button>
+            <button type="button" class="primary-btn" @click="openCreate">新增耗材</button>
+          </div>
         </div>
       </div>
 
       <p v-if="message" class="info-text">{{ message }}</p>
-      <BaseTable :headers="['名称', '编号', '规格', '实验室', '库存', '预警线', '单位', '状态', '操作']">
+      <BaseTable :headers="['名称', '编号', '实验室', '库存', '预警线', '单位', '状态', '操作']">
         <tr v-if="loading">
-          <td colspan="9" class="empty-cell">加载中...</td>
+          <td colspan="8" class="empty-cell">加载中...</td>
         </tr>
         <tr v-else-if="consumableState.list.length === 0">
-          <td colspan="9" class="empty-cell">暂无耗材</td>
+          <td colspan="8" class="empty-cell">暂无耗材</td>
         </tr>
         <tr v-for="item in consumableState.list" :key="item.id" class="row-clickable" @click="openDetail(item)">
           <td>{{ item.consumableName }}</td>
           <td>{{ item.consumableCode }}</td>
-          <td>{{ item.specification || '--' }}</td>
           <td>{{ labName(item.labId) }}</td>
           <td>{{ item.stockQuantity }}</td>
           <td>{{ item.warningThreshold }}</td>
@@ -79,7 +85,6 @@
         <div class="detail-grid">
           <div><span>编号</span><strong>{{ selectedConsumable.consumableCode }}</strong></div>
           <div><span>实验室</span><strong>{{ labName(selectedConsumable.labId) }}</strong></div>
-          <div><span>规格</span><strong>{{ selectedConsumable.specification || '--' }}</strong></div>
           <div><span>单位</span><strong>{{ selectedConsumable.unit }}</strong></div>
           <div><span>当前库存</span><strong>{{ selectedConsumable.stockQuantity }}</strong></div>
           <div><span>预警线</span><strong>{{ selectedConsumable.warningThreshold }}</strong></div>
@@ -89,30 +94,65 @@
         <div class="dialog-actions">
           <button type="button" class="ghost-btn" @click="openEdit(selectedConsumable)">编辑</button>
           <button type="button" class="ghost-btn" @click="openStock(selectedConsumable)">调库存</button>
-          <button type="button" class="ghost-btn" @click="handleDelete(selectedConsumable)">删除</button>
+          <button type="button" class="ghost-btn" @click="openDeleteConfirm(selectedConsumable)">删除</button>
         </div>
       </div>
     </div>
 
-    <div v-if="editorVisible" class="dialog-mask" @click.self="closeEditor">
-      <div class="dialog-card">
-        <div class="dialog-head">
-          <h3>{{ editingId ? '编辑耗材' : '新增耗材' }}</h3>
-          <button type="button" class="ghost-btn small-btn" @click="closeEditor">关闭</button>
+    <div v-if="deleteConfirmVisible && selectedConsumable" class="dialog-mask" @click.self="closeDeleteConfirm">
+      <div class="dialog-card delete-confirm-dialog">
+        <div class="delete-confirm-head">
+          <span class="delete-confirm-badge">删除确认</span>
+          <h3>确认删除当前耗材？</h3>
+          <p>
+            删除后将无法恢复，
+            <strong>{{ selectedConsumable.consumableName }}</strong>
+            的台账数据会被移除。
+          </p>
         </div>
-        <div class="form-grid">
-          <label><span>实验室</span><select v-model.number="form.labId"><option v-for="lab in labOptions" :key="lab.value" :value="lab.value">{{ lab.label }}</option></select></label>
-          <label><span>名称</span><input v-model.trim="form.consumableName" /></label>
-          <label><span>编号</span><input v-model.trim="form.consumableCode" /></label>
-          <label><span>规格</span><input v-model.trim="form.specification" /></label>
-          <label><span>单位</span><input v-model.trim="form.unit" /></label>
-          <label><span>库存</span><input v-model.number="form.stockQuantity" type="number" min="0" /></label>
-          <label><span>预警线</span><input v-model.number="form.warningThreshold" type="number" min="0" /></label>
-          <label><span>状态</span><select v-model.number="form.status"><option :value="1">启用</option><option :value="0">停用</option></select></label>
-          <label class="full-width"><span>备注</span><textarea v-model.trim="form.remark" rows="3" /></label>
+
+        <div class="delete-confirm-preview">
+          <div>
+            <span>耗材编号</span>
+            <strong>{{ selectedConsumable.consumableCode }}</strong>
+          </div>
+          <div>
+            <span>所属实验室</span>
+            <strong>{{ labName(selectedConsumable.labId) }}</strong>
+          </div>
+          <div>
+            <span>当前库存</span>
+            <strong>{{ selectedConsumable.stockQuantity }} {{ selectedConsumable.unit }}</strong>
+          </div>
         </div>
-        <div class="dialog-actions">
-          <button type="button" class="ghost-btn" @click="closeEditor">取消</button>
+
+        <div class="delete-confirm-actions">
+          <button type="button" class="ghost-btn" :disabled="saving" @click="closeDeleteConfirm">取消</button>
+          <button type="button" class="danger-btn delete-confirm-btn" :disabled="saving" @click="confirmDelete">
+            {{ saving ? '删除中...' : '确认删除' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+      <div v-if="editorVisible" class="dialog-mask" @click.self="closeEditor">
+        <div class="dialog-card">
+          <div class="dialog-head">
+            <h3>{{ editingId ? '编辑耗材' : '新增耗材' }}</h3>
+            <button type="button" class="ghost-btn small-btn" @click="closeEditor">关闭</button>
+          </div>
+          <p v-if="!editingId" class="form-note">耗材编号将在保存后自动生成。</p>
+          <div class="form-grid">
+            <label><span>实验室</span><select v-model.number="form.labId"><option v-for="lab in labOptions" :key="lab.value" :value="lab.value">{{ lab.label }}</option></select></label>
+            <label><span>名称</span><input v-model.trim="form.consumableName" /></label>
+            <label><span>单位</span><input v-model.trim="form.unit" /></label>
+            <label><span>库存</span><input v-model.number="form.stockQuantity" type="number" min="0" /></label>
+            <label><span>预警线</span><input v-model.number="form.warningThreshold" type="number" min="0" /></label>
+            <label><span>状态</span><select v-model.number="form.status"><option :value="1">启用</option><option :value="0">停用</option></select></label>
+            <label class="full-width"><span>备注</span><textarea v-model.trim="form.remark" rows="3" /></label>
+          </div>
+          <div class="dialog-actions">
+            <button type="button" class="ghost-btn" @click="closeEditor">取消</button>
           <button type="button" class="primary-btn" :disabled="saving" @click="handleSave">{{ saving ? '保存中...' : '保存' }}</button>
         </div>
       </div>
@@ -125,12 +165,27 @@
           <button type="button" class="ghost-btn small-btn" @click="closeStock">关闭</button>
         </div>
         <div class="form-grid single">
-          <label><span>变更类型</span><select v-model="stockForm.changeType"><option value="IN">入库</option><option value="ADJUST">调整</option></select></label>
-          <label><span>变更后库存</span><input v-model.number="stockForm.stockQuantity" type="number" min="0" /></label>
+          <label>
+            <span>变更类型</span>
+            <select v-model="stockForm.changeType">
+              <option value="IN">入库</option>
+              <option value="OUT">出库</option>
+              <option value="ADJUST">调整</option>
+            </select>
+          </label>
+          <label>
+            <span>{{ stockQuantityLabel }}</span>
+            <input v-if="stockForm.changeType === 'ADJUST'" v-model.number="stockForm.targetStock" type="number" min="0" />
+            <input v-else v-model.number="stockForm.quantity" type="number" min="1" />
+          </label>
+          <div class="stock-preview-card">
+            <span>库存预览</span>
+            <strong>{{ stockPreviewText }}</strong>
+          </div>
           <label><span>备注</span><textarea v-model.trim="stockForm.remark" rows="3" /></label>
         </div>
         <div class="dialog-actions">
-          <button type="button" class="primary-btn" :disabled="saving" @click="handleStockSave">保存库存调整</button>
+          <button type="button" class="primary-btn" :disabled="saving" @click="handleStockSave">保存库存变更</button>
         </div>
       </div>
     </div>
@@ -139,7 +194,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import {
   createConsumable,
   deleteConsumable,
@@ -157,6 +213,7 @@ import type { ConsumableDto, ConsumableSavePayload, LabDto, OptionItem, PageData
 
 const auth = useAuthStore();
 const { showToast } = useGlobalToast();
+const route = useRoute();
 const labOptions = ref<OptionItem[]>([]);
 const labCatalog = ref<LabDto[]>([]);
 const consumableState = ref<PageData<ConsumableDto>>({ list: [], total: 0, pageNum: 1, pageSize: 10 });
@@ -166,6 +223,7 @@ const message = ref('');
 const detailVisible = ref(false);
 const editorVisible = ref(false);
 const stockVisible = ref(false);
+const deleteConfirmVisible = ref(false);
 const editingId = ref<number | null>(null);
 const selectedConsumable = ref<ConsumableDto | null>(null);
 const stockTarget = ref<ConsumableDto | null>(null);
@@ -174,25 +232,57 @@ const query = reactive({ labType: '', labId: 0, keyword: '', status: -1 });
 const form = reactive<ConsumableSavePayload>({
   labId: 0,
   consumableName: '',
-  consumableCode: '',
-  specification: '',
   unit: '',
   stockQuantity: 0,
   warningThreshold: 0,
   status: 1,
   remark: '',
 });
-const stockForm = reactive({ stockQuantity: 0, changeType: 'ADJUST', remark: '' });
+const stockForm = reactive<{
+  changeType: 'IN' | 'OUT' | 'ADJUST';
+  quantity: number;
+  targetStock: number;
+  remark: string;
+}>({
+  changeType: 'ADJUST',
+  quantity: 1,
+  targetStock: 0,
+  remark: '',
+});
 const consumableTotalPages = computed(() => Math.max(1, Math.ceil(consumableState.value.total / consumableState.value.pageSize)));
 const labTypeOptions = computed(() => Array.from(new Set(labCatalog.value.map((lab) => lab.labType).filter(Boolean) as string[])));
 const filteredLabOptions = computed(() => labCatalog.value
   .filter((lab) => !query.labType || lab.labType === query.labType)
   .map((lab) => ({ label: lab.labName, value: lab.id })));
+const stockQuantityLabel = computed(() => (stockForm.changeType === 'ADJUST' ? '调整后库存' : '变更数量'));
+const stockPreviewText = computed(() => {
+  if (!stockTarget.value) {
+    return '--';
+  }
+  const before = stockTarget.value.stockQuantity;
+  if (stockForm.changeType === 'ADJUST') {
+    const target = stockForm.targetStock;
+    return target == null || Number.isNaN(target) ? `当前 ${before}` : `${before} -> ${target}`;
+  }
+  const quantity = stockForm.quantity;
+  if (quantity == null || Number.isNaN(quantity)) {
+    return `当前 ${before}`;
+  }
+  const after = stockForm.changeType === 'IN' ? before + quantity : before - quantity;
+  return `${before} -> ${after}`;
+});
 
 onMounted(async () => {
   await loadLabOptions();
-  await loadConsumables(1);
+  await syncRouteFilters();
 });
+
+watch(
+  () => route.query.status,
+  () => {
+    void syncRouteFilters();
+  },
+);
 
 async function loadLabOptions(): Promise<void> {
   const data = await fetchLabs({ pageNum: 1, pageSize: 1000, departmentId: auth.currentUser.value?.departmentId ?? undefined }, auth.token.value);
@@ -215,7 +305,8 @@ async function loadConsumables(pageNum = 1): Promise<void> {
         labId: query.labId || undefined,
         labType: query.labType || undefined,
         consumableName: query.keyword || undefined,
-        status: query.status >= 0 ? query.status : undefined,
+        status: query.status === 0 || query.status === 1 ? query.status : undefined,
+        warningOnly: query.status === 2 ? true : undefined,
       },
       auth.token.value,
     );
@@ -226,8 +317,26 @@ async function loadConsumables(pageNum = 1): Promise<void> {
   }
 }
 
+function parseRouteStatus(): number {
+  const rawStatus = typeof route.query.status === 'string' ? Number(route.query.status) : Number.NaN;
+  return [0, 1, 2].includes(rawStatus) ? rawStatus : -1;
+}
+
+async function syncRouteFilters(): Promise<void> {
+  query.status = parseRouteStatus();
+  await loadConsumables(1);
+}
+
 function handleLabTypeChange(): void {
   query.labId = 0;
+  void loadConsumables(1);
+}
+
+function handleReset(): void {
+  query.labType = '';
+  query.labId = 0;
+  query.keyword = '';
+  query.status = -1;
   void loadConsumables(1);
 }
 
@@ -237,8 +346,6 @@ function openCreate(): void {
   Object.assign(form, {
     labId: labOptions.value[0]?.value ?? 0,
     consumableName: '',
-    consumableCode: '',
-    specification: '',
     unit: '',
     stockQuantity: 0,
     warningThreshold: 0,
@@ -257,10 +364,28 @@ function closeDetail(): void {
   detailVisible.value = false;
 }
 
+function openDeleteConfirm(item: ConsumableDto): void {
+  selectedConsumable.value = { ...item };
+  deleteConfirmVisible.value = true;
+}
+
+function closeDeleteConfirm(): void {
+  if (saving.value) return;
+  deleteConfirmVisible.value = false;
+}
+
 function openEdit(item: ConsumableDto): void {
   closeDetail();
   editingId.value = item.id;
-  Object.assign(form, { ...item });
+  Object.assign(form, {
+    labId: item.labId,
+    consumableName: item.consumableName,
+    unit: item.unit,
+    stockQuantity: item.stockQuantity,
+    warningThreshold: item.warningThreshold,
+    status: item.status ?? 1,
+    remark: item.remark ?? '',
+  });
   editorVisible.value = true;
 }
 
@@ -269,8 +394,8 @@ function closeEditor(): void {
 }
 
 async function handleSave(): Promise<void> {
-  if (!form.labId || !form.consumableName || !form.consumableCode || !form.unit) {
-    showToast('error', '请填写实验室、名称、编号和单位');
+  if (!form.labId || !form.consumableName || !form.unit) {
+    showToast('error', '请填写实验室、名称和单位');
     return;
   }
   saving.value = true;
@@ -293,22 +418,29 @@ async function handleSave(): Promise<void> {
   }
 }
 
-async function handleDelete(item: ConsumableDto): Promise<void> {
-  if (!window.confirm(`确认删除 ${item.consumableName}？`)) return;
-  await deleteConsumable(item.id, auth.token.value);
-  showToast('success', '耗材已删除');
-  if (selectedConsumable.value?.id === item.id) {
+async function confirmDelete(): Promise<void> {
+  if (!selectedConsumable.value) return;
+  saving.value = true;
+  try {
+    await deleteConsumable(selectedConsumable.value.id, auth.token.value);
+    showToast('success', '耗材已删除');
+    deleteConfirmVisible.value = false;
     closeDetail();
     selectedConsumable.value = null;
+    await loadConsumables(consumableState.value.pageNum);
+  } catch (error) {
+    showToast('error', error instanceof Error ? error.message : '删除失败');
+  } finally {
+    saving.value = false;
   }
-  await loadConsumables(consumableState.value.pageNum);
 }
 
 function openStock(item: ConsumableDto): void {
   closeDetail();
   stockTarget.value = item;
-  stockForm.stockQuantity = item.stockQuantity;
   stockForm.changeType = 'ADJUST';
+  stockForm.quantity = 1;
+  stockForm.targetStock = item.stockQuantity;
   stockForm.remark = '';
   stockVisible.value = true;
 }
@@ -318,16 +450,29 @@ function closeStock(): void {
 }
 
 async function handleStockSave(): Promise<void> {
-  if (!stockTarget.value || stockForm.stockQuantity < 0) return;
+  if (!stockTarget.value) return;
+  if (stockForm.changeType === 'ADJUST' && stockForm.targetStock < 0) {
+    showToast('error', '调整后库存不能为负数');
+    return;
+  }
+  if ((stockForm.changeType === 'IN' || stockForm.changeType === 'OUT') && stockForm.quantity <= 0) {
+    showToast('error', '变更数量必须大于 0');
+    return;
+  }
   saving.value = true;
   try {
     await updateConsumableStock(stockTarget.value.id, stockForm, auth.token.value);
-    showToast('success', '库存已调整');
+    showToast('success', '库存已更新');
     stockVisible.value = false;
     if (selectedConsumable.value?.id === stockTarget.value.id) {
+      const nextStock = stockForm.changeType === 'ADJUST'
+        ? stockForm.targetStock
+        : stockForm.changeType === 'IN'
+          ? selectedConsumable.value.stockQuantity + stockForm.quantity
+          : selectedConsumable.value.stockQuantity - stockForm.quantity;
       selectedConsumable.value = {
         ...selectedConsumable.value,
-        stockQuantity: stockForm.stockQuantity,
+        stockQuantity: nextStock,
       };
     }
     await loadConsumables(consumableState.value.pageNum);
@@ -346,7 +491,6 @@ async function handleStockSave(): Promise<void> {
   gap: 18px;
 }
 
-.toolbar,
 .row-actions,
 .dialog-actions,
 .pagination-wrap {
@@ -357,19 +501,33 @@ async function handleStockSave(): Promise<void> {
 }
 
 .toolbar {
-  margin-bottom: 16px;
+  margin-bottom: 18px;
+}
+
+.toolbar-top {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
 }
 
 .toolbar-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .toolbar-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 8px;
 }
 
 .pagination-wrap {
@@ -392,30 +550,29 @@ async function handleStockSave(): Promise<void> {
 }
 
 .toolbar-input {
-  width: 220px;
+  width: 240px;
 }
 
 .toolbar-select {
-  width: 160px;
+  width: 150px;
 }
 
-.ghost-btn,
-.primary-btn {
-  border-radius: 999px;
-  padding: 10px 16px;
+.toolbar-title {
+  color: #0f172a;
+  font-size: 28px;
+  line-height: 1.15;
   font-weight: 700;
 }
 
-.ghost-btn {
-  border: 1px solid #dbe4ee;
-  background: #fff;
-  color: #334155;
+.toolbar-actions .ghost-btn {
+  min-width: 86px;
 }
 
-.primary-btn {
-  border: none;
-  background: linear-gradient(135deg, #2563eb, #0891b2);
-  color: #fff;
+.form-note {
+  margin: -4px 0 16px;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .small-btn {
@@ -447,6 +604,98 @@ async function handleStockSave(): Promise<void> {
   width: min(520px, 94vw);
 }
 
+.delete-confirm-dialog {
+  position: relative;
+  width: min(560px, 92vw);
+  display: grid;
+  gap: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.88);
+  background:
+    radial-gradient(circle at 92% 10%, rgba(239, 68, 68, 0.12), transparent 30%),
+    radial-gradient(circle at 0% 0%, rgba(219, 234, 254, 0.7), transparent 34%),
+    linear-gradient(180deg, #ffffff, #f8fafc);
+  box-shadow: 0 34px 90px rgba(15, 23, 42, 0.34);
+}
+
+.delete-confirm-head {
+  display: grid;
+  gap: 10px;
+}
+
+.delete-confirm-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.delete-confirm-head h3 {
+  margin: 0;
+  color: #17233f;
+  font-size: 26px;
+  line-height: 1.25;
+}
+
+.delete-confirm-head p {
+  margin: 0;
+  color: #5b6d8d;
+  line-height: 1.7;
+}
+
+.delete-confirm-head strong {
+  color: #dc2626;
+  font-weight: 800;
+}
+
+.delete-confirm-preview {
+  display: grid;
+  gap: 10px;
+}
+
+.delete-confirm-preview div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(203, 213, 225, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.delete-confirm-preview span {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.delete-confirm-preview strong {
+  color: #17233f;
+  text-align: right;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.delete-confirm-btn {
+  min-width: 120px;
+  justify-content: center;
+  box-shadow: 0 16px 32px rgba(220, 38, 38, 0.26);
+}
+
 .dialog-head {
   display: flex;
   justify-content: space-between;
@@ -472,6 +721,25 @@ async function handleStockSave(): Promise<void> {
 .form-grid {
   display: grid;
   gap: 8px;
+}
+
+.stock-preview-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f8fbff, #f1f5f9);
+  border: 1px solid #dbe4ee;
+}
+
+.stock-preview-card span {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.stock-preview-card strong {
+  color: #0f172a;
+  font-size: 16px;
 }
 
 .detail-grid span {

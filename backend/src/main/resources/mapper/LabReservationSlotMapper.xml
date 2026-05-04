@@ -71,6 +71,21 @@
         </foreach>
     </delete>
 
+    <select id="selectPendingConflictReservationIds" resultType="long">
+        select distinct other.reservation_id
+        from lab_reservation_slot current_slot
+        join lab_reservation_slot other
+          on other.lab_id = current_slot.lab_id
+         and other.reservation_date = current_slot.reservation_date
+         and other.period_id = current_slot.period_id
+         and other.slot_status = 1
+         and other.reservation_id &lt;&gt; current_slot.reservation_id
+        join lab_reservation r on r.id = other.reservation_id
+        where current_slot.reservation_id = #{reservationId}
+          and current_slot.slot_status = 1
+          and r.status = 1
+    </select>
+
     <select id="selectReservedSlots" resultType="com.nlt.domain.vo.schedule.ReservedSlotRow">
         select s.reservation_date as reservationDate,
                s.period_id as periodId,

@@ -18,6 +18,8 @@ public class DeviceRepairEntity {
 
     private String deviceCode;
 
+    private Integer deviceStatus;
+
     private String labName;
 
     private String applicantName;

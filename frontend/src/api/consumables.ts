@@ -16,6 +16,7 @@ export interface ConsumableQuery {
   consumableName?: string;
   consumableCode?: string;
   status?: number;
+  warningOnly?: boolean;
 }
 
 function buildConsumableQuery(query: ConsumableQuery): string {
@@ -27,6 +28,7 @@ function buildConsumableQuery(query: ConsumableQuery): string {
   if (query.consumableName) params.set('consumableName', query.consumableName);
   if (query.consumableCode) params.set('consumableCode', query.consumableCode);
   if (query.status !== undefined && query.status !== null) params.set('status', String(query.status));
+  if (query.warningOnly) params.set('warningOnly', 'true');
   return params.toString();
 }
 

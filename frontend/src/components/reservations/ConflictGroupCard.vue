@@ -30,7 +30,7 @@
             <div class="rank-title">
               <strong>{{ item.applicantName }}</strong>
               <span :class="applicantRoleTagClass(item.applicantRole)">{{ applicantRoleLabel(item.applicantRole) }}</span>
-              <span :class="reservationTypeTagClass(item.reservationType)">{{ reservationTypeLabel(item.reservationType) }}</span>
+              <span :class="reservationTypeTagClass(item.reservationType)">{{ reservationTypeLabel(item.reservationType, item.applicantRole) }}</span>
               <span v-if="item.isRecommended" class="recommend-pill">系统推荐</span>
               <span v-if="item.priorityRank === 1" class="priority-pill">最高优先级</span>
             </div>

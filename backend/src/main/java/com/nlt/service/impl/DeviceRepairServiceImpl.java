@@ -31,10 +31,9 @@ public class DeviceRepairServiceImpl implements DeviceRepairService {
         ensureTeacherOrAdmin();
         int offset = (pageNum - 1) * pageSize;
         Long departmentId = currentUserScopeService.requireCurrentDepartmentId();
-        Long applicantUserId = currentUserScopeService.isAdmin() ? null : currentUserScopeService.currentUserIdOrNull();
         return new PageData<>(
-            deviceRepairMapper.selectPage(offset, pageSize, labId, trimToNull(labType), deviceId, status, departmentId, applicantUserId),
-            deviceRepairMapper.countPage(labId, trimToNull(labType), deviceId, status, departmentId, applicantUserId),
+            deviceRepairMapper.selectPage(offset, pageSize, labId, trimToNull(labType), deviceId, status, departmentId, null),
+            deviceRepairMapper.countPage(labId, trimToNull(labType), deviceId, status, departmentId, null),
             pageNum,
             pageSize
         );
@@ -53,6 +52,9 @@ public class DeviceRepairServiceImpl implements DeviceRepairService {
             throw new BusinessException(404, "设备不存在");
         }
         currentUserScopeService.ensureCurrentDepartmentAccessible(lab.getDepartmentId(), "设备不存在");
+        if (deviceRepairMapper.countActiveByDeviceId(request.getDeviceId(), null) > 0) {
+            throw new BusinessException(400, "当前设备已有未完成报修，请勿重复提交");
+        }
 
         DeviceRepairEntity entity = new DeviceRepairEntity();
         entity.setDeviceId(request.getDeviceId());
@@ -66,6 +68,7 @@ public class DeviceRepairServiceImpl implements DeviceRepairService {
         entity.setUrgencyLevel(urgencyLevel);
         entity.setStatus(1);
         deviceRepairMapper.insert(entity);
+        deviceMapper.updateStatus(request.getDeviceId(), 2);
         return getById(entity.getId());
     }
 
@@ -86,9 +89,6 @@ public class DeviceRepairServiceImpl implements DeviceRepairService {
         if (request.getStatus() == null || request.getStatus() < 1 || request.getStatus() > 4) {
             throw new BusinessException(400, "报修状态不合法");
         }
-        if (request.getDeviceStatus() != null && (request.getDeviceStatus() < 1 || request.getDeviceStatus() > 3)) {
-            throw new BusinessException(400, "设备状态不合法");
-        }
         DeviceRepairEntity entity = getById(id);
         entity.setStatus(request.getStatus());
         entity.setHandlerUserId(currentUserScopeService.currentUserIdOrNull());
@@ -101,28 +101,33 @@ public class DeviceRepairServiceImpl implements DeviceRepairService {
             entity.setHandledAt(null);
         }
         deviceRepairMapper.updateStatus(entity);
-        if (request.getDeviceStatus() != null) {
-            deviceMapper.updateStatus(entity.getDeviceId(), request.getDeviceStatus());
-        }
+        deviceMapper.updateStatus(entity.getDeviceId(), resolveDeviceStatus(entity, request));
         return getById(id);
     }
 
+    private Integer resolveDeviceStatus(DeviceRepairEntity entity, DeviceRepairStatusUpdateRequest request) {
+        long otherActiveCount = deviceRepairMapper.countActiveByDeviceId(entity.getDeviceId(), entity.getId());
+        if (request.getStatus() == 1 || request.getStatus() == 2 || otherActiveCount > 0) {
+            return 2;
+        }
+        if (request.getStatus() == 4) {
+            return 1;
+        }
+        if (request.getDeviceStatus() == null || (request.getDeviceStatus() != 1 && request.getDeviceStatus() != 3)) {
+            throw new BusinessException(400, "完成报修时请明确设备恢复正常或禁用");
+        }
+        return request.getDeviceStatus();
+    }
+
     private void ensureRepairVisible(DeviceRepairEntity entity) {
-        if (currentUserScopeService.isAdmin()) {
-            LabEntity lab = labMapper.selectById(entity.getLabId());
-            if (lab == null || (lab.getDeleted() != null && lab.getDeleted() == 1)) {
-                throw new BusinessException(404, "报修单不存在");
-            }
-            currentUserScopeService.ensureCurrentDepartmentAccessible(lab.getDepartmentId(), "报修单不存在");
-            return;
-        }
-        if (!currentUserScopeService.isTeacher()) {
+        if (!currentUserScopeService.isTeacher() && !currentUserScopeService.isAdmin()) {
             throw new BusinessException(403, "无权查看报修单");
         }
-        Long currentUserId = currentUserScopeService.currentUserIdOrNull();
-        if (currentUserId == null || !currentUserId.equals(entity.getApplicantUserId())) {
-            throw new BusinessException(403, "无权查看报修单");
+        LabEntity lab = labMapper.selectById(entity.getLabId());
+        if (lab == null || (lab.getDeleted() != null && lab.getDeleted() == 1)) {
+            throw new BusinessException(404, "报修单不存在");
         }
+        currentUserScopeService.ensureCurrentDepartmentAccessible(lab.getDepartmentId(), "报修单不存在");
     }
 
     private void ensureTeacherOrAdmin() {

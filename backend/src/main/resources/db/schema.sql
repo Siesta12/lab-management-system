@@ -156,7 +156,6 @@ create table lab_consumable
   lab_id            bigint                             not null comment 'Lab id',
   consumable_name   varchar(100)                       not null comment 'Consumable name',
   consumable_code   varchar(50)                        not null comment 'Consumable code',
-  specification     varchar(100) null comment 'Specification',
   unit              varchar(20)                        not null comment 'Unit',
   stock_quantity    int      default 0                 not null comment 'Stock quantity',
   warning_threshold int      default 0                 not null comment 'Warning threshold',

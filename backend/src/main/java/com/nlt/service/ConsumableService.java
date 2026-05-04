@@ -19,7 +19,7 @@ public interface ConsumableService {
      * @return 分页数据
      */
     PageData<ConsumableEntity> page(int pageNum, int pageSize, Long labId, String labType, String consumableName, String consumableCode,
-        Integer status);
+        Integer status, Boolean warningOnly);
 
     List<ConsumableEntity> availableOptions(Long labId);
 

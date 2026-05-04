@@ -55,7 +55,7 @@
             </select>
             <select v-model="repairFilters.status" class="toolbar-select" @change="loadRepairs(1)">
               <option :value="null">全部状态</option>
-              <option :value="1">待处理</option>
+              <option :value="1">已提交报修</option>
               <option :value="2">处理中</option>
               <option :value="3">已完成</option>
               <option :value="4">已驳回</option>
@@ -115,6 +115,7 @@
             <td>{{ repair.labName || '--' }}</td>
             <td>{{ repair.applicantName || '--' }}</td>
             <td>{{ urgencyText(repair.urgencyLevel) }}</td>
+            <td><span :class="getBadgeClass(deviceStatusText(repair.deviceStatus ?? 1))">{{ deviceStatusText(repair.deviceStatus ?? 1) }}</span></td>
             <td><span :class="getBadgeClass(repairStatusText(repair.status))">{{ repairStatusText(repair.status) }}</span></td>
             <td class="repair-note">{{ repair.issueDescription }}</td>
             <td v-if="isAdmin">
@@ -200,8 +201,44 @@
         <div class="dialog-actions">
           <button v-if="isAdmin" type="button" class="ghost-btn" @click="openDeviceDialog(selectedDevice, 'edit')">编辑信息</button>
           <button v-if="isAdmin" type="button" class="ghost-btn" @click="saveDeviceStatus">保存状态</button>
-          <button v-if="canCreateRepair" type="button" class="primary-btn" @click="openRepairCreate">报修</button>
-          <button v-if="isAdmin" type="button" class="danger-btn" @click="handleDeleteDevice">删除</button>
+          <button v-if="canCreateRepairForSelectedDevice" type="button" class="primary-btn" @click="openRepairCreate">报修</button>
+          <button v-if="isAdmin" type="button" class="danger-btn" @click="openDeleteDeviceConfirm">删除</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="deleteDeviceConfirmVisible && selectedDevice" class="dialog-mask" @click.self="closeDeleteDeviceConfirm">
+      <div class="dialog-card delete-confirm-dialog">
+        <div class="delete-confirm-head">
+          <span class="delete-confirm-badge">删除确认</span>
+          <h3>确认删除当前设备？</h3>
+          <p>
+            删除后将无法恢复，
+            <strong>{{ selectedDevice.deviceName }}</strong>
+            的设备台账数据会被移除。
+          </p>
+        </div>
+
+        <div class="delete-confirm-preview">
+          <div>
+            <span>设备编号</span>
+            <strong>{{ selectedDevice.deviceCode }}</strong>
+          </div>
+          <div>
+            <span>所属实验室</span>
+            <strong>{{ selectedDevice.labName || labLabel(selectedDevice.labId) }}</strong>
+          </div>
+          <div>
+            <span>当前状态</span>
+            <strong>{{ deviceStatusText(selectedDevice.status) }}</strong>
+          </div>
+        </div>
+
+        <div class="delete-confirm-actions">
+          <button type="button" class="ghost-btn" :disabled="deviceSaving" @click="closeDeleteDeviceConfirm">取消</button>
+          <button type="button" class="danger-btn delete-confirm-btn" :disabled="deviceSaving" @click="confirmDeleteDevice">
+            {{ deviceSaving ? '删除中...' : '确认删除' }}
+          </button>
         </div>
       </div>
     </div>
@@ -229,7 +266,13 @@
           </label>
           <label>
             <span>设备编号</span>
-            <input v-model.trim="deviceForm.deviceCode" type="text" />
+            <input
+              :value="deviceDialogMode === 'create' ? '系统自动生成' : selectedDevice?.deviceCode || '--'"
+              type="text"
+              readonly
+              disabled
+              class="readonly-input"
+            />
           </label>
           <label>
             <span>品牌</span>
@@ -241,7 +284,7 @@
           </label>
           <label>
             <span>总数</span>
-            <input v-model.number="deviceForm.quantity" type="number" min="0" />
+            <input v-model.number="deviceForm.quantity" type="number" min="0" @input="syncAvailableQuantityForCreate" />
           </label>
           <label>
             <span>可用数量</span>
@@ -335,6 +378,10 @@
             <strong>{{ repairStatusText(selectedRepair.status) }}</strong>
           </div>
           <div>
+            <span>设备状态</span>
+            <strong>{{ deviceStatusText(selectedRepair.deviceStatus ?? 1) }}</strong>
+          </div>
+          <div>
             <span>报修人</span>
             <strong>{{ selectedRepair.applicantName || '--' }}</strong>
           </div>
@@ -356,8 +403,8 @@
           <label class="status-select-field">
             <span>处理状态</span>
             <div class="status-select-wrap">
-              <select v-model.number="repairProcess.status" class="status-select">
-                <option :value="1">待处理</option>
+              <select v-model.number="repairProcess.status" class="status-select" @change="handleRepairStatusChange">
+                <option :value="1">已提交报修</option>
                 <option :value="2">处理中</option>
                 <option :value="3">已完成</option>
                 <option :value="4">已驳回</option>
@@ -367,13 +414,19 @@
           </label>
           <div class="form-grid repair-process-grid">
             <label>
-              <span>设备状态</span>
-              <select v-model.number="repairProcess.deviceStatus">
-                <option :value="null">不调整</option>
-                <option :value="1">恢复正常</option>
-                <option :value="2">调整为维修中</option>
-                <option :value="3">调整为禁用</option>
-              </select>
+              <span>处理后的设备状态</span>
+              <div class="status-select-wrap">
+                <select v-model.number="repairProcess.deviceStatus" class="status-select" :disabled="repairDeviceStatusLocked">
+                  <option v-if="repairProcess.status === 1 || repairProcess.status === 2" :value="2">维修中（自动保持）</option>
+                  <option v-else-if="repairProcess.status === 4" :value="1">驳回后恢复正常</option>
+                  <template v-else>
+                    <option :value="1">恢复正常</option>
+                    <option :value="3">完成并禁用设备</option>
+                  </template>
+                </select>
+                <span class="status-select-arrow" aria-hidden="true"></span>
+              </div>
+              <small class="field-help">{{ repairDeviceStatusHint }}</small>
             </label>
             <label class="full-width">
               <span>处理结果</span>
@@ -393,7 +446,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import BasePanel from '../components/BasePanel.vue';
 import BaseTable from '../components/BaseTable.vue';
 import { useAuthStore } from '../stores/auth';
@@ -414,18 +468,30 @@ import {
   type DeviceRepairQuery,
 } from '../api/devices';
 import { fetchLabs } from '../api/labs';
-import type { DeviceDto, DeviceRepairDto, DeviceRepairCreatePayload, DeviceSavePayload, LabDto, OptionItem, PageData } from '../types';
+import type {
+  DeviceCreatePayload,
+  DeviceDto,
+  DeviceRepairCreatePayload,
+  DeviceRepairDto,
+  DeviceUpdatePayload,
+  LabDto,
+  OptionItem,
+  PageData,
+} from '../types';
 
 type TabKey = 'inventory' | 'repair';
 type DeviceDialogMode = 'create' | 'edit';
 
 const auth = useAuthStore();
 const { showToast } = useGlobalToast();
+const route = useRoute();
+const router = useRouter();
 
 const currentRole = computed(() => getPrimaryRole(auth.currentUser.value?.roleCodes));
 const isAdmin = computed(() => currentRole.value === 'ADMIN');
 const isTeacher = computed(() => currentRole.value === 'TEACHER');
 const canCreateRepair = computed(() => isAdmin.value || isTeacher.value);
+const canCreateRepairForSelectedDevice = computed(() => canCreateRepair.value && selectedDevice.value?.status === 1);
 const showRepairTab = computed(() => canCreateRepair.value);
 const panelTitle = computed(() => (isAdmin.value ? '设备管理' : '设备查询'));
 
@@ -433,7 +499,11 @@ const activeTab = ref<TabKey>('inventory');
 const message = ref('');
 
 const deviceHeaders = computed(() => ['设备名称', '编号', '实验室', '品牌', '总数', '可用', '状态', '操作']);
-const repairHeaders = computed(() => (isAdmin.value ? ['设备名称', '实验室', '报修人', '紧急', '状态', '问题描述', '操作'] : ['设备名称', '实验室', '报修人', '紧急', '状态', '问题描述']));
+const repairHeaders = computed(() =>
+  isAdmin.value
+    ? ['设备名称', '实验室', '报修人', '紧急', '设备状态', '报修状态', '问题描述', '操作']
+    : ['设备名称', '实验室', '报修人', '紧急', '设备状态', '报修状态', '问题描述'],
+);
 
 const deviceState = ref<PageData<DeviceDto>>({ list: [], total: 0, pageNum: 1, pageSize: 10 });
 const repairState = ref<PageData<DeviceRepairDto>>({ list: [], total: 0, pageNum: 1, pageSize: 10 });
@@ -461,11 +531,11 @@ const repairCreateVisible = ref(false);
 const deviceDetailStatus = ref<number>(1);
 const deviceDialogVisible = ref(false);
 const deviceDialogMode = ref<DeviceDialogMode>('create');
+const deleteDeviceConfirmVisible = ref(false);
 
-const deviceForm = reactive<DeviceSavePayload>({
+const deviceForm = reactive<DeviceCreatePayload & DeviceUpdatePayload>({
   labId: 0,
   deviceName: '',
-  deviceCode: '',
   brand: '',
   modelNo: '',
   quantity: 1,
@@ -502,11 +572,25 @@ const repairTotalPages = computed(() => Math.max(1, Math.ceil(repairState.value.
 const labTypeOptions = computed(() => Array.from(new Set(labCatalog.value.map((lab) => lab.labType).filter(Boolean) as string[])));
 const filteredDeviceLabOptions = computed(() => filteredLabsByType(deviceFilters.labType));
 const filteredRepairLabOptions = computed(() => filteredLabsByType(repairFilters.labType));
+const repairDeviceStatusLocked = computed(() => repairProcess.status !== 3);
+const repairDeviceStatusHint = computed(() => {
+  if (repairProcess.status === 1) return '提交后设备自动保持为维修中，等待管理员处理。';
+  if (repairProcess.status === 2) return '处理中期间设备继续保持维修中。';
+  if (repairProcess.status === 4) return '驳回报修后，设备会自动恢复为正常。';
+  return '完成报修时，请选择设备恢复正常或直接禁用。';
+});
 
 onMounted(async () => {
   await loadLabOptions();
-  await Promise.all([loadDevices(1), showRepairTab.value ? loadRepairs(1) : Promise.resolve()]);
+  await syncRouteTab();
 });
+
+watch(
+  () => route.query.tab,
+  () => {
+    void syncRouteTab();
+  },
+);
 
 function labLabel(labId: number): string {
   return labOptions.value.find((item) => item.value === labId)?.label || '--';
@@ -522,7 +606,7 @@ function repairStatusText(status: number): string {
   if (status === 2) return '处理中';
   if (status === 3) return '已完成';
   if (status === 4) return '已驳回';
-  return '待处理';
+  return '已提交报修';
 }
 
 function urgencyText(level: number): string {
@@ -562,19 +646,39 @@ function handleRepairLabTypeChange(): void {
 function switchTab(tab: TabKey): void {
   if (activeTab.value === tab) {
     if (tab === 'repair') {
-      void loadRepairs(1);
-    } else {
-      void loadDevices(1);
+      void loadRepairs(repairState.value.pageNum);
+      return;
     }
+    void loadDevices(deviceState.value.pageNum);
+    return;
+  }
+  const query: Record<string, string> = { ...(route.query as Record<string, string>) };
+  if (tab === 'repair') {
+    query.tab = 'repair';
+  } else {
+    delete query.tab;
+  }
+  void router.replace({ query });
+}
+
+function parseRouteTab(): TabKey {
+  if (route.query.tab === 'repair' && showRepairTab.value) {
+    return 'repair';
+  }
+  return 'inventory';
+}
+
+async function syncRouteTab(): Promise<void> {
+  const nextTab = parseRouteTab();
+  const tabChanged = activeTab.value !== nextTab;
+  activeTab.value = nextTab;
+
+  if (nextTab === 'repair') {
+    await loadRepairs(tabChanged ? 1 : repairState.value.pageNum);
     return;
   }
 
-  activeTab.value = tab;
-  if (tab === 'repair') {
-    void loadRepairs(1);
-    return;
-  }
-  void loadDevices(1);
+  await loadDevices(tabChanged ? 1 : deviceState.value.pageNum);
 }
 
 async function loadDevices(pageNum = 1): Promise<void> {
@@ -673,7 +777,6 @@ function openDeviceDialog(device?: DeviceDto | null, mode: DeviceDialogMode = 'c
   if (device) {
     deviceForm.labId = device.labId;
     deviceForm.deviceName = device.deviceName;
-    deviceForm.deviceCode = device.deviceCode;
     deviceForm.brand = device.brand || '';
     deviceForm.modelNo = device.modelNo || '';
     deviceForm.quantity = device.quantity;
@@ -684,7 +787,6 @@ function openDeviceDialog(device?: DeviceDto | null, mode: DeviceDialogMode = 'c
   } else {
     deviceForm.labId = labOptions.value[0]?.value || 0;
     deviceForm.deviceName = '';
-    deviceForm.deviceCode = '';
     deviceForm.brand = '';
     deviceForm.modelNo = '';
     deviceForm.quantity = 1;
@@ -700,15 +802,43 @@ function closeDeviceDialog(): void {
   deviceDialogVisible.value = false;
 }
 
+function syncAvailableQuantityForCreate(): void {
+  if (deviceDialogMode.value !== 'create') return;
+  const quantity = Number(deviceForm.quantity ?? 0);
+  deviceForm.availableQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
+}
+
 async function handleSaveDevice(): Promise<void> {
   if (!auth.token.value || !deviceForm.labId) return;
   deviceSaving.value = true;
   try {
     if (deviceDialogMode.value === 'create') {
-      await createDevice(deviceForm, auth.token.value);
-      showToast('success', '设备已创建');
+      const createPayload: DeviceCreatePayload = {
+        labId: deviceForm.labId,
+        deviceName: deviceForm.deviceName,
+        brand: deviceForm.brand,
+        modelNo: deviceForm.modelNo,
+        quantity: deviceForm.quantity,
+        availableQuantity: deviceForm.availableQuantity,
+        status: deviceForm.status,
+        purchaseDate: deviceForm.purchaseDate,
+        remark: deviceForm.remark,
+      };
+      await createDevice(createPayload, auth.token.value);
+      showToast('success', '设备已添加');
     } else if (selectedDevice.value) {
-      await updateDevice(selectedDevice.value.id, deviceForm, auth.token.value);
+      const updatePayload: DeviceUpdatePayload = {
+        labId: deviceForm.labId,
+        deviceName: deviceForm.deviceName,
+        brand: deviceForm.brand,
+        modelNo: deviceForm.modelNo,
+        quantity: deviceForm.quantity,
+        availableQuantity: deviceForm.availableQuantity,
+        status: deviceForm.status,
+        purchaseDate: deviceForm.purchaseDate,
+        remark: deviceForm.remark,
+      };
+      await updateDevice(selectedDevice.value.id, updatePayload, auth.token.value);
       showToast('success', '设备已更新');
     }
     deviceDialogVisible.value = false;
@@ -727,7 +857,7 @@ async function saveDeviceStatus(): Promise<void> {
     await updateDeviceStatus(selectedDevice.value.id, deviceDetailStatus.value, auth.token.value);
     showToast('success', `已更新为${deviceStatusText(deviceDetailStatus.value)}`);
     await loadDevices(deviceState.value.pageNum);
-    selectedDevice.value = await fetchDeviceById(selectedDevice.value.id, auth.token.value);
+    closeDeviceDetail();
   } catch (error) {
     showToast('error', error instanceof Error ? error.message : '保存设备状态失败');
   } finally {
@@ -735,13 +865,23 @@ async function saveDeviceStatus(): Promise<void> {
   }
 }
 
-async function handleDeleteDevice(): Promise<void> {
+function openDeleteDeviceConfirm(): void {
+  if (!selectedDevice.value) return;
+  deleteDeviceConfirmVisible.value = true;
+}
+
+function closeDeleteDeviceConfirm(): void {
+  if (deviceSaving.value) return;
+  deleteDeviceConfirmVisible.value = false;
+}
+
+async function confirmDeleteDevice(): Promise<void> {
   if (!selectedDevice.value || !auth.token.value) return;
-  if (!window.confirm(`确认删除设备“${selectedDevice.value.deviceName}”吗？`)) return;
   deviceSaving.value = true;
   try {
     await deleteDevice(selectedDevice.value.id, auth.token.value);
     showToast('success', '设备已删除');
+    deleteDeviceConfirmVisible.value = false;
     closeDeviceDetail();
     await loadDevices(1);
   } catch (error) {
@@ -773,6 +913,7 @@ function closeRepairCreate(): void {
 }
 
 function closeAllDeviceDialogs(): void {
+  deleteDeviceConfirmVisible.value = false;
   deviceDialogVisible.value = false;
   repairDetailVisible.value = false;
   selectedRepair.value = null;
@@ -817,12 +958,31 @@ function openRepairDetail(repair: DeviceRepairDto): void {
   selectedRepair.value = repair;
   repairProcess.status = repair.status ?? 1;
   repairProcess.handlingResult = repair.handlingResult || '';
-  repairProcess.deviceStatus = repair.status === 3 ? 1 : null;
+  repairProcess.deviceStatus = repair.deviceStatus ?? 2;
+  normalizeRepairProcessDeviceStatus();
   repairDetailVisible.value = true;
 }
 
 function closeRepairDetail(): void {
   repairDetailVisible.value = false;
+}
+
+function handleRepairStatusChange(): void {
+  normalizeRepairProcessDeviceStatus();
+}
+
+function normalizeRepairProcessDeviceStatus(): void {
+  if (repairProcess.status === 1 || repairProcess.status === 2) {
+    repairProcess.deviceStatus = 2;
+    return;
+  }
+  if (repairProcess.status === 4) {
+    repairProcess.deviceStatus = 1;
+    return;
+  }
+  if (repairProcess.deviceStatus !== 1 && repairProcess.deviceStatus !== 3) {
+    repairProcess.deviceStatus = 1;
+  }
 }
 
 async function handleUpdateRepairStatus(): Promise<void> {
@@ -909,9 +1069,10 @@ async function handleUpdateRepairStatus(): Promise<void> {
 }
 
 .toolbar-filters {
-  display: grid;
-  grid-template-columns: minmax(220px, 1.2fr) repeat(3, minmax(160px, 0.8fr)) auto auto;
-  gap: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
   align-items: center;
 }
 
@@ -944,6 +1105,7 @@ async function handleUpdateRepairStatus(): Promise<void> {
 
 .toolbar-input,
 .toolbar-select,
+.readonly-input,
 .form-grid input,
 .form-grid select,
 .form-grid textarea {
@@ -954,19 +1116,27 @@ async function handleUpdateRepairStatus(): Promise<void> {
 }
 
 .toolbar-input,
-.toolbar-select {
+.toolbar-select,
+.readonly-input {
   height: 42px;
   padding: 0 14px;
 }
 
 .toolbar-input {
-  width: 100%;
+  width: 280px;
   min-width: 0;
 }
 
 .toolbar-select {
-  width: 100%;
+  width: 170px;
   min-width: 0;
+}
+
+.readonly-input {
+  width: 100%;
+  opacity: 1;
+  color: #64748b;
+  cursor: not-allowed;
 }
 
 .ghost-btn,
@@ -1117,6 +1287,12 @@ async function handleUpdateRepairStatus(): Promise<void> {
   font-size: 14px;
 }
 
+.field-help {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .detail-grid strong {
   color: #0f172a;
   font-size: 18px;
@@ -1182,12 +1358,109 @@ async function handleUpdateRepairStatus(): Promise<void> {
   pointer-events: none;
 }
 
+.repair-process-grid {
+  grid-template-columns: 1fr;
+  margin-top: 10px;
+}
+
 .dialog-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 12px;
   margin-top: 20px;
+}
+
+.delete-confirm-dialog {
+  position: relative;
+  width: min(560px, 92vw);
+  display: grid;
+  gap: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.88);
+  background:
+    radial-gradient(circle at 92% 10%, rgba(239, 68, 68, 0.12), transparent 30%),
+    radial-gradient(circle at 0% 0%, rgba(219, 234, 254, 0.7), transparent 34%),
+    linear-gradient(180deg, #ffffff, #f8fafc);
+  box-shadow: 0 34px 90px rgba(15, 23, 42, 0.34);
+}
+
+.delete-confirm-head {
+  display: grid;
+  gap: 10px;
+}
+
+.delete-confirm-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.delete-confirm-head h3 {
+  margin: 0;
+  color: #17233f;
+  font-size: 26px;
+  line-height: 1.25;
+}
+
+.delete-confirm-head p {
+  margin: 0;
+  color: #5b6d8d;
+  line-height: 1.7;
+}
+
+.delete-confirm-head strong {
+  color: #dc2626;
+  font-weight: 800;
+}
+
+.delete-confirm-preview {
+  display: grid;
+  gap: 10px;
+}
+
+.delete-confirm-preview div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(203, 213, 225, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.delete-confirm-preview span {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.delete-confirm-preview strong {
+  color: #17233f;
+  text-align: right;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.delete-confirm-btn {
+  min-width: 120px;
+  justify-content: center;
+  box-shadow: 0 16px 32px rgba(220, 38, 38, 0.26);
 }
 
 .info-text {
@@ -1220,7 +1493,13 @@ async function handleUpdateRepairStatus(): Promise<void> {
   }
 
   .toolbar-filters {
-    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
+
+  .toolbar-input,
+  .toolbar-select,
+  .toolbar-filters > .ghost-btn {
+    width: 100%;
   }
 
   .dialog-card {

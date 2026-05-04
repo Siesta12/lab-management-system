@@ -81,16 +81,17 @@ export function fetchTeacherOptions(token: string): Promise<OptionItem[]> {
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => null);
+  if (payload) {
+    const businessCode = Number(payload.code);
+    if (businessCode === 200) {
+      return payload.data as T;
+    }
+    throw new ApiError(Number.isFinite(businessCode) ? businessCode : response.status, payload.message || '请求失败');
+  }
   if (!response.ok) {
-    throw new ApiError(response.status, payload?.message ?? `请求失败：${response.status}`);
+    throw new ApiError(response.status, `请求失败：${response.status}`);
   }
-  if (!payload) {
-    throw new ApiError(response.status, '服务端返回了无效响应');
-  }
-  if (payload.code !== 200) {
-    throw new ApiError(payload.code, payload.message || '请求失败');
-  }
-  return payload.data as T;
+  throw new ApiError(response.status, '服务端返回了无效响应');
 }
 
 export async function importUsers(file: File, token: string): Promise<UserImportResult> {

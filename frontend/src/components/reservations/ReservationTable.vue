@@ -31,7 +31,7 @@
       <td><span :class="applicantRoleTagClass(row.applicantRole)">{{ applicantRoleLabel(row.applicantRole) }}</span></td>
       <td>
         <div class="type-stack">
-          <span :class="reservationTypeTagClass(row.reservationType)">{{ reservationTypeLabel(row.reservationType) }}</span>
+          <span :class="reservationTypeTagClass(row.reservationType)">{{ reservationTypeLabel(row.reservationType, row.applicantRole) }}</span>
           <span class="priority-pill">{{ row.priorityLabel }}</span>
         </div>
       </td>

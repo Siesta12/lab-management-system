@@ -1,5 +1,9 @@
 import type { ApiResponse } from '../types';
 
+type ApiEnvelope<T> = Omit<ApiResponse<T>, 'code'> & {
+  code: number | string;
+};
+
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || '/api';
 
 export function getApiBaseUrl(): string {
@@ -43,26 +47,28 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
     throw new ApiError(0, `无法连接到服务端：${API_BASE_URL}`);
   }
 
-  let body: ApiResponse<T> | null = null;
+  let body: ApiEnvelope<T> | null = null;
   try {
-    body = (await response.json()) as ApiResponse<T>;
+    body = (await response.json()) as ApiEnvelope<T>;
   } catch {
     body = null;
   }
 
+  if (body) {
+    const businessCode = Number(body.code);
+
+    if (Number.isFinite(businessCode) && businessCode >= 200 && businessCode < 300) {
+      return body.data as T;
+    }
+
+    throw new ApiError(Number.isFinite(businessCode) ? businessCode : response.status, body.message || '请求失败');
+  }
+
   if (!response.ok) {
-    throw new ApiError(response.status, body?.message ?? `请求失败：${response.status}`);
+    throw new ApiError(response.status, `请求失败：${response.status}`);
   }
 
-  if (!body) {
-    throw new ApiError(response.status, '服务端返回了无效响应');
-  }
-
-  if (body.code !== 200) {
-    throw new ApiError(body.code, body.message || '请求失败');
-  }
-
-  return body.data;
+  throw new ApiError(response.status, '服务端返回了无效响应');
 }
 
 export function get<T>(path: string, token?: string): Promise<T> {

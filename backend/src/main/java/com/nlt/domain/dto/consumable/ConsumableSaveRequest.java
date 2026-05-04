@@ -14,11 +14,6 @@ public class ConsumableSaveRequest {
     private String consumableName;
 
     @NotBlank
-    private String consumableCode;
-
-    private String specification;
-
-    @NotBlank
     private String unit;
 
     private Integer stockQuantity;

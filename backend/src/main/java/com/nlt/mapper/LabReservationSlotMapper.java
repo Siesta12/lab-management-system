@@ -23,6 +23,8 @@ public interface LabReservationSlotMapper {
 
     int deleteCanceledSlots(@Param("list") List<LabReservationSlotEntity> list);
 
+    List<Long> selectPendingConflictReservationIds(@Param("reservationId") Long reservationId);
+
     List<ReservedSlotRow> selectReservedSlots(@Param("labId") Long labId,
         @Param("startDate") LocalDate startDate,
         @Param("endDate") LocalDate endDate);

@@ -1,8 +1,8 @@
 <template>
   <section class="profile-page">
-    <!-- 顶部用户卡片：把信用分放到视觉中心，其他信息作为辅助层级 -->
+    <!-- 顶部用户卡片：学生展示信用信息，教师和管理员保持简洁资料概览 -->
     <article v-if="profile" class="profile-hero-card">
-      <div class="profile-hero-main">
+      <div class="profile-hero-main" :class="{ compact: !showCreditMetrics }">
         <div class="profile-identity">
           <span class="profile-eyebrow">个人资料</span>
           <h2>{{ profile.realName }}</h2>
@@ -218,7 +218,7 @@ const passwordForm = reactive({
 });
 
 const identityLabel = computed(() => (primaryRole.value === 'STUDENT' ? '学号' : '工号'));
-const showCreditMetrics = computed(() => primaryRole.value !== 'TEACHER');
+const showCreditMetrics = computed(() => primaryRole.value === 'STUDENT');
 const roleLabel = computed(() => {
   if (primaryRole.value === 'STUDENT') return '学生';
   if (primaryRole.value === 'TEACHER') return '教师';
@@ -403,6 +403,10 @@ onMounted(() => {
   grid-template-columns: minmax(220px, 1fr) minmax(220px, 0.9fr) minmax(180px, 0.7fr);
   gap: 18px;
   align-items: stretch;
+}
+
+.profile-hero-main.compact {
+  grid-template-columns: minmax(220px, 1fr);
 }
 
 .profile-identity {

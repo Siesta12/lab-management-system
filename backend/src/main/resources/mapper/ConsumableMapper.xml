@@ -25,6 +25,9 @@
         <if test="status != null">
             and c.status = #{status}
         </if>
+        <if test="warningOnly">
+            and c.stock_quantity &lt;= c.warning_threshold
+        </if>
         order by c.id desc
         limit #{offset}, #{pageSize}
     </select>
@@ -53,6 +56,9 @@
         <if test="status != null">
             and c.status = #{status}
         </if>
+        <if test="warningOnly">
+            and c.stock_quantity &lt;= c.warning_threshold
+        </if>
     </select>
 
     <select id="selectById" resultType="com.nlt.domain.entity.ConsumableEntity">
@@ -67,6 +73,15 @@
         from lab_consumable
         where id = #{id}
             and deleted = 0
+        for update
+    </select>
+
+    <select id="selectLatestConsumableCodeForUpdate" resultType="string">
+        select consumable_code
+        from lab_consumable
+        where consumable_code regexp '^C[0-9]{5}$'
+        order by consumable_code desc
+        limit 1
         for update
     </select>
 
@@ -101,7 +116,6 @@
             lab_id,
             consumable_name,
             consumable_code,
-            specification,
             unit,
             stock_quantity,
             warning_threshold,
@@ -113,7 +127,6 @@
             #{labId},
             #{consumableName},
             #{consumableCode},
-            #{specification},
             #{unit},
             #{stockQuantity},
             #{warningThreshold},
@@ -127,8 +140,6 @@
         update lab_consumable
         set lab_id = #{labId},
                 consumable_name = #{consumableName},
-                consumable_code = #{consumableCode},
-                specification = #{specification},
                 unit = #{unit},
                 stock_quantity = #{stockQuantity},
                 warning_threshold = #{warningThreshold},

@@ -6,10 +6,11 @@ import lombok.Data;
 @Data
 public class ConsumableStockUpdateRequest {
 
-    @NotNull
-    private Integer stockQuantity;
-
     private String changeType;
+
+    private Integer quantity;
+
+    private Integer targetStock;
 
     private String remark;
 

@@ -3,7 +3,8 @@ package com.nlt.controller;
 import com.nlt.common.api.ApiResponse;
 import com.nlt.common.api.PageData;
 import com.nlt.domain.dto.common.StatusUpdateRequest;
-import com.nlt.domain.dto.device.DeviceSaveRequest;
+import com.nlt.domain.dto.device.DeviceCreateRequest;
+import com.nlt.domain.dto.device.DeviceUpdateRequest;
 import com.nlt.domain.entity.DeviceEntity;
 import com.nlt.domain.vo.common.OptionItem;
 import com.nlt.service.DeviceService;
@@ -19,92 +20,48 @@ public class DeviceController {
 
     private final DeviceService deviceService;
 
-    /**
-     * 分页查询设备列表
-     * @param pageNum 页码
-     * @param pageSize 每页大小
-     * @param labId 实验室ID
-     * @param deviceName 设备名称
-     * @param deviceCode 设备编号
-     * @param status 状态
-     * @return 分页数据
-     */
     @GetMapping
-    public ApiResponse<PageData<DeviceEntity>> page(@RequestParam(defaultValue = "1") int pageNum,
+    public ApiResponse<PageData<DeviceEntity>> page(
+        @RequestParam(defaultValue = "1") int pageNum,
         @RequestParam(defaultValue = "10") int pageSize,
         @RequestParam(required = false) Long labId,
         @RequestParam(required = false) String labType,
         @RequestParam(required = false) String deviceName,
         @RequestParam(required = false) String deviceCode,
-        @RequestParam(required = false) Integer status) {
+        @RequestParam(required = false) Integer status
+    ) {
         return ApiResponse.success(deviceService.page(pageNum, pageSize, labId, labType, deviceName, deviceCode, status));
     }
 
-    /**
-     * 创建设备
-     * @param request 请求参数
-     * @return 创建结果
-     */
     @PostMapping
-    public ApiResponse<DeviceEntity> create(@Valid @RequestBody DeviceSaveRequest request) {
+    public ApiResponse<DeviceEntity> create(@Valid @RequestBody DeviceCreateRequest request) {
         return ApiResponse.created(deviceService.create(request));
     }
 
-    /**
-     * 获取设备选项列表
-     * @param labId 实验室ID
-     * @return 选项列表
-     */
     @GetMapping("/options")
     public ApiResponse<List<OptionItem>> options(@RequestParam(required = false) Long labId) {
         return ApiResponse.success(deviceService.options(labId));
     }
 
-    /**
-     * 根据ID查询设备详情
-     * @param id 设备ID
-     * @return 设备详情
-     */
     @GetMapping("/{id}")
     public ApiResponse<DeviceEntity> getById(@PathVariable Long id) {
         return ApiResponse.success(deviceService.getById(id));
     }
 
-    /**
-     * 更新设备信息
-     * @param id 设备ID
-     * @param request 请求参数
-     * @return 更新结果
-     */
     @PutMapping("/{id}")
-    public ApiResponse<DeviceEntity> update(@PathVariable Long id,
-        @Valid @RequestBody DeviceSaveRequest request) {
+    public ApiResponse<DeviceEntity> update(@PathVariable Long id, @Valid @RequestBody DeviceUpdateRequest request) {
         return ApiResponse.success(deviceService.update(id, request));
     }
 
-    /**
-     * 删除设备
-     * @param id 设备ID
-     * @return 删除结果
-     */
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         deviceService.delete(id);
         return ApiResponse.success();
     }
 
-    /**
-     * 更新设备状态
-     * @param id 设备ID
-     * @param request 请求参数
-     * @return 更新结果
-     */
     @PatchMapping("/{id}/status")
-    public ApiResponse<Void> updateStatus(@PathVariable Long id,
-        @Valid @RequestBody StatusUpdateRequest request) {
+    public ApiResponse<Void> updateStatus(@PathVariable Long id, @Valid @RequestBody StatusUpdateRequest request) {
         deviceService.updateStatus(id, request.getStatus());
         return ApiResponse.success();
     }
-
 }
-

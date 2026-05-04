@@ -5,16 +5,13 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
-public class DeviceSaveRequest {
+public class DeviceCreateRequest {
 
     @NotNull
     private Long labId;
 
     @NotBlank
     private String deviceName;
-
-    @NotBlank
-    private String deviceCode;
 
     private String brand;
 
@@ -29,6 +26,4 @@ public class DeviceSaveRequest {
     private String purchaseDate;
 
     private String remark;
-
 }
-

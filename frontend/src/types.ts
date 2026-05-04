@@ -228,7 +228,7 @@ export interface DashboardData {
 export interface ApiResponse<T> {
   code: number;
   message: string;
-  data: T;
+  data: T | null;
 }
 
 export interface PageData<T> {
@@ -436,10 +436,21 @@ export interface DeviceDto {
   remark?: string;
 }
 
-export interface DeviceSavePayload {
+export interface DeviceCreatePayload {
   labId: number;
   deviceName: string;
-  deviceCode: string;
+  brand?: string;
+  modelNo?: string;
+  quantity?: number;
+  availableQuantity?: number;
+  status?: number;
+  purchaseDate?: string;
+  remark?: string;
+}
+
+export interface DeviceUpdatePayload {
+  labId: number;
+  deviceName: string;
   brand?: string;
   modelNo?: string;
   quantity?: number;
@@ -456,6 +467,7 @@ export interface DeviceRepairDto {
   applicantUserId: number;
   deviceName?: string;
   deviceCode?: string;
+  deviceStatus?: number;
   labName?: string;
   applicantName?: string;
   issueDescription: string;
@@ -564,8 +576,6 @@ export interface ConsumableDto {
 export interface ConsumableSavePayload {
   labId: number;
   consumableName: string;
-  consumableCode: string;
-  specification?: string;
   unit: string;
   stockQuantity?: number;
   warningThreshold?: number;
@@ -574,8 +584,9 @@ export interface ConsumableSavePayload {
 }
 
 export interface ConsumableStockUpdatePayload {
-  stockQuantity: number;
-  changeType?: string;
+  changeType?: 'IN' | 'OUT' | 'ADJUST';
+  quantity?: number;
+  targetStock?: number;
   remark?: string;
 }
 

@@ -821,9 +821,29 @@ th {
   font-weight: 600;
 }
 
-.toolbar select {
-  width: 180px;
-  min-width: 180px;
+.toolbar .toolbar-input,
+.toolbar .toolbar-select {
+  border: 1px solid #dbe4ee;
+  border-radius: 16px;
+  background: #fff;
+  color: #0f172a;
+  height: 42px;
+  padding: 0 14px;
+  width: 100%;
+  min-width: 0;
+  box-shadow: none;
+}
+
+.toolbar .toolbar-input {
+  width: 240px;
+}
+
+.toolbar .toolbar-select {
+  width: 150px;
+}
+
+.toolbar .toolbar-input::placeholder {
+  color: #94a3b8;
 }
 
 .info-text,

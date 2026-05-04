@@ -1,9 +1,10 @@
 import type {
+  DeviceCreatePayload,
   DeviceDto,
   DeviceRepairCreatePayload,
   DeviceRepairDto,
   DeviceRepairStatusUpdatePayload,
-  DeviceSavePayload,
+  DeviceUpdatePayload,
   PageData,
 } from '../types';
 import { del, get, patch, post, put } from './http';
@@ -55,11 +56,11 @@ export function fetchDeviceById(id: number, token?: string): Promise<DeviceDto> 
   return get<DeviceDto>(`/devices/${id}`, token);
 }
 
-export function createDevice(payload: DeviceSavePayload, token: string): Promise<DeviceDto> {
+export function createDevice(payload: DeviceCreatePayload, token: string): Promise<DeviceDto> {
   return post<DeviceDto>('/devices', payload, token);
 }
 
-export function updateDevice(id: number, payload: DeviceSavePayload, token: string): Promise<DeviceDto> {
+export function updateDevice(id: number, payload: DeviceUpdatePayload, token: string): Promise<DeviceDto> {
   return put<DeviceDto>(`/devices/${id}`, payload, token);
 }
 

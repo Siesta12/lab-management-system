@@ -23,7 +23,8 @@ public interface ConsumableMapper {
                                       @Param("labId") Long labId, @Param("labType") String labType, @Param("consumableName") String consumableName,
                                       @Param("consumableCode") String consumableCode,
                                       @Param("departmentId") Long departmentId,
-                                      @Param("status") Integer status);
+                                      @Param("status") Integer status,
+                                      @Param("warningOnly") boolean warningOnly);
 
     /**
      * 统计耗材信息数量
@@ -35,7 +36,8 @@ public interface ConsumableMapper {
     long countPage(@Param("labId") Long labId, @Param("labType") String labType, @Param("consumableName") String consumableName,
                    @Param("consumableCode") String consumableCode,
                    @Param("departmentId") Long departmentId,
-                   @Param("status") Integer status);
+                   @Param("status") Integer status,
+                   @Param("warningOnly") boolean warningOnly);
 
     /**
      * 根据ID查询耗材信息
@@ -45,6 +47,8 @@ public interface ConsumableMapper {
     ConsumableEntity selectById(@Param("id") Long id);
 
     ConsumableEntity selectByIdForUpdate(@Param("id") Long id);
+
+    String selectLatestConsumableCodeForUpdate();
 
     List<ConsumableEntity> selectAvailableOptions(@Param("labId") Long labId);
 

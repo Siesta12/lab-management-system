@@ -5,6 +5,7 @@
         select r.*,
                d.device_name as deviceName,
                d.device_code as deviceCode,
+               d.status as deviceStatus,
                l.lab_name as labName,
                u.real_name as applicantName,
                h.real_name as handlerName
@@ -56,10 +57,21 @@
         </if>
     </select>
 
+    <select id="countActiveByDeviceId" resultType="long">
+        select count(*)
+        from lab_device_repair
+        where device_id = #{deviceId}
+          and status in (1, 2)
+        <if test="excludeId != null">
+            and id != #{excludeId}
+        </if>
+    </select>
+
     <select id="selectById" resultType="com.nlt.domain.entity.DeviceRepairEntity">
         select r.*,
                d.device_name as deviceName,
                d.device_code as deviceCode,
+               d.status as deviceStatus,
                l.lab_name as labName,
                u.real_name as applicantName,
                h.real_name as handlerName

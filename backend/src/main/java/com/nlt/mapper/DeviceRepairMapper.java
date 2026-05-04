@@ -17,6 +17,8 @@ public interface DeviceRepairMapper {
                    @Param("status") Integer status, @Param("departmentId") Long departmentId,
                    @Param("applicantUserId") Long applicantUserId);
 
+    long countActiveByDeviceId(@Param("deviceId") Long deviceId, @Param("excludeId") Long excludeId);
+
     DeviceRepairEntity selectById(@Param("id") Long id);
 
     int insert(DeviceRepairEntity entity);

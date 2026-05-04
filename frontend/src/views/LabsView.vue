@@ -206,7 +206,7 @@
                 </div>
               </div>
 
-              <div v-if="isAuthenticated" class="schedule-sidebar" :class="{ blocked: reservationFormLocked }">
+              <div v-if="isAuthenticated" class="schedule-sidebar" :class="{ blocked: scheduleSidebarLocked }">
                 <div class="schedule-forms">
                   <div class="form-card reservation-form-card">
                     <div class="form-card-header" v-if="!isAdmin">
@@ -214,17 +214,26 @@
                       <p>{{ reservationPanelState.detail }}</p>
                     </div>
 
-                    <div v-if="isAdmin" class="form-card-header">
-                      <h6>维护设置</h6>
-                      <p>选择未来三周内的空闲或维护节次，可批量设置维护或取消维护。</p>
-                    </div>
+                      <div v-if="isAdmin" class="form-card-header">
+                        <h6>维护设置</h6>
+                        <p>选择未来三周内的空闲或维护节次。</p>
+                      </div>
 
-                    <p v-if="!selectedKeys.length && !isAdmin" class="info-text compact-tip">
-                      先在课表中选择空闲节次提交预约，或点击不可预约格子获取推荐。
+                      <div v-if="isAdmin && maintenanceSelectionNotice" class="maintenance-selection-notice">
+                        <strong>{{ maintenanceSelectionNotice.title }}</strong>
+                        <span>{{ maintenanceSelectionNotice.detail }}</span>
+                      </div>
+
+                      <p v-if="!selectedKeys.length && !isAdmin" class="info-text compact-tip">
+                        先在课表中选择空闲节次提交预约，或点击不可预约格子获取推荐。
                     </p>
 
-                    <p v-if="!blockedKeys.length && isAdmin" class="info-text compact-tip">
+                    <p v-if="!blockedKeys.length && isAdmin && !maintenanceFormLocked" class="info-text compact-tip">
                       先在课表中点击需要维护的节次，维护中的格子也可再次点击查看并取消。
+                    </p>
+
+                    <p v-if="isAdmin && maintenanceFormLocked" class="info-text compact-tip">
+                      当前选中时段已过，右侧维护设置已锁定，不能填写或提交。
                     </p>
 
                     <fieldset v-if="!isAdmin" class="reservation-fields" :disabled="reservationFormLocked">
@@ -287,15 +296,17 @@
                       </button>
                     </fieldset>
 
-                    <div v-else class="beauty-form">
-                      <label class="field-card field-full">
-                        <span class="field-label">维护原因</span>
-                        <input
-                          v-model="maintenanceForm.reason"
-                          placeholder="例如：设备检修 / 网络维护 / 深度清洁"
-                        />
-                      </label>
-                    </div>
+                    <fieldset v-else class="maintenance-fields" :disabled="maintenanceFormLocked">
+                      <div class="beauty-form">
+                        <label class="field-card field-full">
+                          <span class="field-label">维护原因</span>
+                          <input
+                            v-model="maintenanceForm.reason"
+                            placeholder="例如：设备检修 / 网络维护 / 深度清洁"
+                          />
+                        </label>
+                      </div>
+                    </fieldset>
 
                   <div v-if="!isAdmin" class="recommend-box">
                     <div class="recommend-title">推荐可选节次</div>
@@ -309,15 +320,29 @@
                      </button>
                   </div>
 
-                  <button
-                    v-if="isAdmin"
-                    type="button"
-                    class="primary-btn submit-reservation-btn"
-                    :disabled="!canSubmitMaintenance || savingMaintenance"
-                    @click="handleCreateMaintenance"
-                  >
-                    {{ savingMaintenance ? '正在保存维护...' : '设置为维护' }}
-                  </button>
+                    <div v-if="isAdmin && maintenanceFormLocked" class="submit-reservation-btn disabled-maintenance-box">
+                      不可设置维护
+                    </div>
+
+                    <button
+                      v-else-if="isAdmin && canRestoreMaintenance"
+                      type="button"
+                      class="primary-btn submit-reservation-btn"
+                      :disabled="savingMaintenance"
+                      @click="handleCancelMaintenance"
+                    >
+                      {{ savingMaintenance ? '正在恢复...' : '恢复正常状态' }}
+                    </button>
+
+                    <button
+                      v-else-if="isAdmin"
+                      type="button"
+                      class="primary-btn submit-reservation-btn"
+                      :disabled="!canSubmitMaintenance || savingMaintenance"
+                      @click="handleCreateMaintenance"
+                    >
+                      {{ savingMaintenance ? '正在保存维护...' : '设置为维护' }}
+                    </button>
                  </div>
 
                   <div v-if="conflictPanel.visible" class="form-card conflict-card" :class="conflictPanel.type">
@@ -531,9 +556,10 @@ import { useGlobalToast } from '../composables/useGlobalToast';
 import { fetchConsumables } from '../api/consumables';
 import { fetchDepartmentOptions } from '../api/departments';
 import { fetchDevices } from '../api/devices';
-import {
+  import {
+  cancelLabMaintenance,
   createLabMaintenance,
-  fetchLabById,
+    fetchLabById,
   fetchLabMaintenance,
   fetchLabs,
   fetchLabSchedule,
@@ -756,7 +782,48 @@ const pagePanelTitle = computed(() => {
   }
   return '实验室查询';
 });
-const canSubmitMaintenance = computed(() => isAdmin.value && blockedKeys.value.length > 0 && maintenanceForm.reason.trim().length > 0);
+const maintenanceFormLocked = computed(() =>
+  Boolean(isAdmin.value && focusedKey.value && isPastScheduleSlot(focusedKey.value.date, focusedKey.value.periodId)),
+);
+const focusedScheduleCell = computed(() => {
+  if (!focusedKey.value || !schedule.value) {
+    return null;
+  }
+  const day = schedule.value.days.find((item) => item.date === focusedKey.value?.date);
+  return day ? cell(day, focusedKey.value.periodId) ?? null : null;
+});
+const maintenanceSelectionNotice = computed(() => {
+  if (!isAdmin.value || !focusedScheduleCell.value) {
+    return null;
+  }
+  const status = focusedScheduleCell.value.status;
+  if (status === 'RESERVED') {
+    return {
+      title: '该时段已经有人预约',
+      detail: '设置维护后，系统会自动驳回这条已通过预约，拒绝原因写为“实验室维护”。',
+    };
+  }
+  if (status === 'PENDING' || status === 'PENDING_SELF' || status === 'PENDING_OTHERS') {
+    return {
+      title: '该时段已经有人申请预约',
+      detail: '设置维护后，系统会自动驳回这条待审核预。',
+    };
+  }
+  return null;
+});
+const canRestoreMaintenance = computed(
+  () =>
+      Boolean(
+      isAdmin.value &&
+        !maintenanceFormLocked.value &&
+        focusedScheduleCell.value?.status === 'MAINTENANCE' &&
+        focusedScheduleCell.value?.maintenanceId,
+    ),
+);
+const scheduleSidebarLocked = computed(() => reservationFormLocked.value || maintenanceFormLocked.value);
+const canSubmitMaintenance = computed(
+  () => isAdmin.value && !maintenanceFormLocked.value && !canRestoreMaintenance.value && blockedKeys.value.length > 0,
+);
 const teacherReservationTypeOptions = computed(() => {
   if (isStudent.value) {
     return [{ value: 3, label: '个人预约' }];
@@ -801,6 +868,27 @@ function periodLabel(periodId: number): string {
   return p?.periodName ?? `节次#${periodId}`;
 }
 
+function buildSlotDateTime(dateText: string, timeText?: string): Date | null {
+  if (!dateText || !timeText) {
+    return null;
+  }
+  const [year, month, day] = dateText.split('-').map((item) => Number(item));
+  const [hour, minute] = timeText.split(':').map((item) => Number(item));
+  if ([year, month, day, hour, minute].some((item) => Number.isNaN(item))) {
+    return null;
+  }
+  return new Date(year, month - 1, day, hour, minute, 0, 0);
+}
+
+function isPastScheduleSlot(dateText: string, periodId: number): boolean {
+  const period = schedule.value?.periods?.find((item) => item.id === periodId);
+  const slotStart = buildSlotDateTime(dateText, period?.startTime);
+  if (!slotStart) {
+    return false;
+  }
+  return slotStart.getTime() <= Date.now();
+}
+
 function blockedSlotToastText(status: ScheduleCellDto['status']): string {
   if (status === 'PENDING_SELF') {
     return '你已申请该时段，当前状态为待审核。';
@@ -815,6 +903,10 @@ function blockedSlotToastText(status: ScheduleCellDto['status']): string {
     return '该时段不开放，当前不可填写。';
   }
   return '当前时段不可填写。';
+}
+
+function isAdminMaintenanceSelectableStatus(status?: ScheduleCellDto['status']): boolean {
+  return ['FREE', 'MAINTENANCE', 'RESERVED', 'PENDING', 'PENDING_SELF', 'PENDING_OTHERS'].includes(status || '');
 }
 
 function composeCourseOrProjectName(): string | undefined {
@@ -893,6 +985,7 @@ function downloadCheckinQrCode(): void {
   document.body.appendChild(anchor);
   anchor.click();
   document.body.removeChild(anchor);
+  showToast('success', '二维码下载成功', 2400);
 }
 
 async function loadLabs(pageNum = currentPage.value): Promise<void> {
@@ -1062,7 +1155,7 @@ function cellClass(day: ScheduleDayDto, periodId: number): Record<string, boolea
       (adminBlocked && status !== 'FREE') ||
       (adminFocused && status !== 'FREE') ||
       (!isAdmin.value && (isBlocked(day.date, periodId) || isFocused(day.date, periodId))),
-    clickable: isAdmin.value ? (status === 'FREE' || status === 'MAINTENANCE') : status !== 'CLOSED',
+      clickable: isAdmin.value ? isAdminMaintenanceSelectableStatus(status) : status !== 'CLOSED',
   };
 }
 
@@ -1125,17 +1218,32 @@ async function handleCellClick(day: ScheduleDayDto, periodId: number): Promise<v
   if (!c) return;
 
   if (isAdmin.value) {
-    focusedKey.value = { date: day.date, periodId };
-    if (c.status === 'FREE' || c.status === 'MAINTENANCE') {
+    if (isPastScheduleSlot(day.date, periodId)) {
+      focusedKey.value = { date: day.date, periodId };
       blockedKeys.value = [{ date: day.date, periodId }];
       selectedKeys.value = [];
       recommendations.value = [];
       conflictPanel.visible = false;
-      scheduleMessageTone.value = 'info';
-      scheduleMessage.value = c.status === 'MAINTENANCE'
-        ? '已选中维护中的节次，可在下方取消维护。'
-        : '已选中节次，可填写维护原因后保存。';
-    } else {
+      maintenanceForm.reason = c.status === 'MAINTENANCE' ? (c.maintenanceReason || '') : '';
+      scheduleMessageTone.value = 'warning';
+      scheduleMessage.value = '已选中过去的时间段，但不可设置维护。';
+      return;
+    }
+    focusedKey.value = { date: day.date, periodId };
+      if (isAdminMaintenanceSelectableStatus(c.status)) {
+        blockedKeys.value = [{ date: day.date, periodId }];
+        selectedKeys.value = [];
+        recommendations.value = [];
+        conflictPanel.visible = false;
+        maintenanceForm.reason = c.status === 'MAINTENANCE' ? (c.maintenanceReason || '') : '';
+        scheduleMessageTone.value = 'info';
+        scheduleMessage.value =
+          c.status === 'MAINTENANCE'
+            ? '已选中维护中的节次，可在下方取消维护。'
+            : c.status === 'RESERVED' || c.status === 'PENDING' || c.status === 'PENDING_SELF' || c.status === 'PENDING_OTHERS'
+              ? '已选中存在预约的节次，设置维护后会自动驳回相关预约。'
+              : '已选中节次，可填写维护原因后保存。';
+      } else {
       blockedKeys.value = [];
       selectedKeys.value = [];
       recommendations.value = [];
@@ -1368,7 +1476,20 @@ async function handleSaveLab(): Promise<void> {
 }
 
 async function handleCreateMaintenance(): Promise<void> {
-  if (!selectedLab.value || !auth.token.value || !blockedKeys.value.length || !maintenanceForm.reason.trim()) return;
+  if (!selectedLab.value || !auth.token.value) return;
+  if (!blockedKeys.value.length) {
+    showToast('error', '请先选择维护时间段', 2400);
+    return;
+  }
+  const pastKey = blockedKeys.value.find((item) => isPastScheduleSlot(item.date, item.periodId));
+  if (pastKey) {
+    showToast('error', '已过时间段不可设置维护', 2400);
+    return;
+  }
+  if (!maintenanceForm.reason.trim()) {
+    showToast('error', '请先填写维护原因', 2400);
+    return;
+  }
   savingMaintenance.value = true;
   try {
     const groupedByDate = blockedKeys.value.reduce<Record<string, number[]>>((acc, item) => {
@@ -1391,6 +1512,29 @@ async function handleCreateMaintenance(): Promise<void> {
     showToast('success', '维护设置成功');
   } catch (error) {
     showToast('error', error instanceof Error ? error.message : '维护设置失败');
+  } finally {
+    savingMaintenance.value = false;
+  }
+}
+
+async function handleCancelMaintenance(): Promise<void> {
+  if (!selectedLab.value || !auth.token.value) return;
+  const maintenanceId = focusedScheduleCell.value?.maintenanceId;
+  if (!maintenanceId) {
+    showToast('error', '未找到维护记录');
+    return;
+  }
+  savingMaintenance.value = true;
+  try {
+    await cancelLabMaintenance(selectedLab.value.id, maintenanceId, auth.token.value);
+    maintenances.value = await fetchLabMaintenance(selectedLab.value.id, auth.token.value);
+    maintenanceForm.reason = '';
+    blockedKeys.value = [];
+    focusedKey.value = null;
+    await reloadSchedule();
+    showToast('success', '已恢复正常状态');
+  } catch (error) {
+    showToast('error', error instanceof Error ? error.message : '恢复正常状态失败');
   } finally {
     savingMaintenance.value = false;
   }
@@ -1586,30 +1730,6 @@ onMounted(async () => {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
-}
-
-.toolbar-input,
-.toolbar-select {
-  border: 1px solid #dbe4ee;
-  border-radius: 16px;
-  background: #fff;
-  color: #0f172a;
-  height: 42px;
-  padding: 0 14px;
-  width: 100%;
-  min-width: 0;
-}
-
-.toolbar-input {
-  width: 240px;
-}
-
-.toolbar-select {
-  width: 150px;
-}
-
-.toolbar-input::placeholder {
-  color: #94a3b8;
 }
 
 .toolbar-actions {
@@ -2248,6 +2368,13 @@ onMounted(async () => {
   min-inline-size: 0;
 }
 
+.maintenance-fields {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
 .reservation-fields:disabled .beauty-form,
 .reservation-fields:disabled .submit-reservation-btn {
   opacity: 0.55;
@@ -2255,6 +2382,17 @@ onMounted(async () => {
 
 .reservation-fields:disabled .beauty-form input,
 .reservation-fields:disabled .beauty-form select {
+  background: #f3f4f6;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.maintenance-fields:disabled .beauty-form {
+  opacity: 0.55;
+}
+
+.maintenance-fields:disabled .beauty-form input,
+.maintenance-fields:disabled .beauty-form select {
   background: #f3f4f6;
   color: #94a3b8;
   cursor: not-allowed;
@@ -2418,6 +2556,26 @@ onMounted(async () => {
   font-size: 14px;
 }
 
+.maintenance-selection-notice {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(245, 158, 11, 0.26);
+  background: linear-gradient(180deg, #fff8e6 0%, #fffdf7 100%);
+}
+
+.maintenance-selection-notice strong {
+  color: #9a6700;
+  font-size: 15px;
+}
+
+.maintenance-selection-notice span {
+  color: #92400e;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
 .conflict-chip {
   display: inline-flex;
   align-items: center;
@@ -2451,6 +2609,17 @@ onMounted(async () => {
   border-radius: 999px;
   font-size: 20px;
   font-weight: 600;
+}
+
+.disabled-maintenance-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, rgba(226, 232, 240, 0.92), rgba(203, 213, 225, 0.96));
+  color: #475569;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 @media (max-width: 980px) {

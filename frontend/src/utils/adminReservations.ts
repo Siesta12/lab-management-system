@@ -61,6 +61,8 @@ const TYPE_PRIORITY: Record<ReservationDecisionType, number> = {
   personal: 3,
 };
 
+const TEACHER_ROLE_ID = 2;
+
 export function getDecisionType(reservationType?: number): ReservationDecisionType {
   if (reservationType === 1) {
     return 'course';
@@ -71,13 +73,17 @@ export function getDecisionType(reservationType?: number): ReservationDecisionTy
   return 'personal';
 }
 
-export function getApplicantRole(reservationType?: number): ApplicantRole {
+export function getApplicantRole(reservationType?: number, user?: UserVO): ApplicantRole {
+  if (user?.roleIds?.includes(TEACHER_ROLE_ID)) {
+    return 'teacher';
+  }
   return reservationType === 3 ? 'student' : 'teacher';
 }
 
-export function reservationTypeLabel(type: ReservationDecisionType): string {
+export function reservationTypeLabel(type: ReservationDecisionType, role?: ApplicantRole): string {
   if (type === 'course') return '课程实验';
   if (type === 'research') return '教师科研';
+  if (role === 'teacher') return '教师个人';
   return '学生个人';
 }
 
@@ -117,6 +123,10 @@ export function priorityLabel(type: ReservationDecisionType): string {
   return '学生队列';
 }
 
+function personalRolePriority(role: ApplicantRole): number {
+  return role === 'teacher' ? 0 : 1;
+}
+
 function toTimestamp(value?: string): number {
   if (!value) return Number.MAX_SAFE_INTEGER;
   const time = new Date(value).getTime();
@@ -130,6 +140,19 @@ function compareReservations(left: ConflictRankedReservation, right: ConflictRan
   }
 
   if (left.reservationType === 'personal' && right.reservationType === 'personal') {
+    const roleCompare = personalRolePriority(left.applicantRole) - personalRolePriority(right.applicantRole);
+    if (roleCompare !== 0) {
+      return roleCompare;
+    }
+
+    if (left.applicantRole === 'teacher' || right.applicantRole === 'teacher') {
+      const teacherSubmitCompare = toTimestamp(left.submitTime) - toTimestamp(right.submitTime);
+      if (teacherSubmitCompare !== 0) {
+        return teacherSubmitCompare;
+      }
+      return left.id - right.id;
+    }
+
     const creditCompare = (right.creditScore ?? -1) - (left.creditScore ?? -1);
     if (creditCompare !== 0) {
       return creditCompare;
@@ -151,8 +174,11 @@ function buildRankReason(item: ConflictRankedReservation, sorted: ConflictRanked
   if (item.reservationType === 'research') {
     return '教师科研预约，优先级仅次于课程实验';
   }
+  if (item.applicantRole === 'teacher') {
+    return '教师个人预约，优先级高于学生个人预约';
+  }
 
-  const studentQueue = sorted.filter((entry) => entry.reservationType === 'personal');
+  const studentQueue = sorted.filter((entry) => entry.reservationType === 'personal' && entry.applicantRole === 'student');
   const queueIndex = studentQueue.findIndex((entry) => entry.id === item.id) + 1;
   const sameCreditBefore = studentQueue
     .slice(0, queueIndex - 1)
@@ -183,8 +209,8 @@ export function buildConflictGroups(
     const reservations = sortConflictReservations(
       group.reservations.map((item) => {
         const reservationType = getDecisionType(item.reservationType);
-        const applicantRole = getApplicantRole(item.reservationType);
         const user = userMap.get(item.applicantUserId);
+        const applicantRole = getApplicantRole(item.reservationType, user);
         return {
           id: item.reservationId,
           reservationNo: item.reservationNo,
@@ -234,8 +260,8 @@ export function buildReservationRows(
 
   return reservations.map((item) => {
     const reservationType = getDecisionType(item.reservationType);
-    const applicantRole = getApplicantRole(item.reservationType);
     const user = userMap.get(item.applicantUserId);
+    const applicantRole = getApplicantRole(item.reservationType, user);
     const conflictEntry = conflictMap.get(item.id);
     const firstSlot = item.slots?.[0];
     const timeDetail = (item.slots ?? [])
@@ -258,10 +284,10 @@ export function buildReservationRows(
       status: item.status,
       hasConflict: Boolean(conflictEntry),
       isRecommended: Boolean(conflictEntry?.isRecommended),
-      priorityLabel: priorityLabel(reservationType),
+      priorityLabel: applicantRole === 'teacher' && reservationType === 'personal' ? '教师个人优先' : priorityLabel(reservationType),
       rankReason: conflictEntry
         ? conflictEntry.rankReason
-        : `${priorityLabel(reservationType)}，当前无同组冲突`,
+        : `${applicantRole === 'teacher' && reservationType === 'personal' ? '教师个人优先' : priorityLabel(reservationType)}，当前无同组冲突`,
       usagePurpose: item.usagePurpose,
       courseOrProjectName: item.courseOrProjectName,
     };

@@ -38,8 +38,9 @@ public class ConsumableController {
         @RequestParam(required = false) String labType,
         @RequestParam(required = false) String consumableName,
         @RequestParam(required = false) String consumableCode,
-        @RequestParam(required = false) Integer status) {
-        return ApiResponse.success(consumableService.page(pageNum, pageSize, labId, labType, consumableName, consumableCode, status));
+        @RequestParam(required = false) Integer status,
+        @RequestParam(required = false) Boolean warningOnly) {
+        return ApiResponse.success(consumableService.page(pageNum, pageSize, labId, labType, consumableName, consumableCode, status, warningOnly));
     }
 
     @GetMapping("/options")
@@ -108,7 +109,7 @@ public class ConsumableController {
      */
     @PutMapping("/{id}")
     public ApiResponse<ConsumableEntity> update(@PathVariable Long id,
-        @RequestBody ConsumableSaveRequest request) {
+        @Valid @RequestBody ConsumableSaveRequest request) {
         return ApiResponse.success(consumableService.update(id, request));
     }
 

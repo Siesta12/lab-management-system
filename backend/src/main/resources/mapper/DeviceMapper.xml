@@ -1,8 +1,36 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.nlt.mapper.DeviceMapper">
+    <sql id="deviceStatusExpr">
+        case
+            when d.status = 3 then 3
+            when exists (
+                select 1
+                from lab_device_repair r
+                where r.device_id = d.id
+                  and r.status in (1, 2)
+            ) then 2
+            else d.status
+        end
+    </sql>
+
     <select id="selectPage" resultType="com.nlt.domain.entity.DeviceEntity">
-        select d.*, l.lab_name as labName, l.department_id as departmentId
+        select d.id,
+               d.lab_id as labId,
+               l.department_id as departmentId,
+               l.lab_name as labName,
+               d.device_name as deviceName,
+               d.device_code as deviceCode,
+               d.brand,
+               d.model_no as modelNo,
+               d.quantity,
+               d.available_quantity as availableQuantity,
+               <include refid="deviceStatusExpr"/> as status,
+               d.purchase_date as purchaseDate,
+               d.remark,
+               d.deleted,
+               d.created_at as createdAt,
+               d.updated_at as updatedAt
         from lab_device d
         join lab l on l.id = d.lab_id
         where d.deleted = 0
@@ -27,7 +55,7 @@
             )
         </if>
         <if test="status != null">
-            and d.status = #{status}
+            and <include refid="deviceStatusExpr"/> = #{status}
         </if>
         <if test="departmentId != null">
             and l.department_id = #{departmentId}
@@ -62,7 +90,7 @@
             )
         </if>
         <if test="status != null">
-            and d.status = #{status}
+            and <include refid="deviceStatusExpr"/> = #{status}
         </if>
         <if test="departmentId != null">
             and l.department_id = #{departmentId}
@@ -70,16 +98,46 @@
     </select>
 
     <select id="selectById" resultType="com.nlt.domain.entity.DeviceEntity">
-        select d.*, l.lab_name as labName, l.department_id as departmentId
+        select d.id,
+               d.lab_id as labId,
+               l.department_id as departmentId,
+               l.lab_name as labName,
+               d.device_name as deviceName,
+               d.device_code as deviceCode,
+               d.brand,
+               d.model_no as modelNo,
+               d.quantity,
+               d.available_quantity as availableQuantity,
+               <include refid="deviceStatusExpr"/> as status,
+               d.purchase_date as purchaseDate,
+               d.remark,
+               d.deleted,
+               d.created_at as createdAt,
+               d.updated_at as updatedAt
         from lab_device d
         join lab l on l.id = d.lab_id
         where d.id = #{id}
-            and d.deleted = 0
-            and l.deleted = 0
+          and d.deleted = 0
+          and l.deleted = 0
     </select>
 
     <select id="selectOptions" resultType="com.nlt.domain.entity.DeviceEntity">
-        select d.*, l.lab_name as labName, l.department_id as departmentId
+        select d.id,
+               d.lab_id as labId,
+               l.department_id as departmentId,
+               l.lab_name as labName,
+               d.device_name as deviceName,
+               d.device_code as deviceCode,
+               d.brand,
+               d.model_no as modelNo,
+               d.quantity,
+               d.available_quantity as availableQuantity,
+               <include refid="deviceStatusExpr"/> as status,
+               d.purchase_date as purchaseDate,
+               d.remark,
+               d.deleted,
+               d.created_at as createdAt,
+               d.updated_at as updatedAt
         from lab_device d
         join lab l on l.id = d.lab_id
         where d.deleted = 0
@@ -94,12 +152,27 @@
     </select>
 
     <select id="selectWarningList" resultType="com.nlt.domain.entity.DeviceEntity">
-        select d.*, l.lab_name as labName, l.department_id as departmentId
+        select d.id,
+               d.lab_id as labId,
+               l.department_id as departmentId,
+               l.lab_name as labName,
+               d.device_name as deviceName,
+               d.device_code as deviceCode,
+               d.brand,
+               d.model_no as modelNo,
+               d.quantity,
+               d.available_quantity as availableQuantity,
+               <include refid="deviceStatusExpr"/> as status,
+               d.purchase_date as purchaseDate,
+               d.remark,
+               d.deleted,
+               d.created_at as createdAt,
+               d.updated_at as updatedAt
         from lab_device d
         join lab l on l.id = d.lab_id
         where d.deleted = 0
           and l.deleted = 0
-          and d.status != 1
+          and <include refid="deviceStatusExpr"/> != 1
         <if test="departmentId != null">
             and l.department_id = #{departmentId}
         </if>
@@ -107,9 +180,9 @@
     </select>
 
     <insert id="insert"
-                    parameterType="com.nlt.domain.entity.DeviceEntity"
-                    useGeneratedKeys="true"
-                    keyProperty="id">
+            parameterType="com.nlt.domain.entity.DeviceEntity"
+            useGeneratedKeys="true"
+            keyProperty="id">
         insert into lab_device(
             lab_id,
             device_name,
@@ -138,33 +211,40 @@
         )
     </insert>
 
+    <select id="countByDeviceCode" resultType="long">
+        select count(*)
+        from lab_device
+        where device_code = #{deviceCode}
+          and deleted = 0
+    </select>
+
     <update id="update" parameterType="com.nlt.domain.entity.DeviceEntity">
         update lab_device
         set lab_id = #{labId},
-                device_name = #{deviceName},
-                device_code = #{deviceCode},
-                brand = #{brand},
-                model_no = #{modelNo},
-                quantity = #{quantity},
-                available_quantity = #{availableQuantity},
-                status = #{status},
-                purchase_date = #{purchaseDate},
-                remark = #{remark}
+            device_name = #{deviceName},
+            device_code = #{deviceCode},
+            brand = #{brand},
+            model_no = #{modelNo},
+            quantity = #{quantity},
+            available_quantity = #{availableQuantity},
+            status = #{status},
+            purchase_date = #{purchaseDate},
+            remark = #{remark}
         where id = #{id}
-            and deleted = 0
+          and deleted = 0
     </update>
 
     <update id="updateStatus">
         update lab_device
         set status = #{status}
         where id = #{id}
-            and deleted = 0
+          and deleted = 0
     </update>
 
     <update id="softDelete">
         update lab_device
         set deleted = 1
         where id = #{id}
-            and deleted = 0
+          and deleted = 0
     </update>
 </mapper>
